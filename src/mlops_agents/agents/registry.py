@@ -1,0 +1,29 @@
+"""Agent registry — lazy-builds agents on first access to avoid import-time LLM calls."""
+
+from functools import lru_cache
+from typing import Any
+
+
+@lru_cache(maxsize=None)
+def get_agent(name: str) -> Any:
+    """Return a built agent by name. Agents are cached after first build.
+
+    Args:
+        name: One of 'data_validator', 'trainer', 'evaluator', 'deployer'.
+
+    Returns:
+        A compiled create_react_agent graph.
+    """
+    if name == "data_validator":
+        from mlops_agents.agents.data_agent import build_data_agent
+        return build_data_agent()
+    if name == "trainer":
+        from mlops_agents.agents.training_agent import build_training_agent
+        return build_training_agent()
+    if name == "evaluator":
+        from mlops_agents.agents.evaluation_agent import build_evaluation_agent
+        return build_evaluation_agent()
+    if name == "deployer":
+        from mlops_agents.agents.deployment_agent import build_deployment_agent
+        return build_deployment_agent()
+    raise ValueError(f"Unknown agent: '{name}'. Valid names: data_validator, trainer, evaluator, deployer")

@@ -1,0 +1,49 @@
+# UV / Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.so
+
+# Environment — NEVER commit real credentials
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tools
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# MLflow local artifacts
+mlruns/
+mlartifacts/
+mlflow.db
+checkpoints.db
+evidently_workspace/
+
+# Claude Code — local overrides only, not shared config
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Data — large raw files
+data/raw/
+*.parquet
+*.pkl
+*.joblib
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db

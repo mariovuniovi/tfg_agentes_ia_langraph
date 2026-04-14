@@ -1,0 +1,63 @@
+services:
+  # ===========================================================================
+  # MLflow Tracking Server (SQLite backend — simple for thesis)
+  # Access at: http://localhost:5000
+  # ===========================================================================
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.18.0
+    container_name: mlops-mlflow
+    restart: unless-stopped
+    command: >
+      mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri sqlite:///mlflow/mlflow.db
+        --artifacts-destination /mlflow/artifacts
+        --serve-artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    ports:
+      - "5000:5000"
+    networks:
+      - mlops-net
+
+  # ===========================================================================
+  # Streamlit Dashboard + LangGraph Agents
+  # Access at: http://localhost:8501
+  # ===========================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mlops-app
+    restart: unless-stopped
+    depends_on:
+      - mlflow
+    env_file:
+      - .env
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - mlops-net
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./dashboard
+          target: /app/dashboard
+        - action: rebuild
+          path: ./pyproject.toml
+
+volumes:
+  mlflow_data:
+
+networks:
+  mlops-net:
+    driver: bridge

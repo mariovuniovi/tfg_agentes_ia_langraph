@@ -1,0 +1,7 @@
+{
+  "dependencies": ["./"],
+  "graphs": {
+    "mlops_supervisor": "./src/mlops_agents/graphs/mlops_graph.py:graph"
+  },
+  "env": "./.env"
+}

@@ -1,0 +1,5 @@
+{
+  "description": "Expected schema for the MLOps pipeline input dataset",
+  "required_columns": ["target"],
+  "notes": "All columns except 'target' are treated as numeric features. The 'target' column must contain class labels."
+}
