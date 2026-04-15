@@ -47,3 +47,9 @@ data/raw/
 # OS
 .DS_Store
 Thumbs.db
+
+# folder
+.claude/
+
+# files
+CLAUDE.md
