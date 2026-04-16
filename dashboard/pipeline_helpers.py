@@ -3,6 +3,9 @@
 No Streamlit imports — these are extracted for testability.
 """
 
+from pathlib import Path
+
+import pandas as pd
 from langchain_core.messages import HumanMessage
 
 
@@ -53,4 +56,35 @@ def build_initial_state(dataset_path: str) -> dict:
         "deployment_status": "",
         "error_message": "",
         "retry_count": 0,
+    }
+
+
+def extract_panel_data(state: dict) -> dict:
+    """Extract displayable panel data from a raw LangGraph state dict.
+
+    Returns a dict with keys:
+      validation_report  — dict from check_data_quality tool output
+      training_metrics   — dict with model_type, train_accuracy, val_accuracy
+      evaluation_report  — dict with candidate_metrics, baseline_metrics
+      dataset_preview    — list of row dicts (first 10 rows), loaded once after validation
+    All values are empty ({} / []) when the corresponding stage has not yet completed.
+    """
+    validation_report: dict = state.get("validation_report") or {}
+    training_metrics: dict = state.get("training_metrics") or {}
+    evaluation_report: dict = state.get("evaluation_report") or {}
+
+    dataset_preview: list = []
+    if validation_report:
+        dataset_path = state.get("dataset_path", "")
+        if dataset_path and Path(dataset_path).exists():
+            try:
+                dataset_preview = pd.read_csv(dataset_path).head(10).to_dict("records")
+            except Exception:
+                dataset_preview = []
+
+    return {
+        "validation_report": validation_report,
+        "training_metrics": training_metrics,
+        "evaluation_report": evaluation_report,
+        "dataset_preview": dataset_preview,
     }
