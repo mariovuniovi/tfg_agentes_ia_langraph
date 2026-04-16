@@ -3,13 +3,12 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-
 
 # ---------------------------------------------------------------------------
 # _extract_tool_json
 # ---------------------------------------------------------------------------
+
 
 def test_extract_tool_json_finds_matching_message():
     from mlops_agents.graphs.mlops_graph import _extract_tool_json
@@ -77,6 +76,7 @@ def test_extract_tool_json_skips_non_tool_messages():
 # data_validator_node
 # ---------------------------------------------------------------------------
 
+
 def _make_state() -> dict:
     return {
         "messages": [HumanMessage(content="Run pipeline on iris.csv")],
@@ -100,14 +100,16 @@ def _make_state() -> dict:
 def test_data_validator_node_populates_validation_report():
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
-    quality_json = json.dumps({
-        "passed": True,
-        "row_count": 150,
-        "column_count": 5,
-        "missing_values_total": 0,
-        "max_missing_pct": 0.0,
-        "duplicate_rows": 0,
-    })
+    quality_json = json.dumps(
+        {
+            "passed": True,
+            "row_count": 150,
+            "column_count": 5,
+            "missing_values_total": 0,
+            "max_missing_pct": 0.0,
+            "duplicate_rows": 0,
+        }
+    )
     mock_result = {
         "messages": [
             ToolMessage(content=quality_json, tool_call_id="1", name="check_data_quality"),
@@ -146,17 +148,20 @@ def test_data_validator_node_passed_false_when_no_tool_output():
 # trainer_node
 # ---------------------------------------------------------------------------
 
+
 def test_trainer_node_populates_training_metrics():
     from mlops_agents.graphs.mlops_graph import trainer_node
 
-    train_json = json.dumps({
-        "model_type": "random_forest",
-        "model_path": "./models/random_forest_model.pkl",
-        "hyperparameters": {"n_estimators": 100},
-        "train_accuracy": 0.98,
-        "val_accuracy": 0.95,
-        "classification_report": {},
-    })
+    train_json = json.dumps(
+        {
+            "model_type": "random_forest",
+            "model_path": "./models/random_forest_model.pkl",
+            "hyperparameters": {"n_estimators": 100},
+            "train_accuracy": 0.98,
+            "val_accuracy": 0.95,
+            "classification_report": {},
+        }
+    )
     mlflow_json = json.dumps({"run_id": "abc123", "model_uri": "runs:/abc123/model"})
     mock_result = {
         "messages": [
@@ -183,13 +188,26 @@ def test_trainer_node_populates_training_metrics():
 # evaluator_node
 # ---------------------------------------------------------------------------
 
+
 def test_evaluator_node_populates_evaluation_report():
     from mlops_agents.graphs.mlops_graph import evaluator_node
 
-    runs_json = json.dumps([
-        {"run_id": "run1", "metrics": {"accuracy": 0.97, "f1_score": 0.96}, "params": {}, "model_uri": "runs:/run1/model"},
-        {"run_id": "run0", "metrics": {"accuracy": 0.93, "f1_score": 0.92}, "params": {}, "model_uri": "runs:/run0/model"},
-    ])
+    runs_json = json.dumps(
+        [
+            {
+                "run_id": "run1",
+                "metrics": {"accuracy": 0.97, "f1_score": 0.96},
+                "params": {},
+                "model_uri": "runs:/run1/model",
+            },
+            {
+                "run_id": "run0",
+                "metrics": {"accuracy": 0.93, "f1_score": 0.92},
+                "params": {},
+                "model_uri": "runs:/run0/model",
+            },
+        ]
+    )
     mock_result = {
         "messages": [
             ToolMessage(content=runs_json, tool_call_id="1", name="get_best_run"),
