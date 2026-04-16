@@ -26,8 +26,11 @@ def event_to_log_line(event: dict) -> str | None:
             return "🏁 `[supervisor]` → **FINISH**"
         if next_agent:
             return f"🔀 `[supervisor]` → **{next_agent}**"
+        # Supervisor emitted a partial update without a routing decision — skip silently
         return None
 
+    if not event:
+        return None
     node_name = next(iter(event))
     return f"✅ `[{node_name}]` completed"
 

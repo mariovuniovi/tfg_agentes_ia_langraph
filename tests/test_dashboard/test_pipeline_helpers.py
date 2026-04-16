@@ -1,5 +1,7 @@
 """Unit tests for Pipeline page helper functions."""
 
+from langchain_core.messages import HumanMessage
+
 from dashboard.pipeline_helpers import build_initial_state, event_to_log_line
 
 
@@ -32,7 +34,6 @@ def test_build_initial_state_sets_dataset_path():
 
 
 def test_build_initial_state_has_human_message():
-    from langchain_core.messages import HumanMessage
     state = build_initial_state("./data/samples/iris.csv")
     assert len(state["messages"]) == 1
     assert isinstance(state["messages"][0], HumanMessage)
@@ -48,3 +49,12 @@ def test_build_initial_state_validation_false():
     state = build_initial_state("./data/samples/iris.csv")
     assert state["validation_passed"] is False
     assert state["evaluation_passed"] is False
+
+
+def test_event_to_log_line_empty_event_returns_none():
+    assert event_to_log_line({}) is None
+
+
+def test_event_to_log_line_worker_node_deployer():
+    event = {"deployer": {"messages": []}}
+    assert event_to_log_line(event) == "✅ `[deployer]` completed"
