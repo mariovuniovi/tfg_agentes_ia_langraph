@@ -1,8 +1,9 @@
 """Unit tests for Pipeline page helper functions."""
 
+import pandas as pd
 from langchain_core.messages import HumanMessage
 
-from dashboard.pipeline_helpers import build_initial_state, event_to_log_line
+from dashboard.pipeline_helpers import build_initial_state, event_to_log_line, extract_panel_data
 
 
 def test_event_to_log_line_supervisor_routes_to_agent():
@@ -60,10 +61,6 @@ def test_event_to_log_line_worker_node_deployer():
     assert event_to_log_line(event) == "✅ `[deployer]` completed"
 
 
-import pandas as pd
-from dashboard.pipeline_helpers import extract_panel_data
-
-
 def test_extract_panel_data_empty_state_returns_all_empty():
     result = extract_panel_data({})
     assert result["validation_report"] == {}
@@ -109,9 +106,11 @@ def test_extract_panel_data_loads_preview_when_valid(tmp_path):
     csv_path = tmp_path / "sample.csv"
     df = pd.DataFrame({"a": range(20), "b": range(20), "target": range(20)})
     df.to_csv(csv_path, index=False)
-    result = extract_panel_data({
-        "validation_report": {"passed": True},
-        "dataset_path": str(csv_path),
-    })
+    result = extract_panel_data(
+        {
+            "validation_report": {"passed": True},
+            "dataset_path": str(csv_path),
+        }
+    )
     assert len(result["dataset_preview"]) == 10
     assert result["dataset_preview"][0]["a"] == 0
