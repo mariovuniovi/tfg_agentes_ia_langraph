@@ -205,8 +205,10 @@ if st.session_state["phase"] == "idle":
                 if line:
                     _log(line)
                     _render_log(log_placeholder)
-                _update_panel_data(config)
-                _render_tabs(right_placeholder)
+                node = next(iter(event), None)
+                if node in ("data_validator", "trainer", "evaluator"):
+                    _update_panel_data(config)
+                    _render_tabs(right_placeholder)
 
         if interrupt_detected:
             _render_log(log_placeholder)

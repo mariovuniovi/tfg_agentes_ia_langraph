@@ -12,13 +12,11 @@ Run with:
 """
 
 import json
-import operator
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.graph import END, START, StateGraph
-from langgraph.managed.is_last_step import RemainingSteps
+from langgraph.graph import START, StateGraph
 from langgraph.types import Command, interrupt
 
 from mlops_agents.agents.registry import get_agent
@@ -49,21 +47,6 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
             except (json.JSONDecodeError, TypeError):
                 return {}
     return {}
-
-
-def _wrap_agent(agent_name: str, state: AgentState) -> Command[Literal["supervisor"]]:
-    """Generic wrapper: invoke a react agent and route back to supervisor."""
-    agent = get_agent(agent_name)
-    result = agent.invoke({"messages": list(state["messages"])})
-    final_message = result["messages"][-1].content
-
-    logger.info(f"[{agent_name}] completed — routing back to supervisor")
-    return Command(
-        update={
-            "messages": [HumanMessage(content=final_message, name=agent_name)],
-        },
-        goto="supervisor",
-    )
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
