@@ -13,6 +13,8 @@ import streamlit as st
 from langgraph.types import Command
 
 from dashboard.pipeline_helpers import build_initial_state, event_to_log_line
+from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
+from mlops_agents.graphs.mlops_graph import graph
 
 st.set_page_config(page_title="Pipeline", layout="wide")
 st.title("🤖 MLOps Pipeline")
@@ -44,10 +46,7 @@ def _render_log(placeholder) -> None:
 
 def _resume_pipeline(resume: dict) -> None:
     """Resume the paused graph with the operator decision and stream remaining events."""
-    from mlops_agents.graphs.mlops_graph import graph
-
     config = st.session_state["pipeline_config"]
-    st.subheader("Pipeline Log")
     log_placeholder = st.empty()
     _render_log(log_placeholder)
 
@@ -72,7 +71,8 @@ def _resume_pipeline(resume: dict) -> None:
 # ── Phase: idle ───────────────────────────────────────────────────────────────
 
 if st.session_state["phase"] == "idle":
-    data_dir = Path("./data/samples")
+    from mlops_agents.config.settings import settings
+    data_dir = Path(settings.data_dir)
     csvs = sorted(data_dir.glob("*.csv")) if data_dir.exists() else []
     options = [str(f) for f in csvs] or ["./data/samples/iris.csv"]
 
@@ -87,9 +87,6 @@ if st.session_state["phase"] == "idle":
         run_button = st.button("▶ Run Pipeline", type="primary", use_container_width=True)
 
     if run_button:
-        from mlops_agents.graphs.mlops_graph import graph
-        from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
-
         thread_id = f"streamlit-{int(time.time())}"
         config = {
             "configurable": {"thread_id": thread_id},
@@ -100,21 +97,25 @@ if st.session_state["phase"] == "idle":
         st.subheader("Pipeline Log")
         log_placeholder = st.empty()
 
+        interrupt_detected = False
         for event in graph.stream(build_initial_state(dataset_path), config=config):
             if "__interrupt__" in event:
                 st.session_state["interrupt_value"] = event["__interrupt__"][0].value
                 st.session_state["phase"] = "awaiting_approval"
                 _log("⏸ **Pipeline paused — awaiting human approval**")
-                _render_log(log_placeholder)
-                st.rerun()
+                interrupt_detected = True
+                break  # close the iterator cleanly before rerunning
             else:
                 line = event_to_log_line(event)
                 if line:
                     _log(line)
                     _render_log(log_placeholder)
 
-        # Stream ended without interrupt — pipeline finished inline
-        if st.session_state["phase"] == "idle":
+        if interrupt_detected:
+            _render_log(log_placeholder)
+            st.rerun()
+        elif st.session_state["phase"] == "idle":
+            # Stream ended without interrupt — pipeline finished inline
             final = graph.get_state(config).values
             st.session_state["deployment_decision"] = final.get("deployment_decision", "pending")
             msgs = final.get("messages", [])
@@ -178,5 +179,6 @@ elif st.session_state["phase"] == "complete":
         st.error(f"Pipeline stopped early. {msg}" if msg else "Pipeline stopped early.")
 
     if st.button("🔄 Run Again"):
-        st.session_state.clear()
+        for k, v in _DEFAULTS.items():
+            st.session_state[k] = v
         st.rerun()
