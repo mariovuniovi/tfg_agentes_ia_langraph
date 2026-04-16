@@ -59,7 +59,7 @@ def _update_panel_data(config: dict) -> None:
     state_vals = graph.get_state(config).values
     panel = extract_panel_data(state_vals)
     for key, val in panel.items():
-        if val:
+        if val:  # never overwrite populated data with empty values from intermediate state polls
             st.session_state[key] = val
     run_id = state_vals.get("training_run_id", "")
     if run_id:
