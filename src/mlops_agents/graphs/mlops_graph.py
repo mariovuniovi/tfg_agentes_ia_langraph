@@ -11,10 +11,11 @@ Run with:
     uv run python scripts/run_pipeline.py
 """
 
+import json
 import operator
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.managed.is_last_step import RemainingSteps
@@ -35,6 +36,21 @@ logger = get_logger(__name__)
 # appends it to the shared message history, and returns to the supervisor.
 # =============================================================================
 
+def _extract_tool_json(messages: list, tool_name: str) -> Any:
+    """Return the parsed JSON content of the last ToolMessage matching tool_name.
+
+    Returns {} if no matching message is found or JSON parsing fails.
+    Returns a list when the tool responded with a JSON array (e.g. get_best_run).
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage) and getattr(msg, "name", None) == tool_name:
+            try:
+                return json.loads(msg.content)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+    return {}
+
+
 def _wrap_agent(agent_name: str, state: AgentState) -> Command[Literal["supervisor"]]:
     """Generic wrapper: invoke a react agent and route back to supervisor."""
     agent = get_agent(agent_name)
@@ -51,15 +67,74 @@ def _wrap_agent(agent_name: str, state: AgentState) -> Command[Literal["supervis
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    return _wrap_agent("data_validator", state)
+    agent = get_agent("data_validator")
+    result = agent.invoke({"messages": list(state["messages"])})
+    final_message = result["messages"][-1].content
+
+    quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")
+
+    logger.info("[data_validator] completed — routing back to supervisor")
+    return Command(
+        update={
+            "messages": [HumanMessage(content=final_message, name="data_validator")],
+            "validation_report": quality_report,
+            "validation_passed": bool(quality_report.get("passed", False)),
+        },
+        goto="supervisor",
+    )
 
 
 def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    return _wrap_agent("trainer", state)
+    agent = get_agent("trainer")
+    result = agent.invoke({"messages": list(state["messages"])})
+    final_message = result["messages"][-1].content
+
+    train_result: dict = _extract_tool_json(result["messages"], "train_model")
+    mlflow_result: dict = _extract_tool_json(result["messages"], "log_experiment")
+
+    training_metrics = {
+        "model_type": train_result.get("model_type", ""),
+        "train_accuracy": train_result.get("train_accuracy", 0.0),
+        "val_accuracy": train_result.get("val_accuracy", 0.0),
+    }
+
+    logger.info("[trainer] completed — routing back to supervisor")
+    return Command(
+        update={
+            "messages": [HumanMessage(content=final_message, name="trainer")],
+            "training_metrics": training_metrics,
+            "training_run_id": mlflow_result.get("run_id", ""),
+            "trained_model_path": train_result.get("model_path", ""),
+        },
+        goto="supervisor",
+    )
 
 
 def evaluator_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    return _wrap_agent("evaluator", state)
+    agent = get_agent("evaluator")
+    result = agent.invoke({"messages": list(state["messages"])})
+    final_message = result["messages"][-1].content
+
+    best_runs_raw = _extract_tool_json(result["messages"], "get_best_run")
+    runs_list: list = best_runs_raw if isinstance(best_runs_raw, list) else []
+    candidate = runs_list[0] if runs_list else {}
+    baseline = runs_list[1] if len(runs_list) > 1 else {}
+
+    evaluation_report = {
+        "candidate_metrics": candidate.get("metrics", {}),
+        "candidate_run_id": candidate.get("run_id", ""),
+        "baseline_metrics": baseline.get("metrics", {}),
+    }
+
+    logger.info("[evaluator] completed — routing back to supervisor")
+    return Command(
+        update={
+            "messages": [HumanMessage(content=final_message, name="evaluator")],
+            "evaluation_report": evaluation_report,
+            "evaluation_passed": bool(candidate),
+        },
+        goto="supervisor",
+    )
 
 
 def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
@@ -130,7 +205,7 @@ graph = _build_graph(checkpointer=_checkpointer)
 
 
 def main() -> None:
-    """Run the full MLOps pipeline from the CLI."""
+    """Run the full MLOps pipeline from the CLI, including HITL approval."""
     import sys
 
     dataset_path = sys.argv[1] if len(sys.argv) > 1 else "./data/samples/iris.csv"
@@ -161,12 +236,42 @@ def main() -> None:
     print(f"{'='*60}\n")
 
     for event in graph.stream(initial_state, config=config):
-        for node_name, node_output in event.items():
-            print(f"[{node_name}] completed")
+        if "__interrupt__" in event:
+            interrupt_value = event["__interrupt__"][0].value
+            _handle_hitl(graph, config, interrupt_value)
+        else:
+            for node_name in event:
+                print(f"  [{node_name}] completed")
 
     print(f"\n{'='*60}")
     print("Pipeline finished.")
     print(f"{'='*60}\n")
+
+
+def _handle_hitl(graph: Any, config: dict[str, Any], interrupt_value: dict[str, Any]) -> None:
+    """Prompt the operator for HITL approval and resume the graph."""
+    from langgraph.types import Command
+
+    print(f"\n{'='*60}")
+    print("HUMAN APPROVAL REQUIRED")
+    print(f"{'='*60}")
+    print(interrupt_value.get("question", "Approve this action?"))
+    summary = interrupt_value.get("registration_summary", "")
+    if summary:
+        print(f"\nDetails:\n{summary}")
+    print(f"{'='*60}")
+
+    raw = input("\nApprove? (y/n): ").strip().lower()
+    approved = raw == "y"
+    resume: dict[str, Any] = {"approved": approved}
+    if not approved:
+        reason = input("Rejection reason (optional, press Enter to skip): ").strip()
+        resume["reason"] = reason or "Rejected by operator"
+
+    print()
+    for event in graph.stream(Command(resume=resume), config=config):
+        for node_name in event:
+            print(f"  [{node_name}] completed")
 
 
 if __name__ == "__main__":
