@@ -119,7 +119,7 @@ def validate_against_schema(canonical_path: str, schema_path: str) -> str:
 
     schema = json.loads(schema_file.read_text())
     df = pd.read_csv(csv_file)
-    violations: list[dict] = []
+    violations: list[dict[str, str]] = []
 
     for col_def in schema.get("columns", []):
         name = col_def["name"]
