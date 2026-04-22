@@ -6,7 +6,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from mlops_agents.tools.data_tools import check_missing_values, load_dataset, validate_schema
+from mlops_agents.tools.data_tools import (
+    apply_column_mapping,
+    check_missing_values,
+    load_dataset,
+    merge_datasets,
+    validate_against_schema,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -46,61 +52,6 @@ def test_load_dataset_returns_dtypes(sample_csv):
 def test_load_dataset_returns_error_for_missing_file():
     result = json.loads(load_dataset.invoke({"dataset_path": "/nonexistent/path.csv"}))
     assert "error" in result
-
-
-# ---------------------------------------------------------------------------
-# validate_schema
-# ---------------------------------------------------------------------------
-
-def test_validate_schema_passes_when_all_columns_present(sample_csv):
-    expected = json.dumps(["feature_1", "feature_2", "target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is True
-    assert result["missing_columns"] == []
-
-
-def test_validate_schema_passes_with_subset_of_columns(sample_csv):
-    """Subset is valid — all expected columns exist even if dataset has extras."""
-    expected = json.dumps(["feature_1", "target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is True
-
-
-def test_validate_schema_fails_when_column_missing(sample_csv):
-    expected = json.dumps(["feature_1", "nonexistent_col"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is False
-    assert "nonexistent_col" in result["missing_columns"]
-
-
-def test_validate_schema_reports_extra_columns(sample_csv):
-    """Extra columns in dataset (not in expected) are reported but don't fail."""
-    expected = json.dumps(["target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is True
-    assert "feature_1" in result["extra_columns"]
-    assert "feature_2" in result["extra_columns"]
-
-
-def test_validate_schema_returns_total_column_count(sample_csv):
-    expected = json.dumps(["target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["total_columns"] == 3
 
 
 # ---------------------------------------------------------------------------

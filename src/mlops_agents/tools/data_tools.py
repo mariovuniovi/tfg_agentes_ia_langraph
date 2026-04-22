@@ -44,31 +44,6 @@ def load_dataset(dataset_path: str) -> str:
 
 
 @tool
-def validate_schema(dataset_path: str, expected_columns: str) -> str:
-    """Check that the dataset has all expected columns with correct types.
-
-    Args:
-        dataset_path: Path to the CSV file.
-        expected_columns: JSON array of column name strings that must be present.
-
-    Returns:
-        JSON with 'valid' bool, 'missing_columns', and 'extra_columns' lists.
-    """
-    df = pd.read_csv(dataset_path)
-    expected = json.loads(expected_columns)
-    actual = set(df.columns.tolist())
-    expected_set = set(expected)
-
-    result = {
-        "valid": expected_set.issubset(actual),
-        "missing_columns": list(expected_set - actual),
-        "extra_columns": list(actual - expected_set),
-        "total_columns": len(actual),
-    }
-    return json.dumps(result)
-
-
-@tool
 def check_missing_values(dataset_path: str) -> str:
     """Compute missing value statistics for every column.
 

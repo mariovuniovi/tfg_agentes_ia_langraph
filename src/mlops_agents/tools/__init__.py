@@ -1,4 +1,10 @@
-from mlops_agents.tools.data_tools import load_dataset, validate_schema, check_missing_values
+from mlops_agents.tools.data_tools import (
+    apply_column_mapping,
+    check_missing_values,
+    load_dataset,
+    merge_datasets,
+    validate_against_schema,
+)
 from mlops_agents.tools.evidently_tools import check_data_quality, check_data_drift
 from mlops_agents.tools.training_tools import tune_hyperparameters, train_model
 from mlops_agents.tools.mlflow_tools import (
@@ -10,7 +16,9 @@ from mlops_agents.tools.mlflow_tools import (
 
 __all__ = [
     "load_dataset",
-    "validate_schema",
+    "merge_datasets",
+    "apply_column_mapping",
+    "validate_against_schema",
     "check_missing_values",
     "check_data_quality",
     "check_data_drift",
