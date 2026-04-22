@@ -96,3 +96,67 @@ def check_missing_values(dataset_path: str) -> str:
         "passed_threshold": float(pct.max()) < (MAX_DRIFT_SCORE * 100),
     }
     return json.dumps(result)
+
+
+@tool
+def validate_against_schema(canonical_path: str, schema_path: str) -> str:
+    """Validate a canonical CSV against all constraints in a schema JSON file.
+
+    Args:
+        canonical_path: Path to the cleaned/canonical CSV to validate.
+        schema_path: Full path to the schema JSON file.
+
+    Returns:
+        JSON with {passed: bool, violations: [{column, rule, detail}, ...]}.
+    """
+    schema_file = Path(schema_path)
+    if not schema_file.exists():
+        return json.dumps({"error": f"Schema file not found: {schema_path}"})
+
+    csv_file = Path(canonical_path)
+    if not csv_file.exists():
+        return json.dumps({"error": f"Dataset not found: {canonical_path}"})
+
+    schema = json.loads(schema_file.read_text())
+    df = pd.read_csv(csv_file)
+    violations: list[dict] = []
+
+    for col_def in schema.get("columns", []):
+        name = col_def["name"]
+        required = col_def.get("required", False)
+
+        if name not in df.columns:
+            if required:
+                violations.append({"column": name, "rule": "required", "detail": "Column missing from dataset"})
+            continue
+
+        series = df[name]
+
+        if not col_def.get("nullable", True) and series.isnull().any():
+            null_count = int(series.isnull().sum())
+            violations.append({"column": name, "rule": "nullable", "detail": f"{null_count} null value(s) found"})
+
+        if col_def.get("unique", False) and series.duplicated().any():
+            dup_count = int(series.duplicated().sum())
+            violations.append({"column": name, "rule": "unique", "detail": f"{dup_count} duplicate value(s) found"})
+
+        if "min" in col_def:
+            below = series.dropna() < col_def["min"]
+            if below.any():
+                violations.append({"column": name, "rule": "min", "detail": f"{int(below.sum())} value(s) below minimum {col_def['min']}"})
+
+        if "max" in col_def:
+            above = series.dropna() > col_def["max"]
+            if above.any():
+                violations.append({"column": name, "rule": "max", "detail": f"{int(above.sum())} value(s) above maximum {col_def['max']}"})
+
+        if "allowed_values" in col_def:
+            allowed = set(col_def["allowed_values"])
+            bad = series.dropna()[~series.dropna().astype(str).isin(allowed)]
+            if not bad.empty:
+                bad_vals = bad.unique().tolist()[:5]
+                violations.append({"column": name, "rule": "allowed_values", "detail": f"Unexpected values: {bad_vals}"})
+
+    result = {"passed": len(violations) == 0, "violations": violations}
+    logger.info(f"Schema validation: {'PASSED' if result['passed'] else 'FAILED'} ({len(violations)} violation(s))")
+    return json.dumps(result)

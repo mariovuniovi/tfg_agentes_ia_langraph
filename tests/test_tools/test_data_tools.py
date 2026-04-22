@@ -135,3 +135,97 @@ def test_check_missing_values_passed_threshold_false_when_high_missing(sample_cs
 def test_check_missing_values_passed_threshold_true_when_clean(sample_csv):
     result = json.loads(check_missing_values.invoke({"dataset_path": str(sample_csv)}))
     assert result["passed_threshold"] is True
+
+
+# ---------------------------------------------------------------------------
+# validate_against_schema
+# ---------------------------------------------------------------------------
+
+def test_validate_against_schema_passes_valid_data(canonical_iris_csv, iris_schema_file):
+    from mlops_agents.tools.data_tools import validate_against_schema
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(canonical_iris_csv),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is True
+    assert result["violations"] == []
+
+
+def test_validate_against_schema_detects_nullable_violation(tmp_path, iris_schema_file):
+    from mlops_agents.tools.data_tools import validate_against_schema
+    df = pd.DataFrame({
+        "sepal_length": [5.1, None],
+        "sepal_width":  [3.5, 3.0],
+        "petal_length": [1.4, 1.4],
+        "petal_width":  [0.2, 0.2],
+        "sample_id":    [1, 2],
+        "target":       ["setosa", "setosa"],
+    })
+    path = tmp_path / "nullable_violation.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "sepal_length" and v["rule"] == "nullable" for v in result["violations"])
+
+
+def test_validate_against_schema_detects_min_violation(tmp_path, iris_schema_file):
+    from mlops_agents.tools.data_tools import validate_against_schema
+    df = pd.DataFrame({
+        "sepal_length": [-1.0, 4.9],
+        "sepal_width":  [3.5, 3.0],
+        "petal_length": [1.4, 1.4],
+        "petal_width":  [0.2, 0.2],
+        "sample_id":    [1, 2],
+        "target":       ["setosa", "setosa"],
+    })
+    path = tmp_path / "min_violation.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "sepal_length" and v["rule"] == "min" for v in result["violations"])
+
+
+def test_validate_against_schema_detects_allowed_values_violation(tmp_path, iris_schema_file):
+    from mlops_agents.tools.data_tools import validate_against_schema
+    df = pd.DataFrame({
+        "sepal_length": [5.1],
+        "sepal_width":  [3.5],
+        "petal_length": [1.4],
+        "petal_width":  [0.2],
+        "sample_id":    [1],
+        "target":       ["unknown_species"],
+    })
+    path = tmp_path / "allowed_violation.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "target" and v["rule"] == "allowed_values" for v in result["violations"])
+
+
+def test_validate_against_schema_detects_missing_required_column(tmp_path, iris_schema_file):
+    from mlops_agents.tools.data_tools import validate_against_schema
+    df = pd.DataFrame({
+        "sepal_length": [5.1],
+        "sepal_width":  [3.5],
+        # petal_length missing
+        "petal_width":  [0.2],
+        "sample_id":    [1],
+        "target":       ["setosa"],
+    })
+    path = tmp_path / "missing_col.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "petal_length" and v["rule"] == "required" for v in result["violations"])

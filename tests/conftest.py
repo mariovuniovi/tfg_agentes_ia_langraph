@@ -59,3 +59,40 @@ def mock_llm():
     mock = MagicMock()
     mock.invoke.return_value = MagicMock(content="Mocked LLM response", tool_calls=[])
     return mock
+
+
+@pytest.fixture()
+def iris_schema_file(tmp_path: Path) -> Path:
+    """Iris schema JSON file for validate_against_schema tests."""
+    import json
+    schema = {
+        "name": "iris_classification",
+        "columns": [
+            {"name": "sepal_length", "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "sepal_width",  "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "petal_length", "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "petal_width",  "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "sample_id",    "dtype": "int",   "required": True, "nullable": False, "is_key": True},
+            {"name": "target",       "dtype": "str",   "required": True, "nullable": False,
+             "allowed_values": ["setosa", "versicolor", "virginica"]},
+        ],
+    }
+    path = tmp_path / "iris_classification.json"
+    path.write_text(json.dumps(schema))
+    return path
+
+
+@pytest.fixture()
+def canonical_iris_csv(tmp_path: Path) -> Path:
+    """Valid canonical iris CSV — all constraints satisfied."""
+    df = pd.DataFrame({
+        "sepal_length": [5.1, 4.9, 4.7],
+        "sepal_width":  [3.5, 3.0, 3.2],
+        "petal_length": [1.4, 1.4, 1.3],
+        "petal_width":  [0.2, 0.2, 0.2],
+        "sample_id":    [1, 2, 3],
+        "target":       ["setosa", "setosa", "setosa"],
+    })
+    path = tmp_path / "canonical.csv"
+    df.to_csv(path, index=False)
+    return path
