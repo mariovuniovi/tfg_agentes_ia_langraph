@@ -96,3 +96,30 @@ def canonical_iris_csv(tmp_path: Path) -> Path:
     path = tmp_path / "canonical.csv"
     df.to_csv(path, index=False)
     return path
+
+
+@pytest.fixture()
+def measurements_csv(tmp_path: Path) -> Path:
+    """Raw iris measurements CSV with 'Id' as key column."""
+    df = pd.DataFrame({
+        "Id": [1, 2, 3],
+        "SepalLengthCm": [5.1, 4.9, 4.7],
+        "SepalWidthCm":  [3.5, 3.0, 3.2],
+        "PetalLengthCm": [1.4, 1.4, 1.3],
+        "PetalWidthCm":  [0.2, 0.2, 0.2],
+    })
+    path = tmp_path / "measurements.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture()
+def labels_csv(tmp_path: Path) -> Path:
+    """Raw iris labels CSV with 'sample_id' as key column."""
+    df = pd.DataFrame({
+        "sample_id": [1, 2, 3],
+        "species":   ["setosa", "setosa", "setosa"],
+    })
+    path = tmp_path / "labels.csv"
+    df.to_csv(path, index=False)
+    return path

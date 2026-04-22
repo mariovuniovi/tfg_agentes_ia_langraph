@@ -290,3 +290,83 @@ def test_apply_column_mapping_reports_mapped_columns(tmp_path, sample_csv):
     }))
     assert "mapped_columns" in result
     assert "sepal_length" in result["mapped_columns"]
+
+
+# ---------------------------------------------------------------------------
+# merge_datasets
+# ---------------------------------------------------------------------------
+
+def test_merge_datasets_joins_two_files(tmp_path, measurements_csv, labels_csv):
+    from mlops_agents.tools.data_tools import merge_datasets
+    join_spec = json.dumps({
+        "join_key": "sample_id",
+        "files": [
+            {"path": str(measurements_csv), "key_column": "Id"},
+            {"path": str(labels_csv),       "key_column": "sample_id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    result = json.loads(merge_datasets.invoke({
+        "join_spec_json": join_spec,
+        "output_path": output_path,
+    }))
+    assert result["success"] is True
+    merged = pd.read_csv(output_path)
+    assert "SepalLengthCm" in merged.columns
+    assert "species" in merged.columns
+    assert result["row_count"] == 3
+
+
+def test_merge_datasets_writes_output_file(tmp_path, measurements_csv, labels_csv):
+    from mlops_agents.tools.data_tools import merge_datasets
+    join_spec = json.dumps({
+        "join_key": "sample_id",
+        "files": [
+            {"path": str(measurements_csv), "key_column": "Id"},
+            {"path": str(labels_csv),       "key_column": "sample_id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    merge_datasets.invoke({"join_spec_json": join_spec, "output_path": output_path})
+    assert Path(output_path).exists()
+
+
+def test_merge_datasets_returns_error_when_key_missing(tmp_path, measurements_csv, labels_csv):
+    from mlops_agents.tools.data_tools import merge_datasets
+    join_spec = json.dumps({
+        "join_key": "sample_id",
+        "files": [
+            {"path": str(measurements_csv), "key_column": "nonexistent_key"},
+            {"path": str(labels_csv),       "key_column": "sample_id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    result = json.loads(merge_datasets.invoke({
+        "join_spec_json": join_spec,
+        "output_path": output_path,
+    }))
+    assert "error" in result
+    assert not Path(output_path).exists()
+
+
+def test_merge_datasets_returns_error_when_join_produces_zero_rows(tmp_path):
+    from mlops_agents.tools.data_tools import merge_datasets
+    df_a = pd.DataFrame({"id": [1, 2], "val_a": [10, 20]})
+    df_b = pd.DataFrame({"id": [3, 4], "val_b": ["x", "y"]})
+    path_a = tmp_path / "a.csv"
+    path_b = tmp_path / "b.csv"
+    df_a.to_csv(path_a, index=False)
+    df_b.to_csv(path_b, index=False)
+    join_spec = json.dumps({
+        "join_key": "id",
+        "files": [
+            {"path": str(path_a), "key_column": "id"},
+            {"path": str(path_b), "key_column": "id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    result = json.loads(merge_datasets.invoke({
+        "join_spec_json": join_spec,
+        "output_path": output_path,
+    }))
+    assert "error" in result

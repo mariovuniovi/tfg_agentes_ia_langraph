@@ -197,3 +197,54 @@ def apply_column_mapping(raw_path: str, mapping_json: str, output_path: str) -> 
     }
     logger.info(f"Column mapping applied: {len(canonical_cols)} mapped, {len(dropped)} dropped → {output_path}")
     return json.dumps(result)
+
+
+@tool
+def merge_datasets(join_spec_json: str, output_path: str) -> str:
+    """Merge multiple raw CSV files by joining them on a common key column.
+
+    Args:
+        join_spec_json: JSON with shape:
+            {
+              "join_key": "canonical_key_name",
+              "files": [{"path": "...", "key_column": "raw_col_name"}, ...]
+            }
+        output_path: Destination path for the merged CSV.
+
+    Returns:
+        JSON with {success, output_path, row_count, columns} or {error}.
+    """
+    spec: dict = json.loads(join_spec_json)
+    join_key: str = spec["join_key"]
+    file_specs: list[dict[str, str]] = spec["files"]
+
+    dfs: list[pd.DataFrame] = []
+    for fs in file_specs:
+        path = Path(fs["path"])
+        key_col = fs["key_column"]
+        if not path.exists():
+            return json.dumps({"error": f"File not found: {fs['path']}"})
+        df = pd.read_csv(path)
+        if key_col not in df.columns:
+            return json.dumps({"error": f"Key column '{key_col}' not found in {fs['path']}"})
+        df = df.rename(columns={key_col: join_key})
+        dfs.append(df)
+
+    merged = dfs[0]
+    for df in dfs[1:]:
+        merged = merged.merge(df, on=join_key, how="inner")
+
+    if merged.empty:
+        return json.dumps({"error": "Merge produced zero rows — no matching keys across files"})
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    merged.to_csv(output_path, index=False)
+
+    result = {
+        "success": True,
+        "output_path": output_path,
+        "row_count": len(merged),
+        "columns": merged.columns.tolist(),
+    }
+    logger.info(f"Merged {len(file_specs)} files → {len(merged)} rows, {len(merged.columns)} columns → {output_path}")
+    return json.dumps(result)
