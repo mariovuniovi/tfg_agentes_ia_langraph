@@ -160,3 +160,40 @@ def validate_against_schema(canonical_path: str, schema_path: str) -> str:
     result = {"passed": len(violations) == 0, "violations": violations}
     logger.info(f"Schema validation: {'PASSED' if result['passed'] else 'FAILED'} ({len(violations)} violation(s))")
     return json.dumps(result)
+
+
+@tool
+def apply_column_mapping(raw_path: str, mapping_json: str, output_path: str) -> str:
+    """Rename raw columns to canonical names and write the result to a new CSV.
+
+    Args:
+        raw_path: Path to the raw (possibly merged) CSV.
+        mapping_json: JSON object {"raw_col": "canonical_col", ...}.
+        output_path: Destination path for the renamed CSV.
+
+    Returns:
+        JSON with {success, output_path, mapped_columns, dropped_columns}.
+    """
+    csv_file = Path(raw_path)
+    if not csv_file.exists():
+        return json.dumps({"error": f"File not found: {raw_path}"})
+
+    mapping: dict[str, str] = json.loads(mapping_json)
+    df = pd.read_csv(csv_file)
+
+    df = df.rename(columns=mapping)
+    canonical_cols = list(mapping.values())
+    dropped = [c for c in df.columns if c not in canonical_cols]
+    df = df[canonical_cols]
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, index=False)
+
+    result = {
+        "success": True,
+        "output_path": output_path,
+        "mapped_columns": canonical_cols,
+        "dropped_columns": dropped,
+    }
+    logger.info(f"Column mapping applied: {len(canonical_cols)} mapped, {len(dropped)} dropped → {output_path}")
+    return json.dumps(result)

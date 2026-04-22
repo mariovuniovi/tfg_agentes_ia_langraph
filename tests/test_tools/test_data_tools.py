@@ -229,3 +229,64 @@ def test_validate_against_schema_detects_missing_required_column(tmp_path, iris_
     }))
     assert result["passed"] is False
     assert any(v["column"] == "petal_length" and v["rule"] == "required" for v in result["violations"])
+
+
+# ---------------------------------------------------------------------------
+# apply_column_mapping
+# ---------------------------------------------------------------------------
+
+def test_apply_column_mapping_renames_columns(tmp_path, sample_csv):
+    from mlops_agents.tools.data_tools import apply_column_mapping
+    mapping = json.dumps({"feature_1": "sepal_length", "feature_2": "sepal_width", "target": "target"})
+    output_path = str(tmp_path / "canonical.csv")
+    result = json.loads(apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    }))
+    assert result["success"] is True
+    out_df = pd.read_csv(output_path)
+    assert "sepal_length" in out_df.columns
+    assert "sepal_width" in out_df.columns
+    assert "feature_1" not in out_df.columns
+
+
+def test_apply_column_mapping_drops_unmapped_columns(tmp_path, sample_csv):
+    from mlops_agents.tools.data_tools import apply_column_mapping
+    mapping = json.dumps({"feature_1": "sepal_length"})
+    output_path = str(tmp_path / "canonical.csv")
+    result = json.loads(apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    }))
+    assert result["success"] is True
+    out_df = pd.read_csv(output_path)
+    assert list(out_df.columns) == ["sepal_length"]
+    assert "feature_2" not in out_df.columns
+    assert "dropped_columns" in result
+
+
+def test_apply_column_mapping_writes_output_file(tmp_path, sample_csv):
+    from mlops_agents.tools.data_tools import apply_column_mapping
+    mapping = json.dumps({"feature_1": "sepal_length", "target": "target"})
+    output_path = str(tmp_path / "out.csv")
+    apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    })
+    assert Path(output_path).exists()
+
+
+def test_apply_column_mapping_reports_mapped_columns(tmp_path, sample_csv):
+    from mlops_agents.tools.data_tools import apply_column_mapping
+    mapping = json.dumps({"feature_1": "sepal_length", "target": "target"})
+    output_path = str(tmp_path / "out.csv")
+    result = json.loads(apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    }))
+    assert "mapped_columns" in result
+    assert "sepal_length" in result["mapped_columns"]
