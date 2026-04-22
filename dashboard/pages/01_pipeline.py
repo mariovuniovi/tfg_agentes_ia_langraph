@@ -164,19 +164,24 @@ if st.session_state["phase"] == "idle":
 
     data_dir = Path(settings.data_dir)
     csvs = sorted(data_dir.glob("*.csv")) if data_dir.exists() else []
-    options = [str(f) for f in csvs] or ["./data/samples/iris.csv"]
+    options = [str(f) for f in csvs] or ["./data/samples/iris_measurements.csv", "./data/samples/iris_labels.csv"]
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        dataset_path = st.selectbox(
-            "Select dataset",
+        dataset_paths = st.multiselect(
+            "Select raw dataset files (one or more CSVs to merge)",
             options=options,
-            help="CSV file with a 'target' column",
+            default=options[:2] if len(options) >= 2 else options,
+            help="Select all CSV files that together form the target dataset",
         )
     with col2:
         run_button = st.button("▶ Run Pipeline", type="primary", use_container_width=True)
 
     if run_button:
+        if not dataset_paths:
+            st.error("Select at least one dataset file.")
+            st.stop()
+
         thread_id = f"streamlit-{int(time.time())}"
         config = {
             "configurable": {"thread_id": thread_id},
@@ -193,7 +198,7 @@ if st.session_state["phase"] == "idle":
             right_placeholder = st.empty()
 
         interrupt_detected = False
-        for event in graph.stream(build_initial_state(dataset_path), config=config):
+        for event in graph.stream(build_initial_state(dataset_paths), config=config):
             if "__interrupt__" in event:
                 st.session_state["interrupt_value"] = event["__interrupt__"][0].value
                 st.session_state["phase"] = "awaiting_approval"

@@ -29,25 +29,28 @@ def test_event_to_log_line_supervisor_no_next_returns_none():
     assert event_to_log_line({"supervisor": {"messages": []}}) is None
 
 
-def test_build_initial_state_sets_dataset_path():
-    state = build_initial_state("./data/samples/iris.csv")
-    assert state["dataset_path"] == "./data/samples/iris.csv"
+def test_build_initial_state_sets_dataset_paths():
+    paths = ["./data/samples/iris_measurements.csv", "./data/samples/iris_labels.csv"]
+    state = build_initial_state(paths)
+    assert state["dataset_paths"] == paths
+    assert state["dataset_path"] == ""
 
 
 def test_build_initial_state_has_human_message():
-    state = build_initial_state("./data/samples/iris.csv")
+    paths = ["./data/samples/iris_measurements.csv", "./data/samples/iris_labels.csv"]
+    state = build_initial_state(paths)
     assert len(state["messages"]) == 1
     assert isinstance(state["messages"][0], HumanMessage)
-    assert "iris.csv" in state["messages"][0].content
+    assert "iris_measurements.csv" in state["messages"][0].content
 
 
 def test_build_initial_state_deployment_pending():
-    state = build_initial_state("./data/samples/iris.csv")
+    state = build_initial_state(["./data/samples/iris.csv"])
     assert state["deployment_decision"] == "pending"
 
 
 def test_build_initial_state_validation_false():
-    state = build_initial_state("./data/samples/iris.csv")
+    state = build_initial_state(["./data/samples/iris.csv"])
     assert state["validation_passed"] is False
     assert state["evaluation_passed"] is False
 

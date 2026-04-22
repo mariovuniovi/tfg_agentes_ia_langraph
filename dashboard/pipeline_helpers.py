@@ -38,12 +38,14 @@ def event_to_log_line(event: dict) -> str | None:
     return f"✅ `[{node_name}]` completed"
 
 
-def build_initial_state(dataset_path: str) -> dict:
+def build_initial_state(dataset_paths: list[str]) -> dict:
     """Build the initial LangGraph state dict for a pipeline run."""
+    paths_display = ", ".join(dataset_paths)
     return {
-        "messages": [HumanMessage(content=f"Run the full MLOps pipeline on dataset: {dataset_path}")],
+        "messages": [HumanMessage(content=f"Run the full MLOps pipeline on these raw files: {paths_display}")],
         "next": "",
-        "dataset_path": dataset_path,
+        "dataset_paths": dataset_paths,
+        "dataset_path": "",
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",
