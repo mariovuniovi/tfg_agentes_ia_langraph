@@ -50,18 +50,40 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
+    from pathlib import Path as _Path
+    from mlops_agents.config.settings import settings
+
+    schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
+    schema_json = schema_file.read_text() if schema_file.exists() else "{}"
+    schema_path = str(schema_file.resolve())
+
+    dataset_paths = state.get("dataset_paths", [])
+    context_message = HumanMessage(
+        content=(
+            f"Raw files: {json.dumps(dataset_paths)}\n"
+            f"Schema path: {schema_path}\n"
+            f"Target schema:\n{schema_json}"
+        )
+    )
+
     agent = get_agent("data_validator")
-    result = agent.invoke({"messages": list(state["messages"])})
+    result = agent.invoke({"messages": list(state["messages"]) + [context_message]})
     final_message = result["messages"][-1].content
 
     quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")
+    mapping_result: dict = _extract_tool_json(result["messages"], "apply_column_mapping")
+    validation_result: dict = _extract_tool_json(result["messages"], "validate_against_schema")
+
+    processed_path = mapping_result.get("output_path", "")
+    validation_passed = bool(validation_result.get("passed", False))
 
     logger.info("[data_validator] completed — routing back to supervisor")
     return Command(
         update={
             "messages": [HumanMessage(content=final_message, name="data_validator")],
             "validation_report": quality_report,
-            "validation_passed": bool(quality_report.get("passed", False)),
+            "validation_passed": validation_passed,
+            "dataset_path": processed_path,
         },
         goto="supervisor",
     )
@@ -191,15 +213,17 @@ def main() -> None:
     """Run the full MLOps pipeline from the CLI, including HITL approval."""
     import sys
 
-    dataset_path = sys.argv[1] if len(sys.argv) > 1 else "./data/samples/iris.csv"
+    dataset_paths = sys.argv[1:] if len(sys.argv) > 1 else ["./data/samples/iris_measurements.csv", "./data/samples/iris_labels.csv"]
+    paths_display = ", ".join(dataset_paths)
 
     config = {"configurable": {"thread_id": "pipeline-1"}, "recursion_limit": GRAPH_RECURSION_LIMIT}
     initial_state: dict = {
         "messages": [
-            HumanMessage(content=f"Run the full MLOps pipeline on dataset: {dataset_path}")
+            HumanMessage(content=f"Run the full MLOps pipeline on these raw files: {paths_display}")
         ],
         "next": "",
-        "dataset_path": dataset_path,
+        "dataset_paths": dataset_paths,
+        "dataset_path": "",
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",
@@ -215,7 +239,7 @@ def main() -> None:
     }
 
     print(f"\n{'='*60}")
-    print(f"MLOps Pipeline — dataset: {dataset_path}")
+    print(f"MLOps Pipeline — files: {paths_display}")
     print(f"{'='*60}\n")
 
     for event in graph.stream(initial_state, config=config):

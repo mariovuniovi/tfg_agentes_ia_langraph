@@ -20,7 +20,8 @@ class AgentState(TypedDict):
     next: str
 
     # Pipeline inputs
-    dataset_path: str
+    dataset_paths: list[str]   # raw CSV files provided by user
+    dataset_path: str          # canonical CSV written by data_validator_node
 
     # Stage outputs (set by each agent node)
     validation_passed: bool

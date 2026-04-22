@@ -81,6 +81,7 @@ def _make_state() -> dict:
     return {
         "messages": [HumanMessage(content="Run pipeline on iris.csv")],
         "next": "",
+        "dataset_paths": ["./data/samples/iris.csv"],
         "dataset_path": "./data/samples/iris.csv",
         "validation_passed": False,
         "validation_report": {},
@@ -110,9 +111,11 @@ def test_data_validator_node_populates_validation_report():
             "duplicate_rows": 0,
         }
     )
+    validation_json = json.dumps({"passed": True, "output_path": "./data/processed/iris.csv"})
     mock_result = {
         "messages": [
             ToolMessage(content=quality_json, tool_call_id="1", name="check_data_quality"),
+            ToolMessage(content=validation_json, tool_call_id="2", name="validate_against_schema"),
             AIMessage(content="Data validation passed."),
         ]
     }
