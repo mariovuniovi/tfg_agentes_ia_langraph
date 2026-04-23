@@ -71,7 +71,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str]) -> None:
             if mode == "updates":
                 if "__interrupt__" in data:
                     interrupt_list = data["__interrupt__"]
-                    interrupt_val = interrupt_list[0].get("value", {}) if interrupt_list else {}
+                    interrupt_val = interrupt_list[0].value if interrupt_list else {}
                     entry.status = "awaiting_approval"
                     entry.interrupt_value = interrupt_val
                     hitl_event: dict = {
@@ -111,26 +111,14 @@ async def pipeline_task(run_id: str, dataset_paths: list[str]) -> None:
             entry.status = "running"
             await _stream(Command(resume=entry.hitl_decision))
 
-        final_state = (await graph.aget_state(config)).values
-        dataset_path = final_state.get("dataset_path", "")
-        try:
-            if dataset_path:
-                current_df = pd.read_csv(dataset_path)
-                reference_df = current_df
-                drift_report = run_evidently(reference_df, current_df)
-            else:
-                drift_report = {}
-        except Exception:
-            drift_report = {}
-
-        entry.last_drift_report = drift_report
-        run_store.set_latest_drift_report(drift_report)
-
+        # Automatic drift detection is not performed here because the graph
+        # state does not expose two distinct DataFrames (reference vs current).
+        # Use POST /monitoring/drift for ad-hoc drift analysis.
         complete_event = {
             "type": "run_complete",
             "agent": "supervisor",
             "timestamp_ms": time.time() * 1000,
-            "data": drift_report,
+            "data": {},
         }
         entry.events.append(complete_event)
         await entry.queue.put(complete_event)

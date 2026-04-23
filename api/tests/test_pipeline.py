@@ -20,7 +20,10 @@ def _messages_chunk():
 
 
 def _interrupt_chunk():
-    return ("ns", "updates", {"__interrupt__": [{"value": {"model_uri": "runs:/abc/model"}}]})
+    from unittest.mock import MagicMock
+    interrupt = MagicMock()
+    interrupt.value = {"model_uri": "runs:/abc/model"}
+    return ("ns", "updates", {"__interrupt__": [interrupt]})
 
 
 def _run_complete_chunk():
