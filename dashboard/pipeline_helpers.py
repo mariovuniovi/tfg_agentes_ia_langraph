@@ -3,10 +3,26 @@
 No Streamlit imports — these are extracted for testability.
 """
 
+import time
 from pathlib import Path
+from typing import TypedDict
 
 import pandas as pd
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
+
+_tool_start_times: dict[str, float] = {}
+
+
+def reset_tool_start_times() -> None:
+    """Clear the tool start times dict for a new pipeline run."""
+    _tool_start_times.clear()
+
+
+class PipelineEvent(TypedDict):
+    type: str
+    agent: str
+    timestamp_ms: float
+    data: dict
 
 
 def event_to_log_line(event: dict) -> str | None:
@@ -59,6 +75,49 @@ def build_initial_state(dataset_paths: list[str]) -> dict:
         "error_message": "",
         "retry_count": 0,
     }
+
+
+def parse_stream_event(chunk: tuple) -> PipelineEvent | None:
+    try:
+        message_chunk, metadata = chunk
+    except (TypeError, ValueError):
+        return None
+
+    agent: str = metadata.get("langgraph_node", "unknown") if isinstance(metadata, dict) else "unknown"
+    now_ms: float = time.time() * 1000
+
+    if isinstance(message_chunk, AIMessageChunk):
+        tool_calls = message_chunk.tool_calls
+        if tool_calls:
+            tool_name: str = tool_calls[0]["name"]
+            _tool_start_times[tool_name] = now_ms
+            return PipelineEvent(
+                type="tool_call",
+                agent=agent,
+                timestamp_ms=now_ms,
+                data={"tool_name": tool_name, "arguments": tool_calls[0].get("args", {})},
+            )
+        if message_chunk.content:
+            return PipelineEvent(
+                type="agent_reasoning",
+                agent=agent,
+                timestamp_ms=now_ms,
+                data={"content": message_chunk.content},
+            )
+        return None
+
+    if isinstance(message_chunk, ToolMessage):
+        tool_name = message_chunk.name or ""
+        start_ms = _tool_start_times.pop(tool_name, now_ms)
+        duration_ms: float = now_ms - start_ms
+        return PipelineEvent(
+            type="tool_result",
+            agent=agent,
+            timestamp_ms=now_ms,
+            data={"tool_name": tool_name, "result": message_chunk.content, "duration_ms": duration_ms},
+        )
+
+    return None
 
 
 def extract_panel_data(state: dict) -> dict:

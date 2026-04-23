@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     # Application
     log_level: str = "INFO"
+    log_verbosity: int = 2
     data_dir: str = "./data/samples"
     dataset_schema: str = "iris_classification"
 

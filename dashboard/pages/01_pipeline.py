@@ -16,7 +16,7 @@ from langgraph.types import Command
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 
-from dashboard.pipeline_helpers import build_initial_state, event_to_log_line, extract_panel_data
+from dashboard.pipeline_helpers import PipelineEvent, build_initial_state, event_to_log_line, extract_panel_data, parse_stream_event, reset_tool_start_times
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.graphs.mlops_graph import graph
 
@@ -37,6 +37,7 @@ _DEFAULTS: dict = {
     "evaluation_report": {},
     "dataset_preview": [],
     "training_run_id": "",
+    "run_events": [],
 }
 for _k, _v in _DEFAULTS.items():
     if _k not in st.session_state:
@@ -136,12 +137,31 @@ def _resume_pipeline(resume: dict) -> None:
     config = st.session_state["pipeline_config"]
     log_placeholder = st.empty()
     _render_log(log_placeholder)
+    reset_tool_start_times()
 
-    for event in graph.stream(Command(resume=resume), config=config):
-        line = event_to_log_line(event)
-        if line:
-            _log(line)
-            _render_log(log_placeholder)
+    for chunk in graph.stream(Command(resume=resume), config=config, stream_mode=["updates", "messages"], subgraphs=True):
+        _ns, mode, data = chunk
+        if mode == "updates":
+            line = event_to_log_line(data)
+            if line:
+                _log(line)
+                _render_log(log_placeholder)
+            if "supervisor" in data:
+                next_agent = data["supervisor"].get("next", "")
+                if next_agent:
+                    st.session_state["run_events"].append(PipelineEvent(
+                        type="routing",
+                        agent="supervisor",
+                        timestamp_ms=time.time() * 1000,
+                        data={
+                            "next": next_agent,
+                            "reasoning": data["supervisor"].get("reasoning", ""),
+                        },
+                    ))
+        elif mode == "messages":
+            pipeline_event = parse_stream_event(data)
+            if pipeline_event:
+                st.session_state["run_events"].append(pipeline_event)
 
     _update_panel_data(config)
 
@@ -197,23 +217,50 @@ if st.session_state["phase"] == "idle":
             st.subheader("Live Results")
             right_placeholder = st.empty()
 
+        st.session_state["run_events"] = []
+        reset_tool_start_times()
+
         interrupt_detected = False
-        for event in graph.stream(build_initial_state(dataset_paths), config=config):
-            if "__interrupt__" in event:
-                st.session_state["interrupt_value"] = event["__interrupt__"][0].value
-                st.session_state["phase"] = "awaiting_approval"
-                _log("⏸ **Pipeline paused — awaiting human approval**")
-                interrupt_detected = True
-                break
-            else:
-                line = event_to_log_line(event)
-                if line:
-                    _log(line)
-                    _render_log(log_placeholder)
-                node = next(iter(event), None)
-                if node in ("data_validator", "trainer", "evaluator"):
-                    _update_panel_data(config)
-                    _render_tabs(right_placeholder)
+        for chunk in graph.stream(
+            build_initial_state(dataset_paths),
+            config=config,
+            stream_mode=["updates", "messages"],
+            subgraphs=True,
+        ):
+            _ns, mode, data = chunk
+            if mode == "updates":
+                event = data
+                if "__interrupt__" in event:
+                    st.session_state["interrupt_value"] = event["__interrupt__"][0].value
+                    st.session_state["phase"] = "awaiting_approval"
+                    _log("⏸ **Pipeline paused — awaiting human approval**")
+                    interrupt_detected = True
+                    break
+                else:
+                    line = event_to_log_line(event)
+                    if line:
+                        _log(line)
+                        _render_log(log_placeholder)
+                    if "supervisor" in event:
+                        next_agent = event["supervisor"].get("next", "")
+                        if next_agent:
+                            st.session_state["run_events"].append(PipelineEvent(
+                                type="routing",
+                                agent="supervisor",
+                                timestamp_ms=time.time() * 1000,
+                                data={
+                                    "next": next_agent,
+                                    "reasoning": event["supervisor"].get("reasoning", ""),
+                                },
+                            ))
+                    node = next(iter(event), None)
+                    if node in ("data_validator", "trainer", "evaluator"):
+                        _update_panel_data(config)
+                        _render_tabs(right_placeholder)
+            elif mode == "messages":
+                pipeline_event = parse_stream_event(data)
+                if pipeline_event:
+                    st.session_state["run_events"].append(pipeline_event)
 
         if interrupt_detected:
             _render_log(log_placeholder)

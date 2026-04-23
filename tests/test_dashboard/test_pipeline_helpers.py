@@ -1,9 +1,10 @@
 """Unit tests for Pipeline page helper functions."""
 
 import pandas as pd
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
 
-from dashboard.pipeline_helpers import build_initial_state, event_to_log_line, extract_panel_data
+import dashboard.pipeline_helpers as _ph
+from dashboard.pipeline_helpers import build_initial_state, event_to_log_line, extract_panel_data, parse_stream_event
 
 
 def test_event_to_log_line_supervisor_routes_to_agent():
@@ -117,3 +118,63 @@ def test_extract_panel_data_loads_preview_when_valid(tmp_path):
     )
     assert len(result["dataset_preview"]) == 10
     assert result["dataset_preview"][0]["a"] == 0
+
+
+# --- parse_stream_event tests ---
+
+
+def test_parse_stream_event_agent_reasoning():
+    chunk = AIMessageChunk(content="thinking about data...")
+    metadata = {"langgraph_node": "data_validator"}
+    result = parse_stream_event((chunk, metadata))
+    assert result is not None
+    assert result["type"] == "agent_reasoning"
+    assert result["agent"] == "data_validator"
+    assert result["data"]["content"] == "thinking about data..."
+
+
+def test_parse_stream_event_tool_call():
+    chunk = AIMessageChunk(
+        content="",
+        tool_calls=[{"name": "load_dataset", "args": {"path": "iris.csv"}, "id": "call_1"}],
+    )
+    metadata = {"langgraph_node": "data_validator"}
+    result = parse_stream_event((chunk, metadata))
+    assert result is not None
+    assert result["type"] == "tool_call"
+    assert result["data"]["tool_name"] == "load_dataset"
+    assert result["data"]["arguments"] == {"path": "iris.csv"}
+
+
+def test_parse_stream_event_tool_result_with_duration():
+    # First register a tool_call so _tool_start_times is populated
+    call_chunk = AIMessageChunk(
+        content="",
+        tool_calls=[{"name": "load_dataset", "args": {"path": "iris.csv"}, "id": "call_1"}],
+    )
+    _ph._tool_start_times.clear()
+    parse_stream_event((call_chunk, {"langgraph_node": "data_validator"}))
+    assert "load_dataset" in _ph._tool_start_times
+
+    # Now send the ToolMessage
+    tool_msg = ToolMessage(content='{"rows": 150}', tool_call_id="call_1", name="load_dataset")
+    metadata = {"langgraph_node": "data_validator"}
+    result = parse_stream_event((tool_msg, metadata))
+    assert result is not None
+    assert result["type"] == "tool_result"
+    assert result["data"]["tool_name"] == "load_dataset"
+    assert isinstance(result["data"]["duration_ms"], float)
+    # Entry must be cleared after use
+    assert "load_dataset" not in _ph._tool_start_times
+
+
+def test_parse_stream_event_unknown_chunk_returns_none():
+    result = parse_stream_event(("not_a_message", {"langgraph_node": "supervisor"}))
+    assert result is None
+
+
+def test_parse_stream_event_empty_content_no_tool_calls_returns_none():
+    chunk = AIMessageChunk(content="")
+    metadata = {"langgraph_node": "data_validator"}
+    result = parse_stream_event((chunk, metadata))
+    assert result is None
