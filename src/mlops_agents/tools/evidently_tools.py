@@ -39,16 +39,17 @@ def check_data_quality(dataset_path: str) -> str:
         return json.dumps({"error": "evidently not installed — run: uv add evidently"})
 
     df = pd.read_csv(dataset_path)
-    report = Report([DataSummaryPreset()])
-    result = report.run(df, df)
-    report_dict = result.dump_dict()
+    missing = df.isnull().sum()
+    max_missing_pct = float(missing.max() / len(df) * 100) if len(df) > 0 else 0.0
 
-    # Extract key metrics for the agent to interpret
     summary = {
-        "passed": True,  # agent will update this based on metrics
+        "passed": max_missing_pct < 20.0 and int(df.duplicated().sum()) == 0,
         "row_count": len(df),
         "column_count": len(df.columns),
-        "report": report_dict,
+        "missing_values_total": int(missing.sum()),
+        "columns_with_missing": {col: int(cnt) for col, cnt in missing.items() if cnt > 0},
+        "max_missing_pct": round(max_missing_pct, 2),
+        "duplicate_rows": int(df.duplicated().sum()),
     }
     logger.info(f"Data quality check complete for {Path(dataset_path).name}")
     return json.dumps(summary, default=str)
@@ -78,9 +79,22 @@ def check_data_drift(current_path: str, reference_path: str) -> str:
     result = report.run(reference, current)
     report_dict = result.dump_dict()
 
+    # Extract only the drift verdict and per-feature scores — not the full report
+    drift_detected = False
+    feature_drift: dict = {}
+    try:
+        for metric in report_dict.get("metrics", []):
+            value = metric.get("value", {})
+            if "drift_detected" in value:
+                drift_detected = bool(value["drift_detected"])
+            if "column_name" in value and "drift_score" in value:
+                feature_drift[value["column_name"]] = round(float(value["drift_score"]), 4)
+    except Exception:
+        pass
+
     summary = {
-        "drift_detected": False,  # agent will interpret report_dict to set this
-        "report": report_dict,
+        "drift_detected": drift_detected,
+        "feature_drift_scores": feature_drift,
     }
     logger.info(f"Drift check: {Path(current_path).name} vs {Path(reference_path).name}")
     return json.dumps(summary, default=str)

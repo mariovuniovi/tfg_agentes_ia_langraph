@@ -50,7 +50,9 @@ def log_experiment(
     mlflow.set_experiment(settings.mlflow_experiment_name)
 
     params = json.loads(hyperparameters_json)
-    metrics = json.loads(metrics_json)
+    raw_metrics = json.loads(metrics_json)
+    # MLflow only accepts scalar floats — skip any nested dicts the agent may pass
+    metrics = {k: float(v) for k, v in raw_metrics.items() if isinstance(v, (int, float))}
 
     with open(model_path, "rb") as f:
         model = pickle.load(f)
