@@ -84,8 +84,8 @@
 | E7-2 | Como usuario, quiero una página "Experiments" que muestre los runs de MLflow en una tabla con métricas y parámetros. | ✅ Done (scaffold) |
 | E7-3 | Como usuario, quiero una página "Monitoring" donde pueda subir dos CSVs y ver el informe de drift de Evidently. | ✅ Done (scaffold) |
 | E7-4 | Como usuario, quiero una página "Chat" donde pueda hablar con los agentes en lenguaje natural. | ✅ Done (scaffold) |
-| **E7-5** | **Como usuario, quiero que la página Pipeline muestre el log en tiempo real (streaming) mientras los agentes trabajan.** | ⬜ Pendiente |
-| **E7-6** | **Como usuario, quiero que el dashboard detecte cuando hay un `interrupt()` pendiente y muestre un botón de "Aprobar / Rechazar" despliegue.** | ⬜ Pendiente |
+| **E7-5** | **Como usuario, quiero que la página Pipeline muestre el log en tiempo real (streaming) mientras los agentes trabajan.** | ✅ Done |
+| **E7-6** | **Como usuario, quiero que el dashboard detecte cuando hay un `interrupt()` pendiente y muestre un botón de "Aprobar / Rechazar" despliegue.** | ✅ Done |
 | **E7-7** | **Como usuario, quiero lanzar `uv run streamlit run dashboard/app.py` y que las 4 páginas carguen sin errores de import.** | ⬜ Pendiente |
 
 ---
@@ -96,7 +96,7 @@
 
 | # | Historia | Estado |
 |---|----------|--------|
-| **E8-1** | **Como desarrollador, quiero corregir el bug en `get_logger()` que llama `logger.remove()` en cada import para que el handler de loguru no se registre múltiples veces.** | ⬜ Pendiente |
+| **E8-1** | **Como desarrollador, quiero corregir el bug en `get_logger()` que llama `logger.remove()` en cada import para que el handler de loguru no se registre múltiples veces.** | ✅ Done |
 | **E8-2** | **Como desarrollador, quiero que los logs se escriban a `logs/pipeline.log` con rotación diaria (máx. 7 días) además de a stderr, para poder revisar ejecuciones pasadas.** | ⬜ Pendiente |
 | **E8-3** | **Como desarrollador, quiero un sink en memoria (`queue.Queue`) en `utils/logging.py` que acumule los log entries del run actual para que Streamlit los pueda leer en tiempo real.** | ⬜ Pendiente |
 | **E8-4** | **Como usuario del dashboard, quiero que la página "Pipeline" muestre el contenido real de los mensajes de cada agente (no solo "nodo completado") mientras el grafo hace streaming.** | ⬜ Pendiente |
@@ -148,4 +148,4 @@
 
 ---
 
-*Última actualización: 2026-04-02*
+*Última actualización: 2026-04-19*
