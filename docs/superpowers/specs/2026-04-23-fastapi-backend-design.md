@@ -96,7 +96,7 @@ latest_drift_report: dict | None = None   # module-level; survives RunEntry clea
 ### Runs
 
 **`POST /runs`**
-- Body: `RunCreate { dataset_path: str }`
+- Body: `RunCreate { dataset_paths: list[str] }` (list — supports multi-file pipelines)
 - Creates `RunEntry`, spawns `pipeline_task` via `BackgroundTasks`
 - Returns: `{ run_id: str }`
 
