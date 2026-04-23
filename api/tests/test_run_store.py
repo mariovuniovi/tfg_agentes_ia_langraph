@@ -1,7 +1,16 @@
 """Tests for in-memory RunStore."""
 import asyncio
 import pytest
+import api.services.run_store as _rs
 from api.services.run_store import RunEntry, create_entry, get_entry, set_latest_drift_report, get_latest_drift_report
+
+
+@pytest.fixture(autouse=True)
+def reset_drift_report():
+    """Ensure global drift report state is clean before each test."""
+    _rs._latest_drift_report = None
+    yield
+    _rs._latest_drift_report = None
 
 
 def _make_entry(run_id: str = "test-run") -> RunEntry:
