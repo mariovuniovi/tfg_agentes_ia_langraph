@@ -1,5 +1,6 @@
 """Regression tests for the loguru handler bug (E8-1)."""
 
+import contextlib
 from io import StringIO
 
 from loguru import logger as _logger
@@ -29,10 +30,9 @@ def test_get_logger_does_not_remove_external_sinks():
             "get_logger() called logger.remove() and stripped the external sink"
         )
     finally:
-        try:
+        # sink may already be gone if the bug removed it — suppress the error
+        with contextlib.suppress(Exception):
             _logger.remove(sink_id)
-        except Exception:
-            pass  # sink already removed by the bug — that's fine in the finally
 
 
 def test_get_logger_returns_logger_bound_with_name():

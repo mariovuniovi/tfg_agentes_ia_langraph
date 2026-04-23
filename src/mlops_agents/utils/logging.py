@@ -5,6 +5,7 @@ binds a name into the context — it never touches global handler state.
 """
 
 import sys
+from typing import Any
 
 from loguru import logger
 from mlops_agents.config.settings import settings
@@ -23,7 +24,7 @@ logger.add(
 )
 
 
-def get_logger(name: str):
+def get_logger(name: str) -> Any:
     """Return a loguru logger bound with the module name.
 
     Safe to call many times — does not alter the global handler list.

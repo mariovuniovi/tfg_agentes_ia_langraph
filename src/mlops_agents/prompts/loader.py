@@ -1,7 +1,9 @@
-"""YAML prompt loader using LangChain's load_prompt."""
+"""YAML prompt loader."""
 
 from pathlib import Path
-from langchain_core.prompts import load_prompt, PromptTemplate
+
+import yaml
+from langchain_core.prompts import PromptTemplate
 
 PROMPTS_DIR = Path(__file__).parent
 
@@ -18,4 +20,8 @@ def get_prompt(name: str) -> PromptTemplate:
     path = PROMPTS_DIR / f"{name}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"Prompt file not found: {path}")
-    return load_prompt(str(path))
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return PromptTemplate(
+        template=data["template"],
+        input_variables=data.get("input_variables", []),
+    )
