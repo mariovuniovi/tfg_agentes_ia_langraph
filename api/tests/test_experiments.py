@@ -68,3 +68,48 @@ def test_get_runs_empty():
         svc = MlflowService()
         runs = svc.get_runs("1")
     assert runs == []
+
+
+# ── Router-level tests ─────────────────────────────────────────────────────────
+from datetime import datetime, timezone
+from httpx import AsyncClient, ASGITransport
+from api.main import app
+
+
+@pytest.mark.asyncio
+async def test_get_experiments_endpoint():
+    with patch("api.routers.experiments.MlflowService") as MockSvc:
+        MockSvc.return_value.list_experiments.return_value = [
+            ExperimentOut(experiment_id="1", name="mlops-agents"),
+        ]
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/experiments")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "mlops-agents"
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_runs_endpoint():
+    from api.models.experiment import MetricSeries
+    with patch("api.routers.experiments.MlflowService") as MockSvc:
+        MockSvc.return_value.get_runs.return_value = [
+            RunOut(
+                run_id="abc",
+                run_name="run-1",
+                status="FINISHED",
+                start_time=datetime.now(timezone.utc),
+                params={},
+                metrics={"accuracy": 0.94},
+                metric_series=[
+                    MetricSeries(name="accuracy", steps=[1], values=[0.94], line_style="solid")
+                ],
+            )
+        ]
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/experiments/1/runs")
+    assert resp.status_code == 200
+    runs = resp.json()
+    assert runs[0]["run_id"] == "abc"
+    assert runs[0]["metric_series"][0]["line_style"] == "solid"
