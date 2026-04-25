@@ -4,10 +4,7 @@ import { toast } from 'sonner'
 import { uploadFiles, startRun } from '@/lib/api'
 import { useRunStore } from '@/stores/run-store'
 import { RunStatusBadge } from './RunStatusBadge'
-
-function formatBytes(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(0)} KB`
-}
+import { formatBytes } from '@/lib/format'
 
 export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => void }) {
   const [files, setFiles] = useState<File[]>([])
@@ -56,14 +53,17 @@ export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => v
         multiple
         accept=".csv"
         className="hidden"
-        onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        onChange={(e) => {
+          setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])
+          if (inputRef.current) inputRef.current.value = ''
+        }}
       />
 
       {files.length > 0 && (
         <ul className="mb-3 space-y-1.5">
           {files.map((f, i) => (
             <li
-              key={i}
+              key={`${f.name}-${f.lastModified}`}
               className="flex items-center gap-2 rounded bg-slate-100 px-3 py-2 text-sm text-slate-700"
             >
               <span className="truncate flex-1">{f.name}</span>

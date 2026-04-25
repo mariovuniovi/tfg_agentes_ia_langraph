@@ -48,3 +48,23 @@ describe('fetchExperiments', () => {
     expect(result[0].name).toBe('Default')
   })
 })
+
+describe('uploadFiles', () => {
+  it('uploadFiles POSTs FormData to /uploads and returns paths', async () => {
+    const mockPaths = ['data/uploads/abc_iris.csv']
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ paths: mockPaths }),
+    } as Response)
+
+    const file = new File(['col1\n1'], 'iris.csv', { type: 'text/csv' })
+    const { uploadFiles } = await import('@/lib/api')
+    const result = await uploadFiles([file])
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/uploads',
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(result).toEqual({ paths: mockPaths })
+  })
+})

@@ -5,10 +5,7 @@ import { toast } from 'sonner'
 import { runAdHocDrift } from '@/lib/api'
 import type { DriftReport } from '@/types/api'
 import { DriftTable } from './DriftTable'
-
-function formatBytes(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(0)} KB`
-}
+import { formatBytes } from '@/lib/format'
 
 export function AdHocForm() {
   const [files, setFiles] = useState<File[]>([])
@@ -21,7 +18,7 @@ export function AdHocForm() {
     setFiles((prev) => {
       const next = prev.filter((_, i) => i !== index)
       if (refIdx >= next.length) setRefIdx(0)
-      if (curIdx >= next.length) setCurIdx(Math.min(1, next.length - 1))
+      if (curIdx >= next.length) setCurIdx(next.length > 1 ? 1 : 0)
       return next
     })
   }
@@ -56,14 +53,17 @@ export function AdHocForm() {
         multiple
         accept=".csv"
         className="hidden"
-        onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        onChange={(e) => {
+          setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])
+          if (inputRef.current) inputRef.current.value = ''
+        }}
       />
 
       {files.length > 0 && (
         <ul className="space-y-1.5">
           {files.map((f, i) => (
             <li
-              key={i}
+              key={`${f.name}-${f.lastModified}`}
               className="flex items-center gap-2 rounded bg-slate-100 px-3 py-2 text-sm text-slate-700"
             >
               <span className="truncate flex-1">{f.name}</span>
