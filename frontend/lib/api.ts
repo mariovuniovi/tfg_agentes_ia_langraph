@@ -3,7 +3,7 @@ import type {
   HITLDecision, RunOut, RunStatusResponse,
 } from '@/types/api'
 
-const BASE = 'http://localhost:8000'
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
