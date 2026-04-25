@@ -33,7 +33,7 @@ export function DeploymentBarChart({ metrics }: { metrics: Record<string, number
           <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={100} />
           <Tooltip />
           <Bar dataKey="value" fill="#1e3a5f">
-            <LabelList dataKey="value" position="right" style={{ fontSize: 10 }} formatter={(v: any) => v.toFixed(3)} />
+            <LabelList dataKey="value" position="right" style={{ fontSize: 10 }} formatter={(v) => (typeof v === 'number' ? v.toFixed(3) : String(v ?? ''))} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
