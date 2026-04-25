@@ -1,8 +1,8 @@
 'use client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import type { MetricSeries } from '@/types/api'
+import type { MetricSeries, LineStyle } from '@/types/api'
 
-const STROKE_DASH: Record<string, string> = { solid: '0', dashed: '6 3', dotted: '2 2' }
+const STROKE_DASH: Record<LineStyle, string> = { solid: '0', dashed: '6 3', dotted: '2 2' }
 const COLORS = ['#1e3a5f', '#D97706', '#16a34a', '#7c3aed']
 
 export function TrainerLineChart({ series }: { series: MetricSeries[] }) {

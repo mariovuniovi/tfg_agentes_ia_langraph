@@ -3,10 +3,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, Respons
 
 function downloadCSV(metrics: Record<string, number>) {
   const csv = 'metric,value\n' + Object.entries(metrics).map(([k, v]) => `${k},${v}`).join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+  a.href = url
   a.download = 'deployment-metrics.csv'
   a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function DeploymentBarChart({ metrics }: { metrics: Record<string, number> }) {
