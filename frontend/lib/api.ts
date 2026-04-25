@@ -54,6 +54,12 @@ export async function runAdHocDrift(
   return json(await fetch(`${BASE}/monitoring/drift`, { method: 'POST', body: form }))
 }
 
+export async function uploadFiles(files: File[]): Promise<{ paths: string[] }> {
+  const form = new FormData()
+  files.forEach(f => form.append('files', f))
+  return json(await fetch(`${BASE}/uploads`, { method: 'POST', body: form }))
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   return json(await fetch(`${BASE}/health`))
 }
