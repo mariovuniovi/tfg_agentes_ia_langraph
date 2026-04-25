@@ -7,16 +7,20 @@ import { RunStatusBadge } from './RunStatusBadge'
 export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => void }) {
   const [paths, setPaths] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const status = useRunStore((s) => s.status)
 
   async function handleRun() {
     const dataset_paths = paths.split(',').map((p) => p.trim()).filter(Boolean)
     if (!dataset_paths.length) return
+    setError(null)
     setLoading(true)
     try {
       const { run_id } = await startRun(dataset_paths)
       useRunStore.getState().setRunId(run_id)
       onRunStarted(run_id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start run')
     } finally {
       setLoading(false)
     }
@@ -42,6 +46,7 @@ export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => v
         </button>
         <RunStatusBadge />
       </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   )
 }

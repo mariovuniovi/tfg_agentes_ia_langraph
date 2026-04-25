@@ -6,8 +6,10 @@ export function useApprove(runId: string | null) {
   const clearHITL = useRunStore((s) => s.clearHITL)
 
   const mutation = useMutation({
-    mutationFn: (decision: 'approve' | 'reject') =>
-      approveRun(runId!, { decision, reason: '' }),
+    mutationFn: (decision: 'approve' | 'reject') => {
+      if (!runId) throw new Error('no run id')
+      return approveRun(runId, { decision, reason: '' })
+    },
     onSuccess: () => clearHITL(),
   })
 

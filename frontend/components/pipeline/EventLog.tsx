@@ -26,7 +26,7 @@ export function EventLog() {
         <p className="text-slate-400">Waiting for pipeline events...</p>
       )}
       {events.map((e, i) => (
-        <div key={i} className="mb-1 flex gap-2">
+        <div key={`${e.timestamp_ms}-${i}`} className="mb-1 flex gap-2">
           <span className="shrink-0 text-slate-300">
             {new Date(e.timestamp_ms).toISOString().slice(11, 23)}
           </span>
