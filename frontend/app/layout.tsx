@@ -21,8 +21,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <TopNav />
           <main className="p-6">{children}</main>
-          <Toaster position="bottom-right" richColors />
         </Providers>
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   )
