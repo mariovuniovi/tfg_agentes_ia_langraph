@@ -7,6 +7,18 @@ orchestrated by a supervisor with structured output routing.
 Built with Python 3.12, UV, LangGraph, LangChain, GitHub Models (GPT-4.1-mini),
 MLflow, Evidently AI, and Streamlit.
 
+## Setup
+
+The app has two processes that must run in separate terminals:
+
+```bash
+# Terminal 1 — FastAPI backend (MLOps pipeline, agents, MLflow)
+uv run uvicorn api.main:app --reload --port 8000
+
+# Terminal 2 — Next.js frontend (UI at http://localhost:3000)
+cd frontend && npm run dev
+```
+
 ## Quick start
 
 ```bash
