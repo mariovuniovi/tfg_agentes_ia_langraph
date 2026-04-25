@@ -12,7 +12,7 @@ export function EvaluatorBarChart({ metrics }: { metrics: Record<string, number>
         <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
         <Tooltip />
         <Bar dataKey="value" fill="#D97706">
-          <LabelList dataKey="value" position="right" style={{ fontSize: 10 }} formatter={(v: number) => v.toFixed(3)} />
+          <LabelList dataKey="value" position="right" style={{ fontSize: 10 }} formatter={(v: any) => v.toFixed(3)} />
         </Bar>
       </BarChart>
     </ResponsiveContainer>

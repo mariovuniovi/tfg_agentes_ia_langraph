@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { TopNav } from '@/components/TopNav'
 import { Providers } from '@/components/Providers'
+import { Toaster } from 'sonner'
 
 export const metadata: Metadata = { title: 'MLOps Dashboard' }
 
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <TopNav />
           <main className="p-6">{children}</main>
         </Providers>
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   )
