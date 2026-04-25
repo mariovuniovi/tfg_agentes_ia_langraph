@@ -11,7 +11,10 @@ router = APIRouter()
 
 
 @router.post("/uploads")
-async def upload_files(files: Optional[list[UploadFile]] = None) -> dict:
+async def upload_files(
+    # Optional so handler can return 400 — required list[UploadFile] would raise FastAPI's own 422 first
+    files: Optional[list[UploadFile]] = None,
+) -> dict:
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
