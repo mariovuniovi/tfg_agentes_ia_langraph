@@ -8,6 +8,7 @@ export function HITLGate({ runId }: { runId: string | null }) {
   const { approve, isPending } = useApprove(runId)
 
   if (!hitlPending) return null
+  if ((interruptValue as { type?: string })?.type === 'data_validation') return null
 
   return (
     <div className="rounded-lg border border-amber-600 bg-amber-50 p-4">
