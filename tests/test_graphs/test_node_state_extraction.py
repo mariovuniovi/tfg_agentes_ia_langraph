@@ -119,7 +119,8 @@ def test_data_validator_node_populates_validation_report():
             AIMessage(content="Data validation passed."),
         ]
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -136,7 +137,8 @@ def test_data_validator_node_passed_false_when_no_tool_output():
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
     mock_result = {"messages": [AIMessage(content="Could not validate.")]}
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
