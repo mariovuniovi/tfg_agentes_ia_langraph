@@ -50,7 +50,7 @@ if prompt := st.chat_input("Ask the MLOps pipeline anything..."):
                     "deployment_decision": "pending",
                     "deployment_status": "",
                     "error_message": "",
-                    "retry_count": 0,
+                    "agent_attempt_counts": {},
                 }
 
                 result = graph.invoke(state, config=config)
