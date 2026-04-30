@@ -1,6 +1,7 @@
 export type RunStatus = 'running' | 'awaiting_approval' | 'complete' | 'failed'
 
 export type PipelineEventType =
+  | 'run_info'
   | 'routing'
   | 'tool_call'
   | 'tool_result'
@@ -24,6 +25,23 @@ export interface RunStatusResponse {
 export interface HITLDecision {
   decision: 'approve' | 'reject'
   reason?: string
+  comment?: string
+}
+
+export interface DataValidationInterrupt {
+  type: 'data_validation'
+  question: string
+  attempt: number
+  dataset_preview: {
+    shape: [number, number]
+    columns: { name: string; dtype: string }[]
+    sample_rows: Record<string, unknown>[]
+  }
+  validation_summary: {
+    passed: boolean
+    missing_values: Record<string, number>
+    schema_validated: boolean
+  }
 }
 
 export interface ExperimentOut {
