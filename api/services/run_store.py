@@ -11,6 +11,7 @@ class RunEntry:
     graph_config: dict[str, Any]
     hitl_event: asyncio.Event
     hitl_decision: str = ""
+    hitl_comment: str = ""
     events: list[dict] = field(default_factory=list)
     interrupt_value: dict[str, Any] = field(default_factory=dict)
     last_drift_report: dict | None = None

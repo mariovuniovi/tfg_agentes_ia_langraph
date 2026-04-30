@@ -25,3 +25,4 @@ class PipelineEventModel(BaseModel):
 class HITLDecision(BaseModel):
     decision: Literal["approve", "reject"]
     reason: str = ""
+    comment: str = ""

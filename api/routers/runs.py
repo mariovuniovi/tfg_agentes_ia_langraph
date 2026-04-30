@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, WebSocket, WebSoc
 import api.services.run_store as run_store
 from api.models.run import HITLDecision, RunCreate, RunStatus
 from api.services.pipeline import pipeline_task
+from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ router = APIRouter()
 @router.post("/runs")
 async def start_run(body: RunCreate, background_tasks: BackgroundTasks):
     run_id = str(uuid4())
-    config = {"configurable": {"thread_id": run_id}}
+    config = {"configurable": {"thread_id": run_id}, "recursion_limit": GRAPH_RECURSION_LIMIT}
     run_store.create_entry(run_id, config)
     background_tasks.add_task(pipeline_task, run_id, body.dataset_paths)
     return {"run_id": run_id}
@@ -39,6 +40,7 @@ async def approve_run(run_id: str, body: HITLDecision):
     if entry.status != "awaiting_approval":
         raise HTTPException(status_code=400, detail="Run is not awaiting approval")
     entry.hitl_decision = body.decision
+    entry.hitl_comment = body.comment
     entry.hitl_event.set()
     entry.status = "running"
     return {"ok": True}

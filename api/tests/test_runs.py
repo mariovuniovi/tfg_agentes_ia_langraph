@@ -69,3 +69,15 @@ async def test_get_run_events_empty(client):
     resp = await client.get(f"/runs/{run_id}/events")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_approve_saves_comment(client):
+    with patch("api.routers.runs.pipeline_task"):
+        start = await client.post("/runs", json={"dataset_paths": ["data/samples/iris_measurements.csv"]})
+    run_id = start.json()["run_id"]
+    entry = run_store_module.get_entry(run_id)
+    entry.status = "awaiting_approval"
+    resp = await client.post(f"/runs/{run_id}/approve", json={"decision": "reject", "comment": "rename column X"})
+    assert resp.status_code == 200
+    assert entry.hitl_comment == "rename column X"

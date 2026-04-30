@@ -41,6 +41,18 @@ def test_pipeline_event_model():
     assert ev.type == "tool_call"
 
 
+def test_hitl_decision_has_comment_field():
+    from api.models.run import HITLDecision
+    d = HITLDecision(decision="reject", comment="bad column names")
+    assert d.comment == "bad column names"
+
+
+def test_hitl_decision_comment_defaults_to_empty():
+    from api.models.run import HITLDecision
+    d = HITLDecision(decision="approve")
+    assert d.comment == ""
+
+
 def test_metric_series_line_styles():
     ms = MetricSeries(name="accuracy", steps=[1, 2], values=[0.8, 0.9], line_style="solid")
     assert ms.line_style == "solid"

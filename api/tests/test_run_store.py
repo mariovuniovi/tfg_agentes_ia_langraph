@@ -44,3 +44,8 @@ def test_set_and_get_latest_drift_report():
     report = {"dataset_drift": True, "drift_share": 0.5}
     set_latest_drift_report(report)
     assert get_latest_drift_report() == report
+
+
+def test_run_entry_has_hitl_comment_field():
+    entry = _make_entry("r-comment")
+    assert entry.hitl_comment == ""
