@@ -24,7 +24,7 @@ def make_state(messages=None, **kwargs):
         "deployment_decision": "pending",
         "deployment_status": "",
         "error_message": "",
-        "retry_count": 0,
+        "agent_attempt_counts": {},
     }
     base.update(kwargs)
     return base
