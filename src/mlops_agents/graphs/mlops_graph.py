@@ -50,6 +50,7 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
+    import pandas as pd
     from pathlib import Path as _Path
     from mlops_agents.config.settings import settings
 
@@ -77,13 +78,60 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     processed_path = mapping_result.get("output_path", "")
     validation_passed = bool(validation_result.get("passed", False))
 
-    logger.info("[data_validator] completed — routing back to supervisor")
+    # Build dataset preview (up to 20 rows) for the HITL payload
+    preview: dict = {"shape": [0, 0], "columns": [], "sample_rows": []}
+    if processed_path:
+        try:
+            df = pd.read_csv(processed_path)
+            preview = {
+                "shape": list(df.shape),
+                "columns": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "sample_rows": df.head(20).to_dict(orient="records"),
+            }
+        except Exception:
+            pass
+
+    counts = dict(state.get("agent_attempt_counts") or {})
+    attempt = counts.get("data_validator", 1)
+
+    missing_vals: dict = {}
+    if isinstance(quality_report, dict):
+        missing_vals = quality_report.get("missing_values", {})
+
+    approval = interrupt({
+        "type": "data_validation",
+        "question": "Review the processed dataset before training begins.",
+        "attempt": attempt,
+        "dataset_preview": preview,
+        "validation_summary": {
+            "passed": validation_passed,
+            "missing_values": missing_vals,
+            "schema_validated": bool(validation_result.get("passed", False)),
+        },
+    })
+
+    base_update = {
+        "messages": [HumanMessage(content=final_message, name="data_validator")],
+        "validation_report": quality_report,
+        "validation_passed": validation_passed,
+        "dataset_path": processed_path,
+    }
+
+    if approval.get("approved", False):
+        logger.info("[data_validator] approved — routing back to supervisor")
+        return Command(update=base_update, goto="supervisor")
+
+    comment = approval.get("comment", "")
+    rejection_text = f"Dataset review rejected by human. Comment: {comment}" if comment else "Dataset review rejected by human."
+    logger.info(f"[data_validator] rejected — comment: {comment!r}")
     return Command(
         update={
-            "messages": [HumanMessage(content=final_message, name="data_validator")],
-            "validation_report": quality_report,
-            "validation_passed": validation_passed,
-            "dataset_path": processed_path,
+            **base_update,
+            "messages": [
+                HumanMessage(content=final_message, name="data_validator"),
+                HumanMessage(content=rejection_text, name="data_validator"),
+            ],
+            "validation_passed": False,
         },
         goto="supervisor",
     )
