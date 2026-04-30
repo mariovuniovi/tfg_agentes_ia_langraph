@@ -11,15 +11,16 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM — GitHub Models
-    github_token: str = ""
-    github_model: str = "openai/gpt-4.1-mini"   # matches your GITHUB_MODEL env var
-    # Base URL is fixed for GitHub Models — no env var needed
-    github_api_base: str = "https://models.github.ai/inference"
+    # LLM — OpenAI API
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5-mini"   # default / fallback model
 
-    # Fallback providers (optional — only needed if GitHub rate limit is hit)
-    groq_api_key: str = ""
-    gemini_api_key: str = ""
+    # Per-agent model overrides
+    openai_model_supervisor: str = "gpt-5-mini"
+    openai_model_data_validator: str = "gpt-5-mini"
+    openai_model_trainer: str = "gpt-5-mini"
+    openai_model_evaluator: str = "gpt-5-mini"
+    openai_model_deployer: str = "gpt-5.4-nano"
 
     # MLflow
     mlflow_tracking_uri: str = "sqlite:///./mlflow.db"
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     log_verbosity: int = 2
     data_dir: str = "./data/samples"
     dataset_schema: str = "iris_classification"
+    max_attempts_per_agent: int = 3
 
 
 settings = Settings()
