@@ -78,7 +78,9 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     processed_path = mapping_result.get("output_path", "")
     validation_passed = bool(validation_result.get("passed", False))
 
-    # Build dataset preview (up to 20 rows) for the HITL payload
+    # Build dataset preview (up to 20 rows) for the HITL payload.
+    # Use df.to_json + json.loads so NaN/Inf become null — plain to_dict() leaves
+    # Python float('nan') which serialises to the bare token NaN, invalid JSON.
     preview: dict = {"shape": [0, 0], "columns": [], "sample_rows": []}
     if processed_path:
         try:
@@ -86,7 +88,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
             preview = {
                 "shape": list(df.shape),
                 "columns": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
-                "sample_rows": df.head(20).to_dict(orient="records"),
+                "sample_rows": json.loads(df.head(20).to_json(orient="records")),
             }
         except Exception:
             pass
