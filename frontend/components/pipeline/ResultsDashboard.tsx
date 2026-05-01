@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRunStore } from '@/stores/run-store'
 import type { DataValidationInterrupt } from '@/types/api'
 import { useApprove } from '@/hooks/use-approve'
@@ -82,12 +82,14 @@ function DatasetPanel({
   missing,
   validation,
   running,
+  hideRawSample,
 }: {
   dataset?: DatasetSummary
   merged?: MergedSummary
   missing?: MissingSummary
   validation?: ValidationResult
   running: boolean
+  hideRawSample?: boolean
 }) {
   if (!dataset && !merged && running) return <PulseRow />
   if (!dataset && !merged) return <p className="text-xs text-slate-400">No dataset results yet.</p>
@@ -164,8 +166,8 @@ function DatasetPanel({
         <p className="text-xs text-emerald-600">No missing values</p>
       )}
 
-      {/* Sample rows */}
-      {head.length > 0 && (
+      {/* Sample rows — hidden when merged data is present (raw file is not the processed result) */}
+      {head.length > 0 && !hideRawSample && (
         <div>
           <p className="mb-1.5 text-xs font-medium text-slate-500">Sample (3 rows)</p>
           <div className="overflow-x-auto rounded border border-slate-200">
@@ -305,17 +307,22 @@ function ModelPanel({
 function DatasetReviewPanel({
   runId,
   interruptValue,
+  panelRef,
 }: {
   runId: string | null
   interruptValue: DataValidationInterrupt
+  panelRef?: React.RefObject<HTMLDivElement | null>
 }) {
   const commentRef = useRef<HTMLTextAreaElement>(null)
   const { approve, isPending } = useApprove(runId)
   const maxAttempts = 3
   const attempt = interruptValue.attempt ?? 1
+  const preview = interruptValue.dataset_preview
+  const sampleRows = preview?.sample_rows ?? []
+  const sampleCols = preview?.columns ?? []
 
   return (
-    <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+    <div ref={panelRef} className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
       <div className="mb-2 flex items-center gap-2">
         <span className="text-sm font-semibold text-blue-900">Dataset Review</span>
         <span className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
@@ -337,6 +344,40 @@ function DatasetReviewPanel({
         Approve to proceed to training, or reject with a comment so the data agent can fix
         the issue and reprocess.
       </p>
+
+      {sampleRows.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-1 text-xs font-medium text-slate-500">
+            Processed data preview ({preview.shape[0]} rows × {preview.shape[1]} cols)
+          </p>
+          <div className="overflow-x-auto rounded border border-blue-100">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-blue-100">
+                  {sampleCols.map((c) => (
+                    <th key={c.name} className="border-b border-blue-200 px-2 py-1 text-left font-medium text-slate-600">
+                      {c.name}
+                      <span className="ml-1 text-slate-400">{c.dtype}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sampleRows.slice(0, 5).map((row, i) => (
+                  <tr key={i} className="border-b border-blue-100 last:border-0">
+                    {sampleCols.map((c) => (
+                      <td key={c.name} className={`px-2 py-1 ${row[c.name] == null ? 'text-red-400 italic' : 'text-slate-700'}`}>
+                        {row[c.name] == null ? 'null' : String(row[c.name])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <label className="mb-1 block text-xs font-medium text-slate-500">
         Comment (optional)
       </label>
@@ -373,6 +414,16 @@ export function ResultsDashboard() {
   const hitlPending = useRunStore((s) => s.hitlPending)
   const interruptValue = useRunStore((s) => s.interruptValue)
   const [tab, setTab] = useState<'dataset' | 'model'>('dataset')
+  const reviewPanelRef = useRef<HTMLDivElement>(null)
+
+  const isDataValidationHITL = hitlPending && (interruptValue as { type?: string })?.type === 'data_validation'
+
+  useEffect(() => {
+    if (isDataValidationHITL) {
+      setTab('dataset')
+      setTimeout(() => reviewPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
+    }
+  }, [isDataValidationHITL])
 
   const toolResults = useMemo(() => {
     const results: Record<string, unknown> = {}
@@ -438,11 +489,13 @@ export function ResultsDashboard() {
               missing={missing}
               validation={validation}
               running={running}
+              hideRawSample={isDataValidationHITL && !!merged}
             />
-            {hitlPending && (interruptValue as { type?: string })?.type === 'data_validation' && (
+            {isDataValidationHITL && (
               <DatasetReviewPanel
                 runId={runId}
                 interruptValue={interruptValue as unknown as DataValidationInterrupt}
+                panelRef={reviewPanelRef}
               />
             )}
           </>

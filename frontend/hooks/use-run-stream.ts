@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import { useRunStore } from '@/stores/run-store'
 import { fetchRunStatus } from '@/lib/api'
 import type { PipelineEvent } from '@/types/api'
@@ -9,9 +10,12 @@ const MAX_RETRIES = 3
 export function useRunStream(runId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const retriesRef = useRef(0)
+  const status = useRunStore((s) => s.status)
 
   useEffect(() => {
     if (!runId) return
+    const currentStatus = useRunStore.getState().status
+    if (currentStatus === 'complete' || currentStatus === 'failed') return
 
     function connect() {
       const ws = new WebSocket(`${WS_BASE}/ws/${runId}`)
@@ -25,7 +29,14 @@ export function useRunStream(runId: string | null) {
           setHITL(event.data)
         }
         if (event.type === 'run_complete') {
-          setStatus('complete')
+          const error = event.data.error as string | undefined
+          if (error) {
+            toast.error('Pipeline failed', { description: error })
+            setStatus('failed')
+          } else {
+            toast.success('Pipeline complete')
+            setStatus('complete')
+          }
           ws.close()
         }
       }
