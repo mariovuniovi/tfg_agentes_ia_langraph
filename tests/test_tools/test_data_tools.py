@@ -2,10 +2,11 @@
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pandas as pd
-import pytest
 
+import mlops_agents.tools.data_tools as _dt
 from mlops_agents.tools.data_tools import (
     apply_column_mapping,
     check_missing_values,
@@ -13,7 +14,6 @@ from mlops_agents.tools.data_tools import (
     merge_datasets,
     validate_against_schema,
 )
-
 
 # ---------------------------------------------------------------------------
 # load_dataset
@@ -93,7 +93,6 @@ def test_check_missing_values_passed_threshold_true_when_clean(sample_csv):
 # ---------------------------------------------------------------------------
 
 def test_validate_against_schema_passes_valid_data(canonical_iris_csv, iris_schema_file):
-    from mlops_agents.tools.data_tools import validate_against_schema
     result = json.loads(validate_against_schema.invoke({
         "canonical_path": str(canonical_iris_csv),
         "schema_path": str(iris_schema_file),
@@ -103,7 +102,6 @@ def test_validate_against_schema_passes_valid_data(canonical_iris_csv, iris_sche
 
 
 def test_validate_against_schema_detects_nullable_violation(tmp_path, iris_schema_file):
-    from mlops_agents.tools.data_tools import validate_against_schema
     df = pd.DataFrame({
         "sepal_length": [5.1, None],
         "sepal_width":  [3.5, 3.0],
@@ -123,7 +121,6 @@ def test_validate_against_schema_detects_nullable_violation(tmp_path, iris_schem
 
 
 def test_validate_against_schema_detects_min_violation(tmp_path, iris_schema_file):
-    from mlops_agents.tools.data_tools import validate_against_schema
     df = pd.DataFrame({
         "sepal_length": [-1.0, 4.9],
         "sepal_width":  [3.5, 3.0],
@@ -143,7 +140,6 @@ def test_validate_against_schema_detects_min_violation(tmp_path, iris_schema_fil
 
 
 def test_validate_against_schema_detects_allowed_values_violation(tmp_path, iris_schema_file):
-    from mlops_agents.tools.data_tools import validate_against_schema
     df = pd.DataFrame({
         "sepal_length": [5.1],
         "sepal_width":  [3.5],
@@ -163,7 +159,6 @@ def test_validate_against_schema_detects_allowed_values_violation(tmp_path, iris
 
 
 def test_validate_against_schema_detects_missing_required_column(tmp_path, iris_schema_file):
-    from mlops_agents.tools.data_tools import validate_against_schema
     df = pd.DataFrame({
         "sepal_length": [5.1],
         "sepal_width":  [3.5],
@@ -187,7 +182,6 @@ def test_validate_against_schema_detects_missing_required_column(tmp_path, iris_
 # ---------------------------------------------------------------------------
 
 def test_apply_column_mapping_renames_columns(tmp_path, sample_csv):
-    from mlops_agents.tools.data_tools import apply_column_mapping
     mapping = json.dumps({"feature_1": "sepal_length", "feature_2": "sepal_width", "target": "target"})
     output_path = str(tmp_path / "canonical.csv")
     result = json.loads(apply_column_mapping.invoke({
@@ -203,7 +197,6 @@ def test_apply_column_mapping_renames_columns(tmp_path, sample_csv):
 
 
 def test_apply_column_mapping_drops_unmapped_columns(tmp_path, sample_csv):
-    from mlops_agents.tools.data_tools import apply_column_mapping
     mapping = json.dumps({"feature_1": "sepal_length"})
     output_path = str(tmp_path / "canonical.csv")
     result = json.loads(apply_column_mapping.invoke({
@@ -219,7 +212,6 @@ def test_apply_column_mapping_drops_unmapped_columns(tmp_path, sample_csv):
 
 
 def test_apply_column_mapping_writes_output_file(tmp_path, sample_csv):
-    from mlops_agents.tools.data_tools import apply_column_mapping
     mapping = json.dumps({"feature_1": "sepal_length", "target": "target"})
     output_path = str(tmp_path / "out.csv")
     apply_column_mapping.invoke({
@@ -231,7 +223,6 @@ def test_apply_column_mapping_writes_output_file(tmp_path, sample_csv):
 
 
 def test_apply_column_mapping_reports_mapped_columns(tmp_path, sample_csv):
-    from mlops_agents.tools.data_tools import apply_column_mapping
     mapping = json.dumps({"feature_1": "sepal_length", "target": "target"})
     output_path = str(tmp_path / "out.csv")
     result = json.loads(apply_column_mapping.invoke({
@@ -248,7 +239,6 @@ def test_apply_column_mapping_reports_mapped_columns(tmp_path, sample_csv):
 # ---------------------------------------------------------------------------
 
 def test_merge_datasets_joins_two_files(tmp_path, measurements_csv, labels_csv):
-    from mlops_agents.tools.data_tools import merge_datasets
     join_spec = json.dumps({
         "join_key": "sample_id",
         "files": [
@@ -269,7 +259,6 @@ def test_merge_datasets_joins_two_files(tmp_path, measurements_csv, labels_csv):
 
 
 def test_merge_datasets_writes_output_file(tmp_path, measurements_csv, labels_csv):
-    from mlops_agents.tools.data_tools import merge_datasets
     join_spec = json.dumps({
         "join_key": "sample_id",
         "files": [
@@ -283,7 +272,6 @@ def test_merge_datasets_writes_output_file(tmp_path, measurements_csv, labels_cs
 
 
 def test_merge_datasets_returns_error_when_key_missing(tmp_path, measurements_csv, labels_csv):
-    from mlops_agents.tools.data_tools import merge_datasets
     join_spec = json.dumps({
         "join_key": "sample_id",
         "files": [
@@ -301,7 +289,6 @@ def test_merge_datasets_returns_error_when_key_missing(tmp_path, measurements_cs
 
 
 def test_merge_datasets_returns_error_when_join_produces_zero_rows(tmp_path):
-    from mlops_agents.tools.data_tools import merge_datasets
     df_a = pd.DataFrame({"id": [1, 2], "val_a": [10, 20]})
     df_b = pd.DataFrame({"id": [3, 4], "val_b": ["x", "y"]})
     path_a = tmp_path / "a.csv"
@@ -326,9 +313,6 @@ def test_merge_datasets_returns_error_when_join_produces_zero_rows(tmp_path):
 # ---------------------------------------------------------------------------
 # impute_missing_values
 # ---------------------------------------------------------------------------
-
-from unittest.mock import MagicMock
-import mlops_agents.tools.data_tools as _dt
 
 
 def _make_settings(numeric: str = "mean", categorical: str = "mode") -> MagicMock:

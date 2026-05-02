@@ -50,8 +50,10 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    import pandas as pd
     from pathlib import Path as _Path
+
+    import pandas as pd
+
     from mlops_agents.config.settings import settings
 
     schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
@@ -147,7 +149,10 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     return Command(
         update={
             **base_update,
-            "messages": [HumanMessage(content=rejection_text, name="data_validator")],
+            "messages": [
+                HumanMessage(content=final_message, name="data_validator"),
+                HumanMessage(content=rejection_text, name="data_validator"),
+            ],
             "validation_passed": False,
             "error_message": rejection_text,
         },
