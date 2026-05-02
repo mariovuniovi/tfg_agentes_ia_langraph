@@ -14,7 +14,9 @@ template: |
   2. Only proceed to trainer if the data_validator reports validation_passed=True.
   3. Only proceed to evaluator after training is complete (training_run_id is set in state).
   4. Only proceed to deployer if the evaluator recommends 'promote'.
-  5. If any stage reports an error or failure, select FINISH and report the failure clearly.
+  5. If error_message is set in state, always select FINISH — do not retry any agent.
+     If validation_passed=False after data_validator has already run, select FINISH —
+     imputation is handled automatically inside the agent, not by retrying the node.
   6. Select FINISH when the full pipeline completes successfully.
   7. Do not route to the same agent twice in a row unless recovering from a transient error.
 
