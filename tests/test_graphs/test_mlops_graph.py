@@ -85,7 +85,10 @@ def test_data_validator_node_approved_returns_to_supervisor(tmp_path):
 def test_data_validator_node_rejected_injects_message(tmp_path):
     """On rejection, node injects a HumanMessage with the comment and sets validation_passed=False."""
     state = _make_validator_state(tmp_path)
-    mock_agent = _make_mock_agent()
+    mock_agent = _make_mock_agent(
+        tool_name="validate_against_schema",
+        tool_content='{"passed": true}',
+    )
 
     with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
          patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": False, "comment": "rename column X"}):
@@ -104,7 +107,10 @@ def test_data_validator_node_rejected_injects_message(tmp_path):
 def test_data_validator_node_interrupt_payload_has_type(tmp_path):
     """The interrupt payload must have type='data_validation'."""
     state = _make_validator_state(tmp_path)
-    mock_agent = _make_mock_agent()
+    mock_agent = _make_mock_agent(
+        tool_name="validate_against_schema",
+        tool_content='{"passed": true}',
+    )
     captured = {}
 
     def fake_interrupt(value):
