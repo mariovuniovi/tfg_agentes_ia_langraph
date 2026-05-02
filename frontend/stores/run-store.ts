@@ -7,11 +7,13 @@ interface RunState {
   events: PipelineEvent[]
   interruptValue: Record<string, unknown> | null
   hitlPending: boolean
+  stagedFiles: File[]
   setRunId: (id: string) => void
   appendEvent: (event: PipelineEvent) => void
   setHITL: (value: Record<string, unknown>) => void
   clearHITL: () => void
   setStatus: (status: RunStatus | 'idle') => void
+  setStagedFiles: (files: File[]) => void
   reset: () => void
 }
 
@@ -21,6 +23,7 @@ const initial = {
   events: [],
   interruptValue: null,
   hitlPending: false,
+  stagedFiles: [] as File[],
 }
 
 export const useRunStore = create<RunState>((set) => ({
@@ -30,5 +33,6 @@ export const useRunStore = create<RunState>((set) => ({
   setHITL: (value) => set({ hitlPending: true, interruptValue: value, status: 'awaiting_approval' }),
   clearHITL: () => set({ hitlPending: false }),
   setStatus: (status) => set({ status }),
+  setStagedFiles: (files) => set({ stagedFiles: files }),
   reset: () => set(initial),
 }))

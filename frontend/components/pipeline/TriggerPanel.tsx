@@ -6,14 +6,15 @@ import { useRunStore } from '@/stores/run-store'
 import { RunStatusBadge } from './RunStatusBadge'
 import { formatBytes } from '@/lib/format'
 
-export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => void }) {
-  const [files, setFiles] = useState<File[]>([])
+export function TriggerPanel() {
+  const files = useRunStore((s) => s.stagedFiles)
+  const setStagedFiles = useRunStore((s) => s.setStagedFiles)
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const status = useRunStore((s) => s.status)
 
   function removeFile(index: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
+    setStagedFiles(files.filter((_, i) => i !== index))
   }
 
   async function handleRun() {
@@ -23,12 +24,10 @@ export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => v
       const { paths } = await uploadFiles(files)
       const { run_id } = await startRun(paths)
       useRunStore.getState().setRunId(run_id)
-      onRunStarted(run_id)
-      toast.success('Pipeline started', {
-        description: `${files.length} file${files.length > 1 ? 's' : ''} uploaded · ${run_id}`,
-      })
+      setStagedFiles([])
+      toast.success('Pipeline started', { description: run_id })
     } catch (err) {
-      toast.error('Upload failed', {
+      toast.error('Failed to start pipeline', {
         description: err instanceof Error ? err.message : 'Check file format and try again',
       })
     } finally {
@@ -54,8 +53,13 @@ export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => v
         accept=".csv"
         className="hidden"
         onChange={(e) => {
-          setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])
+          const picked = Array.from(e.target.files ?? [])
           if (inputRef.current) inputRef.current.value = ''
+          if (!picked.length) return
+          setStagedFiles([...files, ...picked])
+          toast.success(`${picked.length} file${picked.length > 1 ? 's' : ''} added`, {
+            description: picked.map((f) => f.name).join(', '),
+          })
         }}
       />
 
@@ -91,6 +95,7 @@ export function TriggerPanel({ onRunStarted }: { onRunStarted: (id: string) => v
         </button>
         <RunStatusBadge />
       </div>
+
     </div>
   )
 }
