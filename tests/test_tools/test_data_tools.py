@@ -321,3 +321,145 @@ def test_merge_datasets_returns_error_when_join_produces_zero_rows(tmp_path):
         "output_path": output_path,
     }))
     assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# impute_missing_values
+# ---------------------------------------------------------------------------
+
+from unittest.mock import MagicMock
+import mlops_agents.tools.data_tools as _dt
+
+
+def _make_settings(numeric: str = "mean", categorical: str = "mode") -> MagicMock:
+    s = MagicMock()
+    s.imputation_strategy_numeric = numeric
+    s.imputation_strategy_categorical = categorical
+    return s
+
+
+def test_impute_numeric_mean(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"sepal_width": [3.0, None, 5.0], "target": ["a", "b", "c"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings(numeric="mean"))
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert "sepal_width" in result["imputed_columns"]
+    assert result["imputed_columns"]["sepal_width"]["strategy"] == "mean"
+    assert result["imputed_columns"]["sepal_width"]["rows_affected"] == 1
+    assert abs(result["imputed_columns"]["sepal_width"]["fill_value"] - 4.0) < 0.01
+    df_after = pd.read_csv(path)
+    assert df_after["sepal_width"].isnull().sum() == 0
+
+
+def test_impute_numeric_median(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"val": [1.0, None, 9.0, None, 5.0]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings(numeric="median"))
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["imputed_columns"]["val"]["strategy"] == "median"
+    assert result["imputed_columns"]["val"]["rows_affected"] == 2
+    df_after = pd.read_csv(path)
+    assert df_after["val"].isnull().sum() == 0
+
+
+def test_impute_numeric_zero(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"val": [1.0, None, 3.0]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings(numeric="zero"))
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["imputed_columns"]["val"]["fill_value"] == 0.0
+    df_after = pd.read_csv(path)
+    assert df_after["val"].isnull().sum() == 0
+
+
+def test_impute_categorical_mode(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"species": ["setosa", "setosa", None, "virginica"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings(categorical="mode"))
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["imputed_columns"]["species"]["fill_value"] == "setosa"
+    df_after = pd.read_csv(path)
+    assert df_after["species"].isnull().sum() == 0
+
+
+def test_impute_categorical_unknown(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"species": ["setosa", None]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings(categorical="unknown"))
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["imputed_columns"]["species"]["fill_value"] == "unknown"
+
+
+def test_impute_categorical_drop_row(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"species": ["setosa", None, "virginica"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings(categorical="drop_row"))
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["imputed_columns"]["species"]["strategy"] == "drop_row"
+    df_after = pd.read_csv(path)
+    assert len(df_after) == 2
+
+
+def test_impute_no_missing_is_noop(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"val": [1.0, 2.0, 3.0]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings())
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["imputed_columns"] == {}
+
+
+def test_impute_returns_output_path(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    df = pd.DataFrame({"val": [1.0, None]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    monkeypatch.setattr(_dt, "settings", _make_settings())
+    result = json.loads(impute_missing_values.invoke({"path": str(path)}))
+
+    assert result["output_path"] == str(path)
+
+
+def test_impute_file_not_found(tmp_path, monkeypatch):
+    from mlops_agents.tools.data_tools import impute_missing_values
+
+    monkeypatch.setattr(_dt, "settings", _make_settings())
+    result = json.loads(impute_missing_values.invoke({"path": "/nonexistent/file.csv"}))
+
+    assert "error" in result
