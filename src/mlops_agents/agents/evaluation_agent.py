@@ -10,7 +10,7 @@ from mlops_agents.utils.llm import get_llm
 def build_evaluation_agent():
     """Build and return the model evaluation react agent."""
     return create_agent(
-        model=get_llm(),
+        model=get_llm("evaluator"),
         tools=[get_best_run],
         name="evaluator",
         system_prompt=get_prompt("evaluation_agent").template,

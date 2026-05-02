@@ -1654,6 +1654,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "evidently" },
+    { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain" },
     { name = "langchain-core" },
@@ -1670,8 +1671,10 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "scikit-learn" },
     { name = "streamlit" },
+    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.dev-dependencies]
@@ -1686,6 +1689,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "evidently", specifier = ">=0.5" },
+    { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "langchain", specifier = ">=1.0" },
     { name = "langchain-core", specifier = ">=1.0" },
@@ -1702,8 +1706,10 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.7" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "python-multipart", specifier = ">=0.0.12" },
     { name = "scikit-learn", specifier = ">=1.6" },
     { name = "streamlit", specifier = ">=1.40" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
 [package.metadata.requires-dev]

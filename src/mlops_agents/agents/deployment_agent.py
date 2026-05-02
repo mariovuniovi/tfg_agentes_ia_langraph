@@ -16,7 +16,7 @@ def build_deployment_agent():
     approval logic explicit in the graph topology.
     """
     return create_agent(
-        model=get_llm(),
+        model=get_llm("deployer"),
         tools=[register_model, set_model_alias],
         name="deployer",
         system_prompt=get_prompt("deployment_agent").template,

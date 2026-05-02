@@ -37,6 +37,7 @@ CLAUDE.local.md
 
 # Data — large raw files
 data/raw/
+data/uploads/
 *.parquet
 *.pkl
 *.joblib
@@ -54,3 +55,5 @@ Thumbs.db
 # files
 CLAUDE.md
 CLAUDE_backup.md
+.worktrees/
+.superpowers/

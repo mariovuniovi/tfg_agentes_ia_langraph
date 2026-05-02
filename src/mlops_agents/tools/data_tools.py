@@ -12,6 +12,7 @@ import pandas as pd
 from langchain_core.tools import tool
 
 from mlops_agents.config.constants import MAX_DRIFT_SCORE
+from mlops_agents.config.settings import settings
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -223,3 +224,61 @@ def merge_datasets(join_spec_json: str, output_path: str) -> str:
     }
     logger.info(f"Merged {len(file_specs)} files → {len(merged)} rows, {len(merged.columns)} columns → {output_path}")
     return json.dumps(result)
+
+
+@tool
+def impute_missing_values(path: str) -> str:
+    """Impute missing values in a canonical CSV using strategies from settings.
+
+    Numeric columns (float64, int64): uses settings.imputation_strategy_numeric
+    Categorical columns (object): uses settings.imputation_strategy_categorical
+
+    Writes the result back to the same path (in-place).
+
+    Args:
+        path: Path to the canonical CSV file to impute.
+
+    Returns:
+        JSON with {output_path, imputed_columns} where each imputed column
+        maps to {strategy, fill_value, rows_affected}.
+    """
+    csv_path = Path(path)
+    if not csv_path.exists():
+        return json.dumps({"error": f"File not found: {path}"})
+
+    df = pd.read_csv(csv_path)
+    imputed: dict[str, dict] = {}
+
+    numeric_strategy = settings.imputation_strategy_numeric
+    categorical_strategy = settings.imputation_strategy_categorical
+
+    for col in df.columns:
+        null_count = int(df[col].isnull().sum())
+        if null_count == 0:
+            continue
+
+        if df[col].dtype in ("float64", "int64"):
+            if numeric_strategy == "mean":
+                fill_value = float(df[col].mean())
+            elif numeric_strategy == "median":
+                fill_value = float(df[col].median())
+            else:  # "zero"
+                fill_value = 0.0
+            df[col] = df[col].fillna(fill_value)
+            imputed[col] = {"strategy": numeric_strategy, "fill_value": fill_value, "rows_affected": null_count}
+
+        elif df[col].dtype == object:
+            if categorical_strategy == "mode":
+                fill_value = str(df[col].mode().iloc[0]) if not df[col].mode().empty else "unknown"
+                df[col] = df[col].fillna(fill_value)
+                imputed[col] = {"strategy": "mode", "fill_value": fill_value, "rows_affected": null_count}
+            elif categorical_strategy == "unknown":
+                df[col] = df[col].fillna("unknown")
+                imputed[col] = {"strategy": "unknown", "fill_value": "unknown", "rows_affected": null_count}
+            else:  # "drop_row"
+                df = df.dropna(subset=[col])
+                imputed[col] = {"strategy": "drop_row", "fill_value": None, "rows_affected": null_count}
+
+    df.to_csv(csv_path, index=False)
+    logger.info(f"Imputed {len(imputed)} column(s) in {csv_path.name}")
+    return json.dumps({"output_path": str(csv_path), "imputed_columns": imputed}, default=str)

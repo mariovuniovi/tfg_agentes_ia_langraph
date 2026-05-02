@@ -51,6 +51,9 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     from pathlib import Path as _Path
+
+    import pandas as pd
+
     from mlops_agents.config.settings import settings
 
     schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
@@ -73,17 +76,85 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")
     mapping_result: dict = _extract_tool_json(result["messages"], "apply_column_mapping")
     validation_result: dict = _extract_tool_json(result["messages"], "validate_against_schema")
+    imputation_result: dict = _extract_tool_json(result["messages"], "impute_missing_values")
 
     processed_path = mapping_result.get("output_path", "")
     validation_passed = bool(validation_result.get("passed", False))
 
-    logger.info("[data_validator] completed — routing back to supervisor")
+    base_update = {
+        "messages": [HumanMessage(content=final_message, name="data_validator")],
+        "validation_report": quality_report,
+        "validation_passed": validation_passed,
+        "dataset_path": processed_path,
+    }
+
+    if not validation_passed:
+        # Validation failed after agent's auto-fix attempt — abort without HITL.
+        # The supervisor will see error_message set and select FINISH.
+        error_msg = f"Data validation failed after auto-fix attempt: {final_message}"
+        logger.warning("[data_validator] validation failed — aborting without HITL")
+        return Command(
+            update={**base_update, "error_message": error_msg},
+            goto="supervisor",
+        )
+
+    # Validation passed — build preview and surface HITL for human sign-off.
+    # Use df.to_json + json.loads so NaN/Inf become null — plain to_dict() leaves
+    # Python float('nan') which serialises to the bare token NaN, invalid JSON.
+    preview: dict = {"shape": [0, 0], "columns": [], "sample_rows": []}
+    if processed_path:
+        try:
+            df = pd.read_csv(processed_path)
+            preview = {
+                "shape": list(df.shape),
+                "columns": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "sample_rows": json.loads(df.head(20).to_json(orient="records")),
+            }
+        except Exception:
+            pass
+
+    counts = dict(state.get("agent_attempt_counts") or {})
+    attempt = counts.get("data_validator", 1)
+
+    missing_vals: dict = {}
+    if isinstance(quality_report, dict):
+        missing_vals = quality_report.get("missing_values", {})
+
+    approval = interrupt({
+        "type": "data_validation",
+        "question": "Review the processed dataset before training begins.",
+        "attempt": attempt,
+        "dataset_preview": preview,
+        "validation_summary": {
+            "passed": True,
+            "missing_values": missing_vals,
+            "schema_validated": True,
+        },
+        "imputation_applied": imputation_result,
+    })
+
+    if approval.get("approved", False):
+        logger.info("[data_validator] approved — routing back to supervisor")
+        return Command(update=base_update, goto="supervisor")
+
+    # Human rejected a validated+imputed dataset. Abort — retrying cannot help
+    # because tools and strategy are deterministic.
+    comment = approval.get("comment", "")
+    rejection_text = (
+        f"Dataset rejected by human reviewer. Comment: {comment}"
+        if comment
+        else "Dataset rejected by human reviewer."
+    )
+    logger.info(f"[data_validator] rejected — comment: {comment!r}")
     return Command(
         update={
-            "messages": [HumanMessage(content=final_message, name="data_validator")],
-            "validation_report": quality_report,
-            "validation_passed": validation_passed,
-            "dataset_path": processed_path,
+            **base_update,
+            "messages": [
+                HumanMessage(content=final_message, name="data_validator"),
+                HumanMessage(content=rejection_text, name="data_validator"),
+            ],
+            "validation_passed": False,
+            "error_message": rejection_text,
         },
         goto="supervisor",
     )
@@ -235,7 +306,7 @@ def main() -> None:
         "deployment_decision": "pending",
         "deployment_status": "",
         "error_message": "",
-        "retry_count": 0,
+        "agent_attempt_counts": {},
     }
 
     print(f"\n{'='*60}")

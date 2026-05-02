@@ -39,7 +39,7 @@ def test_full_pipeline_runs_on_sample_dataset(sample_csv):
         "deployment_decision": "pending",
         "deployment_status": "",
         "error_message": "",
-        "retry_count": 0,
+        "agent_attempt_counts": {},
     }
 
     result = graph.invoke(initial_state, config=config)

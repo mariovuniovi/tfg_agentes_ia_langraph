@@ -94,7 +94,7 @@ def _make_state() -> dict:
         "deployment_decision": "pending",
         "deployment_status": "",
         "error_message": "",
-        "retry_count": 0,
+        "agent_attempt_counts": {},
     }
 
 
@@ -119,7 +119,8 @@ def test_data_validator_node_populates_validation_report():
             AIMessage(content="Data validation passed."),
         ]
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -145,6 +146,9 @@ def test_data_validator_node_passed_false_when_no_tool_output():
 
     assert command.update["validation_report"] == {}
     assert command.update["validation_passed"] is False
+    assert "error_message" in command.update
+    assert len(command.update["error_message"]) > 0
+    assert command.goto == "supervisor"
 
 
 # ---------------------------------------------------------------------------
@@ -227,4 +231,73 @@ def test_evaluator_node_populates_evaluation_report():
     assert command.update["evaluation_report"]["candidate_metrics"]["accuracy"] == 0.97
     assert command.update["evaluation_report"]["baseline_metrics"]["accuracy"] == 0.93
     assert command.update["evaluation_report"]["candidate_run_id"] == "run1"
+    assert command.goto == "supervisor"
+
+
+def test_data_validator_node_includes_imputation_in_hitl_payload():
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    imputation_json = json.dumps({
+        "output_path": "./data/processed/iris.csv",
+        "imputed_columns": {
+            "sepal_width": {"strategy": "mean", "fill_value": 3.5, "rows_affected": 1}
+        },
+    })
+    validation_json = json.dumps({"passed": True})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            ToolMessage(content=imputation_json, tool_call_id="2", name="impute_missing_values"),
+            AIMessage(content="Validation passed after imputation."),
+        ]
+    }
+
+    captured_payload: dict = {}
+
+    def fake_interrupt(payload: dict) -> dict:
+        captured_payload.update(payload)
+        return {"approved": True, "comment": ""}
+
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fake_interrupt):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        command = data_validator_node(_make_state())
+
+    assert "imputation_applied" in captured_payload
+    assert "sepal_width" in captured_payload["imputation_applied"]["imputed_columns"]
+    assert command.update["validation_passed"] is True
+    assert command.goto == "supervisor"
+
+
+def test_data_validator_node_no_hitl_when_validation_fails():
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    validation_json = json.dumps({"passed": False, "violations": [{"column": "target", "rule": "allowed_values", "detail": "Unexpected values: ['bad']"}]})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            AIMessage(content="Validation failed. Target column has invalid values."),
+        ]
+    }
+
+    interrupt_called = []
+
+    def fail_if_called(payload: dict) -> dict:
+        interrupt_called.append(payload)
+        return {}
+
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        command = data_validator_node(_make_state())
+
+    assert len(interrupt_called) == 0
+    assert command.update["validation_passed"] is False
+    assert "error_message" in command.update
     assert command.goto == "supervisor"

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Multi-agent MLOps system using a custom LangGraph supervisor pattern.
 Four specialist agents (data validation, training, evaluation, deployment)
 orchestrated by a supervisor with structured output routing.
-Built with UV, Streamlit dashboard, MLflow, Evidently AI, and GitHub Models (gpt-4.1-mini).
+Built with UV, Streamlit dashboard, MLflow, Evidently AI, and OpenAI API (gpt-4.1-mini).
 
 ## Commands
 ```
@@ -92,6 +92,7 @@ Touch only what you must. Clean up only your own mess.
 - **Agent creation**: use `from langchain.agents import create_agent` with `system_prompt=` parameter — `create_react_agent` from `langgraph.prebuilt` is deprecated and removed
 - **Evidently 0.7.21 API**: use `DataSummaryPreset` (not `DataQualityPreset`), `DataDriftPreset()` (no `method=` arg), and `result.dump_dict()` (not `as_dict()` or `load_dict()`)
 - Never commit changes
+- **Never add Claude as co-author** in any commit or merge message — do not include `Co-Authored-By: Claude` or any Anthropic co-author trailer
 
 ## Agent Design Principles
 - **Deterministic first**: data loading, training loop, metric computation = pure Python nodes

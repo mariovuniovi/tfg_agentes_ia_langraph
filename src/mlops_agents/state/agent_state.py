@@ -39,4 +39,4 @@ class AgentState(TypedDict):
 
     # Error tracking
     error_message: str
-    retry_count: int
+    agent_attempt_counts: dict[str, int]  # {"data_validator": 1, "trainer": 2, …}
