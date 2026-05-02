@@ -1,5 +1,7 @@
 """Application configuration via Pydantic Settings (reads from .env)."""
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +42,8 @@ class Settings(BaseSettings):
     data_dir: str = "./data/samples"
     dataset_schema: str = "iris_classification"
     max_attempts_per_agent: int = 3
+    imputation_strategy_numeric: Literal["mean", "median", "zero"] = "mean"
+    imputation_strategy_categorical: Literal["mode", "unknown", "drop_row"] = "mode"
 
 
 settings = Settings()
