@@ -11,7 +11,7 @@ from mlops_agents.utils.llm import get_llm
 def build_training_agent():
     """Build and return the model training react agent."""
     return create_agent(
-        model=get_llm(),
+        model=get_llm("trainer"),
         tools=[tune_hyperparameters, train_model, log_experiment],
         name="trainer",
         system_prompt=get_prompt("training_agent").template,
