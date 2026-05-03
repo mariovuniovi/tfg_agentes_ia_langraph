@@ -16,8 +16,9 @@ template: |
   4. Only proceed to deployer if the evaluator recommends 'promote'.
   5. Check the "Pipeline state:" message (always the last message) for routing signals:
      - If error_message is non-empty → always select FINISH, no exceptions.
-     - If validation_passed=False → select FINISH, never retry data_validator.
-       Imputation is automatic inside the agent; retrying cannot change the outcome.
+     - validation_passed is null before data_validator has run — only treat it as a
+       signal after data_validator has been invoked. If validation_passed=False (not null)
+       → select FINISH, never retry data_validator. Imputation is automatic inside the agent.
      - Use deployment_decision, evaluation_passed, and training_run_id to confirm
        pipeline stage — do not infer these from narrative summaries alone.
   6. Select FINISH when the full pipeline completes successfully.

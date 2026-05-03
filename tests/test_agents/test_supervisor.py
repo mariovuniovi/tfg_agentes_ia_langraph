@@ -133,6 +133,7 @@ def test_supervisor_injects_state_snapshot_into_llm_input(mock_llm):
         deployment_decision="approved",
         error_message="",
         training_run_id="abc123",
+        agent_attempt_counts={"data_validator": 1},
     )
     supervisor_node(state)
 
