@@ -376,3 +376,86 @@ def test_build_deployer_context_includes_model_uri_and_report():
     assert "runs:/abc123/model" in msg.content
     assert "abc123" in msg.content
     assert "0.97" in msg.content
+
+
+def test_data_validator_node_builds_dataset_summary_on_success():
+    """data_validator_node must set dataset_summary in state when validation passes."""
+    import tempfile, os
+    import pandas as pd
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write("a,b\n1,2\n3,4\n")
+        tmp_path = f.name
+
+    validation_json = json.dumps({"passed": True, "output_path": tmp_path})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            AIMessage(content="Validation passed."),
+        ]
+    }
+
+    try:
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+            mock_agent = MagicMock()
+            mock_agent.invoke.return_value = mock_result
+            mock_get_agent.return_value = mock_agent
+
+            state = _make_state()
+            state["dataset_paths"] = [tmp_path]
+            command = data_validator_node(state)
+    finally:
+        os.unlink(tmp_path)
+
+    assert "dataset_summary" in command.update
+    assert command.update["dataset_summary"]["row_count"] == 2
+    assert "a" in command.update["dataset_summary"]["column_names"]
+    assert "b" in command.update["dataset_summary"]["column_names"]
+
+
+def test_data_validator_node_sets_empty_dataset_summary_on_failure():
+    """dataset_summary must be {} when validation fails."""
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    mock_result = {"messages": [AIMessage(content="Could not validate.")]}
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        command = data_validator_node(_make_state())
+
+    assert command.update.get("dataset_summary") == {}
+
+
+def test_data_validator_node_invokes_agent_with_isolated_context():
+    """data_validator_node must NOT pass state['messages'] to agent.invoke."""
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    validation_json = json.dumps({"passed": True, "output_path": ""})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            AIMessage(content="Validation passed."),
+        ]
+    }
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        state = _make_state()
+        state["messages"] = [
+            HumanMessage(content="Prior supervisor message 1"),
+            HumanMessage(content="Prior supervisor message 2"),
+        ]
+        data_validator_node(state)
+
+    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
+    assert len(call_messages) == 1, (
+        f"Expected exactly 1 context message, got {len(call_messages)}. "
+        "Prior state['messages'] must not be forwarded to worker agents."
+    )

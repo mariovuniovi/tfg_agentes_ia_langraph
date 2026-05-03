@@ -96,17 +96,8 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     schema_json = schema_file.read_text() if schema_file.exists() else "{}"
     schema_path = str(schema_file.resolve())
 
-    dataset_paths = state.get("dataset_paths", [])
-    context_message = HumanMessage(
-        content=(
-            f"Raw files: {json.dumps(dataset_paths)}\n"
-            f"Schema path: {schema_path}\n"
-            f"Target schema:\n{schema_json}"
-        )
-    )
-
     agent = get_agent("data_validator")
-    result = agent.invoke({"messages": list(state["messages"]) + [context_message]})
+    result = agent.invoke({"messages": [_build_data_validator_context(state, schema_json=schema_json, schema_path=schema_path)]})
     final_message = result["messages"][-1].content
 
     quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")
@@ -114,14 +105,31 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     validation_result: dict = _extract_tool_json(result["messages"], "validate_against_schema")
     imputation_result: dict = _extract_tool_json(result["messages"], "impute_missing_values")
 
-    processed_path = mapping_result.get("output_path", "")
+    processed_path = (
+        mapping_result.get("output_path", "")
+        or validation_result.get("output_path", "")
+    )
     validation_passed = bool(validation_result.get("passed", False))
+
+    dataset_summary: dict = {}
+    if processed_path:
+        try:
+            df = pd.read_csv(processed_path)
+            dataset_summary = {
+                "row_count": len(df),
+                "column_names": list(df.columns),
+                "dtypes": df.dtypes.astype(str).to_dict(),
+                "null_counts": df.isnull().sum().to_dict(),
+            }
+        except Exception:
+            pass
 
     base_update = {
         "messages": [HumanMessage(content=final_message, name="data_validator")],
         "validation_report": quality_report,
         "validation_passed": validation_passed,
         "dataset_path": processed_path,
+        "dataset_summary": dataset_summary,
     }
 
     if not validation_passed:
