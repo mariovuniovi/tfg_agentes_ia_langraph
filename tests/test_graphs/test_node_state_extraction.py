@@ -100,8 +100,9 @@ def _make_state() -> dict:
 
 
 def test_agent_state_has_dataset_summary_field():
-    from mlops_agents.state.agent_state import AgentState
     import typing
+
+    from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "dataset_summary" in hints
 
@@ -380,8 +381,9 @@ def test_build_deployer_context_includes_model_uri_and_report():
 
 def test_data_validator_node_builds_dataset_summary_on_success():
     """data_validator_node must set dataset_summary in state when validation passes."""
-    import tempfile, os
-    import pandas as pd
+    import os
+    import tempfile
+
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:

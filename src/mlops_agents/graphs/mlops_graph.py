@@ -112,6 +112,10 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     validation_passed = bool(validation_result.get("passed", False))
 
     dataset_summary: dict = {}
+    # Validation passed — build preview and surface HITL for human sign-off.
+    # Use df.to_json + json.loads so NaN/Inf become null — plain to_dict() leaves
+    # Python float('nan') which serialises to the bare token NaN, invalid JSON.
+    preview: dict = {"shape": [0, 0], "columns": [], "sample_rows": []}
     if processed_path:
         try:
             df = pd.read_csv(processed_path)
@@ -120,6 +124,11 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
                 "column_names": list(df.columns),
                 "dtypes": df.dtypes.astype(str).to_dict(),
                 "null_counts": df.isnull().sum().to_dict(),
+            }
+            preview = {
+                "shape": list(df.shape),
+                "columns": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+                "sample_rows": json.loads(df.head(20).to_json(orient="records")),
             }
         except Exception:
             pass
@@ -141,21 +150,6 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
             update={**base_update, "error_message": error_msg},
             goto="supervisor",
         )
-
-    # Validation passed — build preview and surface HITL for human sign-off.
-    # Use df.to_json + json.loads so NaN/Inf become null — plain to_dict() leaves
-    # Python float('nan') which serialises to the bare token NaN, invalid JSON.
-    preview: dict = {"shape": [0, 0], "columns": [], "sample_rows": []}
-    if processed_path:
-        try:
-            df = pd.read_csv(processed_path)
-            preview = {
-                "shape": list(df.shape),
-                "columns": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
-                "sample_rows": json.loads(df.head(20).to_json(orient="records")),
-            }
-        except Exception:
-            pass
 
     counts = dict(state.get("agent_attempt_counts") or {})
     attempt = counts.get("data_validator", 1)
