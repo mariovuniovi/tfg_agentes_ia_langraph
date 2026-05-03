@@ -461,3 +461,80 @@ def test_data_validator_node_invokes_agent_with_isolated_context():
         f"Expected exactly 1 context message, got {len(call_messages)}. "
         "Prior state['messages'] must not be forwarded to worker agents."
     )
+
+
+def test_trainer_node_invokes_agent_with_isolated_context():
+    """trainer_node must pass exactly one context message — not state['messages']."""
+    from mlops_agents.graphs.mlops_graph import trainer_node
+
+    train_json = json.dumps({
+        "model_type": "random_forest", "model_path": "rf.pkl",
+        "train_accuracy": 0.98, "val_accuracy": 0.95,
+    })
+    mock_result = {
+        "messages": [
+            ToolMessage(content=train_json, tool_call_id="1", name="train_model"),
+            AIMessage(content="Training complete."),
+        ]
+    }
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        state = _make_state()
+        state["messages"] = [
+            HumanMessage(content="supervisor msg 1"),
+            HumanMessage(content="supervisor msg 2"),
+        ]
+        trainer_node(state)
+
+    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
+    assert len(call_messages) == 1
+
+
+def test_evaluator_node_invokes_agent_with_isolated_context():
+    """evaluator_node must pass exactly one context message — not state['messages']."""
+    from mlops_agents.graphs.mlops_graph import evaluator_node
+
+    runs_json = json.dumps([
+        {"run_id": "run1", "metrics": {"accuracy": 0.97}, "params": {}, "model_uri": "runs:/run1/model"},
+    ])
+    mock_result = {
+        "messages": [
+            ToolMessage(content=runs_json, tool_call_id="1", name="get_best_run"),
+            AIMessage(content="Evaluation complete."),
+        ]
+    }
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        state = _make_state()
+        state["messages"] = [HumanMessage(content="prior msg 1"), HumanMessage(content="prior msg 2")]
+        evaluator_node(state)
+
+    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
+    assert len(call_messages) == 1
+
+
+def test_deployer_node_invokes_agent_with_isolated_context():
+    """deployer_node must pass exactly one context message — not state['messages']."""
+    from mlops_agents.graphs.mlops_graph import deployer_node
+
+    mock_result = {
+        "messages": [AIMessage(content="Model registered as challenger.")]
+    }
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True}):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = mock_result
+        mock_get_agent.return_value = mock_agent
+
+        state = _make_state()
+        state["messages"] = [HumanMessage(content="prior 1"), HumanMessage(content="prior 2")]
+        deployer_node(state)
+
+    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
+    assert len(call_messages) == 1

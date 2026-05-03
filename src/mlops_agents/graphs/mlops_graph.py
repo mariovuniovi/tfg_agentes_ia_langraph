@@ -200,7 +200,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
 def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
     agent = get_agent("trainer")
-    result = agent.invoke({"messages": list(state["messages"])})
+    result = agent.invoke({"messages": [_build_trainer_context(state)]})
     final_message = result["messages"][-1].content
 
     train_result: dict = _extract_tool_json(result["messages"], "train_model")
@@ -226,7 +226,7 @@ def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
 def evaluator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     agent = get_agent("evaluator")
-    result = agent.invoke({"messages": list(state["messages"])})
+    result = agent.invoke({"messages": [_build_evaluator_context(state)]})
     final_message = result["messages"][-1].content
 
     best_runs_raw = _extract_tool_json(result["messages"], "get_best_run")
@@ -261,7 +261,7 @@ def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
     """
     # Step 1: register model and set challenger alias
     agent = get_agent("deployer")
-    result = agent.invoke({"messages": list(state["messages"])})
+    result = agent.invoke({"messages": [_build_deployer_context(state)]})
     registration_summary = result["messages"][-1].content
 
     # Step 2: HITL — pause and wait for human approval
