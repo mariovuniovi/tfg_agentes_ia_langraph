@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from langchain_core.messages import HumanMessage
 
 from mlops_agents.state.schemas import RouterOutput
