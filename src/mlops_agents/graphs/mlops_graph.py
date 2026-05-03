@@ -49,16 +49,15 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
     return {}
 
 
-def _build_data_validator_context(state: AgentState) -> HumanMessage:
-    from pathlib import Path as _Path
-
-    from mlops_agents.config.settings import settings
-
-    schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
-    schema_json = schema_file.read_text() if schema_file.exists() else "{}"
+def _build_data_validator_context(
+    state: AgentState,
+    *,
+    schema_json: str = "{}",
+    schema_path: str = "",
+) -> HumanMessage:
     return HumanMessage(content=(
         f"Raw files: {json.dumps(state.get('dataset_paths', []))}\n"
-        f"Schema path: {str(schema_file.resolve())}\n"
+        f"Schema path: {schema_path}\n"
         f"Target schema:\n{schema_json}"
     ))
 

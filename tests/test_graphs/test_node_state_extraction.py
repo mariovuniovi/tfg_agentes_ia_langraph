@@ -329,9 +329,15 @@ def test_build_data_validator_context_includes_schema_path():
     from mlops_agents.graphs.mlops_graph import _build_data_validator_context
 
     state = _make_state()
-    msg = _build_data_validator_context(state)
+    msg = _build_data_validator_context(
+        state,
+        schema_json='{"columns": [{"name": "target"}]}',
+        schema_path="/data/schemas/iris.json",
+    )
     assert "Schema path:" in msg.content
+    assert "/data/schemas/iris.json" in msg.content
     assert "Target schema:" in msg.content
+    assert '"target"' in msg.content
 
 
 def test_build_trainer_context_includes_dataset_path_and_summary():
