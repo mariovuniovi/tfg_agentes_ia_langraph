@@ -49,6 +49,43 @@ def _extract_tool_json(messages: list, tool_name: str) -> Any:
     return {}
 
 
+def _build_data_validator_context(state: AgentState) -> HumanMessage:
+    from pathlib import Path as _Path
+
+    from mlops_agents.config.settings import settings
+
+    schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
+    schema_json = schema_file.read_text() if schema_file.exists() else "{}"
+    return HumanMessage(content=(
+        f"Raw files: {json.dumps(state.get('dataset_paths', []))}\n"
+        f"Schema path: {str(schema_file.resolve())}\n"
+        f"Target schema:\n{schema_json}"
+    ))
+
+
+def _build_trainer_context(state: AgentState) -> HumanMessage:
+    return HumanMessage(content=(
+        f"Canonical dataset: {state.get('dataset_path', '')}\n"
+        f"Dataset summary: {json.dumps(state.get('dataset_summary') or {})}"
+    ))
+
+
+def _build_evaluator_context(state: AgentState) -> HumanMessage:
+    return HumanMessage(content=(
+        f"Training run ID: {state.get('training_run_id', '')}\n"
+        f"Trained model path: {state.get('trained_model_path', '')}\n"
+        f"Training metrics: {json.dumps(state.get('training_metrics') or {})}"
+    ))
+
+
+def _build_deployer_context(state: AgentState) -> HumanMessage:
+    return HumanMessage(content=(
+        f"Best model URI: {state.get('best_model_uri', '')}\n"
+        f"Training run ID: {state.get('training_run_id', '')}\n"
+        f"Evaluation report: {json.dumps(state.get('evaluation_report') or {})}"
+    ))
+
+
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     from pathlib import Path as _Path
 

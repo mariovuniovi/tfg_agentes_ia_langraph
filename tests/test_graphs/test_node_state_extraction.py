@@ -309,3 +309,64 @@ def test_data_validator_node_no_hitl_when_validation_fails():
     assert command.update["validation_passed"] is False
     assert "error_message" in command.update
     assert command.goto == "supervisor"
+
+
+# ---------------------------------------------------------------------------
+# Context builder pure functions
+# ---------------------------------------------------------------------------
+
+
+def test_build_data_validator_context_includes_raw_files():
+    from mlops_agents.graphs.mlops_graph import _build_data_validator_context
+
+    state = _make_state()
+    msg = _build_data_validator_context(state)
+    assert "./data/samples/iris.csv" in msg.content
+    assert "Raw files:" in msg.content
+
+
+def test_build_data_validator_context_includes_schema_path():
+    from mlops_agents.graphs.mlops_graph import _build_data_validator_context
+
+    state = _make_state()
+    msg = _build_data_validator_context(state)
+    assert "Schema path:" in msg.content
+    assert "Target schema:" in msg.content
+
+
+def test_build_trainer_context_includes_dataset_path_and_summary():
+    from mlops_agents.graphs.mlops_graph import _build_trainer_context
+
+    state = _make_state()
+    state["dataset_path"] = "data/processed/iris.csv"
+    state["dataset_summary"] = {"row_count": 150, "column_names": ["a", "b"]}
+    msg = _build_trainer_context(state)
+    assert "data/processed/iris.csv" in msg.content
+    assert "row_count" in msg.content
+    assert "150" in msg.content
+
+
+def test_build_evaluator_context_includes_run_id_and_metrics():
+    from mlops_agents.graphs.mlops_graph import _build_evaluator_context
+
+    state = _make_state()
+    state["training_run_id"] = "abc123"
+    state["trained_model_path"] = "models/rf.pkl"
+    state["training_metrics"] = {"val_accuracy": 0.95}
+    msg = _build_evaluator_context(state)
+    assert "abc123" in msg.content
+    assert "models/rf.pkl" in msg.content
+    assert "0.95" in msg.content
+
+
+def test_build_deployer_context_includes_model_uri_and_report():
+    from mlops_agents.graphs.mlops_graph import _build_deployer_context
+
+    state = _make_state()
+    state["best_model_uri"] = "runs:/abc123/model"
+    state["training_run_id"] = "abc123"
+    state["evaluation_report"] = {"candidate_metrics": {"accuracy": 0.97}}
+    msg = _build_deployer_context(state)
+    assert "runs:/abc123/model" in msg.content
+    assert "abc123" in msg.content
+    assert "0.97" in msg.content
