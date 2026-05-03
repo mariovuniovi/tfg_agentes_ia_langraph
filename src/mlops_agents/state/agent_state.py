@@ -43,3 +43,17 @@ class AgentState(TypedDict):
 
     # Context isolation — built deterministically by data_validator_node
     dataset_summary: dict  # {row_count, column_names, dtypes, null_counts}
+
+    # Task type — written once by data_validator_node before agent invocation
+    problem_type: str   # "classification" | "regression" | "forecasting"
+
+    # Task-level metadata — written once by data_validator_node
+    task_metadata: dict
+    # classification/regression: {"target_column": str}
+    # forecasting: {
+    #   "target_column": str,
+    #   "datetime_column": str,
+    #   "series_id_columns": list[str],
+    #   "forecast_horizon": int,
+    #   "frequency": str,
+    # }

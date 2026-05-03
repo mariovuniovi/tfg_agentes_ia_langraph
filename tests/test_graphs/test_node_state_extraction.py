@@ -96,6 +96,8 @@ def _make_state() -> dict:
         "error_message": "",
         "agent_attempt_counts": {},
         "dataset_summary": {},
+        "problem_type": "",
+        "task_metadata": {},
     }
 
 
@@ -105,6 +107,22 @@ def test_agent_state_has_dataset_summary_field():
     from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "dataset_summary" in hints
+
+
+def test_agent_state_has_problem_type_field():
+    import typing
+    from mlops_agents.state.agent_state import AgentState
+    hints = typing.get_type_hints(AgentState)
+    assert "problem_type" in hints
+    assert hints["problem_type"] is str
+
+
+def test_agent_state_has_task_metadata_field():
+    import typing
+    from mlops_agents.state.agent_state import AgentState
+    hints = typing.get_type_hints(AgentState)
+    assert "task_metadata" in hints
+    assert hints["task_metadata"] is dict
 
 
 def test_data_validator_node_populates_validation_report():

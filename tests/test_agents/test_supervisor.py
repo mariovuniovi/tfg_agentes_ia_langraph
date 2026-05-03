@@ -25,6 +25,8 @@ def make_state(messages=None, **kwargs):
         "error_message": "",
         "agent_attempt_counts": {},
         "dataset_summary": {},
+        "problem_type": "",
+        "task_metadata": {},
     }
     base.update(kwargs)
     return base
