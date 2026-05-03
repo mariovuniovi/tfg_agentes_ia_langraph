@@ -95,7 +95,15 @@ def _make_state() -> dict:
         "deployment_status": "",
         "error_message": "",
         "agent_attempt_counts": {},
+        "dataset_summary": {},
     }
+
+
+def test_agent_state_has_dataset_summary_field():
+    from mlops_agents.state.agent_state import AgentState
+    import typing
+    hints = typing.get_type_hints(AgentState)
+    assert "dataset_summary" in hints
 
 
 def test_data_validator_node_populates_validation_report():

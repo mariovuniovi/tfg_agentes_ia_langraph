@@ -25,6 +25,7 @@ def make_state(messages=None, **kwargs):
         "deployment_status": "",
         "error_message": "",
         "agent_attempt_counts": {},
+        "dataset_summary": {},
     }
     base.update(kwargs)
     return base

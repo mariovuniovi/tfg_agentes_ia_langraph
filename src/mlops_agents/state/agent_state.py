@@ -40,3 +40,6 @@ class AgentState(TypedDict):
     # Error tracking
     error_message: str
     agent_attempt_counts: dict[str, int]  # {"data_validator": 1, "trainer": 2, …}
+
+    # Context isolation — built deterministically by data_validator_node
+    dataset_summary: dict  # {row_count, column_names, dtypes, null_counts}
