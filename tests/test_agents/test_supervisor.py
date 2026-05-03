@@ -108,3 +108,41 @@ def test_supervisor_forces_end_when_max_attempts_reached(mock_llm):
 
     assert command.goto == END
     mock_structured.invoke.assert_called_once()  # LLM was called but result overridden
+
+
+@patch("mlops_agents.agents.supervisor._router_llm")
+def test_supervisor_injects_state_snapshot_into_llm_input(mock_llm):
+    """supervisor_node must append a structured state snapshot after state['messages']."""
+    import json
+
+    captured_messages = []
+
+    mock_structured = MagicMock()
+
+    def capture_invoke(messages):
+        captured_messages.extend(messages)
+        return RouterOutput(next="FINISH", reasoning="done")
+
+    mock_structured.invoke.side_effect = capture_invoke
+    mock_llm.with_structured_output.return_value = mock_structured
+
+    from mlops_agents.agents.supervisor import supervisor_node
+
+    state = make_state(
+        validation_passed=True,
+        evaluation_passed=True,
+        deployment_decision="approved",
+        error_message="",
+        training_run_id="abc123",
+    )
+    supervisor_node(state)
+
+    # Last message must be the structured snapshot (HumanMessage with JSON)
+    last_msg = captured_messages[-1]
+    assert isinstance(last_msg, HumanMessage)
+    snapshot = json.loads(last_msg.content.replace("Pipeline state:\n", ""))
+    assert snapshot["validation_passed"] is True
+    assert snapshot["evaluation_passed"] is True
+    assert snapshot["deployment_decision"] == "approved"
+    assert snapshot["error_message"] == ""
+    assert snapshot["training_run_id"] == "abc123"

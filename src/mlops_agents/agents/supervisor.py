@@ -4,9 +4,10 @@ Uses structured output (RouterOutput) so every routing decision is auditable.
 The supervisor uses a cheaper model (gpt-4.1-nano) to conserve rate limit budget.
 """
 
+import json
 from typing import Literal
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END
 from langgraph.managed.is_last_step import RemainingSteps
 from langgraph.types import Command
@@ -39,7 +40,15 @@ def supervisor_node(
         logger.warning("Approaching recursion limit — forcing FINISH")
         return Command(goto=END, update={"next": "FINISH"})
 
-    messages = [SystemMessage(content=_supervisor_prompt)] + list(state["messages"])
+    snapshot_data = {
+        "validation_passed": state.get("validation_passed"),
+        "evaluation_passed": state.get("evaluation_passed"),
+        "deployment_decision": state.get("deployment_decision", "pending"),
+        "error_message": state.get("error_message", ""),
+        "training_run_id": state.get("training_run_id", ""),
+    }
+    state_snapshot = HumanMessage(content=f"Pipeline state:\n{json.dumps(snapshot_data)}")
+    messages = [SystemMessage(content=_supervisor_prompt)] + list(state["messages"]) + [state_snapshot]
     response: RouterOutput = _router_llm.with_structured_output(RouterOutput).invoke(messages)
 
     logger.info(f"[{AGENT_SUPERVISOR}] → {response.next} | reason: {response.reasoning}")
