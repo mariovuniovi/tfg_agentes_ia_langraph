@@ -58,8 +58,7 @@ CLAUDE_backup.md
 .worktrees/
 .superpowers/
 
-# Claude working docs — plans, specs, research notes (not project artifacts)
-docs/superpowers/
+# Claude working docs — research notes (not project artifacts)
 human_in_the_loop_agents_restrain.md
 langraph_supervisor_pattern.md
 multiagent_project_folders_structure.md
