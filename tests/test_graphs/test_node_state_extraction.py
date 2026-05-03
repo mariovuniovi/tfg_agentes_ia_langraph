@@ -491,6 +491,7 @@ def test_trainer_node_invokes_agent_with_isolated_context():
 
     call_messages = mock_agent.invoke.call_args[0][0]["messages"]
     assert len(call_messages) == 1
+    assert "Canonical dataset:" in call_messages[0].content
 
 
 def test_evaluator_node_invokes_agent_with_isolated_context():
@@ -517,6 +518,7 @@ def test_evaluator_node_invokes_agent_with_isolated_context():
 
     call_messages = mock_agent.invoke.call_args[0][0]["messages"]
     assert len(call_messages) == 1
+    assert "Training run ID:" in call_messages[0].content
 
 
 def test_deployer_node_invokes_agent_with_isolated_context():
@@ -538,3 +540,4 @@ def test_deployer_node_invokes_agent_with_isolated_context():
 
     call_messages = mock_agent.invoke.call_args[0][0]["messages"]
     assert len(call_messages) == 1
+    assert "Best model URI:" in call_messages[0].content
