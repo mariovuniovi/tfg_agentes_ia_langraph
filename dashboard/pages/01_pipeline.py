@@ -6,6 +6,7 @@ Three-phase state machine stored in st.session_state:
   complete         → two-column log (left) + results tabs (right) + outcome banner
 """
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -13,12 +14,21 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from langgraph.types import Command
+from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 
-from dashboard.pipeline_helpers import PipelineEvent, build_initial_state, event_to_log_line, extract_panel_data, parse_stream_event, reset_tool_start_times
+from dashboard.pipeline_helpers import (
+    PipelineEvent,
+    build_initial_state,
+    event_to_log_line,
+    extract_panel_data,
+    parse_stream_event,
+    reset_tool_start_times,
+)
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.graphs.mlops_graph import graph
+from mlops_agents.state.schemas import SchemaContract
 
 st.set_page_config(page_title="Pipeline", layout="wide")
 st.title("🤖 MLOps Pipeline")
@@ -38,6 +48,7 @@ _DEFAULTS: dict = {
     "dataset_preview": [],
     "training_run_id": "",
     "run_events": [],
+    "schema_json": "",
 }
 for _k, _v in _DEFAULTS.items():
     if _k not in st.session_state:
@@ -186,6 +197,35 @@ if st.session_state["phase"] == "idle":
     csvs = sorted(data_dir.glob("*.csv")) if data_dir.exists() else []
     options = [str(f) for f in csvs] or ["./data/samples/iris_measurements.csv", "./data/samples/iris_labels.csv"]
 
+    # ── Schema upload ──────────────────────────────────────────────────────────
+    st.subheader("Schema")
+    uploaded_schema = st.file_uploader(
+        "Upload schema JSON",
+        type=["json"],
+        help=(
+            "JSON file declaring problem_type, target_column, and column definitions. "
+            "Required before the pipeline can run."
+        ),
+    )
+    if uploaded_schema is not None:
+        try:
+            raw = uploaded_schema.read()
+            schema_data = json.loads(raw)
+            SchemaContract.model_validate(schema_data)
+            st.session_state["schema_json"] = raw.decode("utf-8")
+            st.success(f"Schema valid — problem type: **{schema_data['problem_type']}**")
+        except json.JSONDecodeError as exc:
+            st.error(f"Not valid JSON: {exc}")
+            st.session_state.pop("schema_json", None)
+        except ValidationError as exc:
+            first_error = exc.errors()[0]["msg"]
+            st.error(f"Schema contract violation: {first_error}")
+            st.session_state.pop("schema_json", None)
+
+    schema_json = st.session_state.get("schema_json", "")
+
+    # ── Dataset selection ──────────────────────────────────────────────────────
+    st.subheader("Dataset")
     col1, col2 = st.columns([3, 1])
     with col1:
         dataset_paths = st.multiselect(
@@ -195,7 +235,13 @@ if st.session_state["phase"] == "idle":
             help="Select all CSV files that together form the target dataset",
         )
     with col2:
-        run_button = st.button("▶ Run Pipeline", type="primary", use_container_width=True)
+        run_button = st.button(
+            "▶ Run Pipeline",
+            type="primary",
+            use_container_width=True,
+            disabled=not schema_json,
+            help=None if schema_json else "Upload a valid schema JSON to enable the pipeline.",
+        )
 
     if run_button:
         if not dataset_paths:
@@ -222,7 +268,7 @@ if st.session_state["phase"] == "idle":
 
         interrupt_detected = False
         for chunk in graph.stream(
-            build_initial_state(dataset_paths),
+            build_initial_state(dataset_paths, schema_json=schema_json),
             config=config,
             stream_mode=["updates", "messages"],
             subgraphs=True,
