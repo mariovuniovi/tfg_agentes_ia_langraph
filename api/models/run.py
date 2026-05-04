@@ -1,9 +1,11 @@
 from typing import Any, Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class RunCreate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     dataset_paths: list[str]
+    schema_json: str = ""
 
 
 class RunStatus(BaseModel):

@@ -8,12 +8,14 @@ interface RunState {
   interruptValue: Record<string, unknown> | null
   hitlPending: boolean
   stagedFiles: File[]
+  schemaJson: string
   setRunId: (id: string) => void
   appendEvent: (event: PipelineEvent) => void
   setHITL: (value: Record<string, unknown>) => void
   clearHITL: () => void
   setStatus: (status: RunStatus | 'idle') => void
   setStagedFiles: (files: File[]) => void
+  setSchemaJson: (json: string) => void
   reset: () => void
 }
 
@@ -24,6 +26,7 @@ const initial = {
   interruptValue: null,
   hitlPending: false,
   stagedFiles: [] as File[],
+  schemaJson: '',
 }
 
 export const useRunStore = create<RunState>((set) => ({
@@ -34,5 +37,6 @@ export const useRunStore = create<RunState>((set) => ({
   clearHITL: () => set({ hitlPending: false }),
   setStatus: (status) => set({ status }),
   setStagedFiles: (files) => set({ stagedFiles: files }),
+  setSchemaJson: (json) => set({ schemaJson: json }),
   reset: () => set(initial),
 }))

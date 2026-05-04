@@ -16,7 +16,7 @@ async def start_run(body: RunCreate, background_tasks: BackgroundTasks):
     run_id = str(uuid4())
     config = {"configurable": {"thread_id": run_id}, "recursion_limit": GRAPH_RECURSION_LIMIT}
     run_store.create_entry(run_id, config)
-    background_tasks.add_task(pipeline_task, run_id, body.dataset_paths)
+    background_tasks.add_task(pipeline_task, run_id, body.dataset_paths, body.schema_json)
     return {"run_id": run_id}
 
 

@@ -10,11 +10,17 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function startRun(dataset_paths: string[]): Promise<{ run_id: string }> {
+export async function validateSchema(file: File): Promise<{ schema_json: string; problem_type: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  return json(await fetch(`${BASE}/uploads/schema`, { method: 'POST', body: form }))
+}
+
+export async function startRun(dataset_paths: string[], schema_json: string): Promise<{ run_id: string }> {
   return json(await fetch(`${BASE}/runs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dataset_paths }),
+    body: JSON.stringify({ dataset_paths, schema_json }),
   }))
 }
 

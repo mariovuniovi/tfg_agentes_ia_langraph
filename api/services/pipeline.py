@@ -55,7 +55,7 @@ def run_evidently(reference_df: pd.DataFrame, current_df: pd.DataFrame) -> dict:
     }
 
 
-async def pipeline_task(run_id: str, dataset_paths: list[str]) -> None:
+async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str = "") -> None:
     """Execute the LangGraph pipeline as an asyncio background task."""
     entry = run_store.get_entry(run_id)
     if entry is None:
@@ -81,7 +81,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str]) -> None:
     await entry.queue.put(info_event)
 
     reset_tool_start_times()
-    initial_state = build_initial_state(dataset_paths)
+    initial_state = build_initial_state(dataset_paths, schema_json=schema_json)
     config = entry.graph_config
 
     # Accumulate per-agent reasoning tokens; emit one event per complete LLM turn.

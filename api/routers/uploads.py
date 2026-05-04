@@ -1,9 +1,13 @@
 """Uploads router: receive CSV files, store them, return server paths."""
+import json
 import os
 import uuid
 
 from fastapi import APIRouter, HTTPException, UploadFile
+from pydantic import ValidationError
 from typing import Optional
+
+from mlops_agents.state.schemas import SchemaContract
 
 UPLOAD_DIR = "data/uploads"
 
@@ -38,3 +42,19 @@ async def upload_files(
         saved_paths.append(dest)
 
     return {"paths": saved_paths}
+
+
+@router.post("/uploads/schema")
+async def validate_schema(file: UploadFile) -> dict:
+    """Validate a schema JSON file against SchemaContract. Returns the raw JSON on success."""
+    raw = await file.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Not valid JSON: {exc}")
+    try:
+        SchemaContract.model_validate(data)
+    except ValidationError as exc:
+        first = exc.errors()[0]["msg"]
+        raise HTTPException(status_code=422, detail=f"Schema contract violation: {first}")
+    return {"schema_json": raw.decode("utf-8"), "problem_type": data["problem_type"]}
