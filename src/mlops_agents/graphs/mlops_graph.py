@@ -64,6 +64,8 @@ def _build_data_validator_context(
 
 def _build_trainer_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
+        f"Problem type: {state.get('problem_type', '')}\n"
+        f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
         f"Canonical dataset: {state.get('dataset_path', '')}\n"
         f"Dataset summary: {json.dumps(state.get('dataset_summary') or {})}"
     ))
@@ -71,6 +73,8 @@ def _build_trainer_context(state: AgentState) -> HumanMessage:
 
 def _build_evaluator_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
+        f"Problem type: {state.get('problem_type', '')}\n"
+        f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
         f"Training run ID: {state.get('training_run_id', '')}\n"
         f"Trained model path: {state.get('trained_model_path', '')}\n"
         f"Training metrics: {json.dumps(state.get('training_metrics') or {})}"
@@ -79,6 +83,7 @@ def _build_evaluator_context(state: AgentState) -> HumanMessage:
 
 def _build_deployer_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
+        f"Problem type: {state.get('problem_type', '')}\n"
         f"Best model URI: {state.get('best_model_uri', '')}\n"
         f"Training run ID: {state.get('training_run_id', '')}\n"
         f"Evaluation report: {json.dumps(state.get('evaluation_report') or {})}"

@@ -805,3 +805,34 @@ def test_deployer_node_invokes_agent_with_isolated_context():
     call_messages = mock_agent.invoke.call_args[0][0]["messages"]
     assert len(call_messages) == 1
     assert "Best model URI:" in call_messages[0].content
+
+
+def test_build_trainer_context_includes_problem_type_and_task_metadata():
+    from mlops_agents.graphs.mlops_graph import _build_trainer_context
+
+    state = _make_state()
+    state["problem_type"] = "classification"
+    state["task_metadata"] = {"target_column": "target"}
+    msg = _build_trainer_context(state)
+    assert "Problem type: classification" in msg.content
+    assert "target_column" in msg.content
+
+
+def test_build_evaluator_context_includes_problem_type_and_task_metadata():
+    from mlops_agents.graphs.mlops_graph import _build_evaluator_context
+
+    state = _make_state()
+    state["problem_type"] = "regression"
+    state["task_metadata"] = {"target_column": "price"}
+    msg = _build_evaluator_context(state)
+    assert "Problem type: regression" in msg.content
+    assert "target_column" in msg.content
+
+
+def test_build_deployer_context_includes_problem_type():
+    from mlops_agents.graphs.mlops_graph import _build_deployer_context
+
+    state = _make_state()
+    state["problem_type"] = "forecasting"
+    msg = _build_deployer_context(state)
+    assert "Problem type: forecasting" in msg.content
