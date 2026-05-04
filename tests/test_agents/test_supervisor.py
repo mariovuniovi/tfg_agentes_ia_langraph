@@ -148,3 +148,33 @@ def test_supervisor_injects_state_snapshot_into_llm_input(mock_llm):
     assert snapshot["deployment_decision"] == "approved"
     assert snapshot["error_message"] == ""
     assert snapshot["training_run_id"] == "abc123"
+
+
+@patch("mlops_agents.agents.supervisor._router_llm")
+def test_supervisor_snapshot_includes_problem_type(mock_llm):
+    """Supervisor snapshot must include problem_type from state."""
+    import json
+
+    captured_messages = []
+
+    mock_structured = MagicMock()
+
+    def capture_invoke(messages):
+        captured_messages.extend(messages)
+        return RouterOutput(next="FINISH", reasoning="done")
+
+    mock_structured.invoke.side_effect = capture_invoke
+    mock_llm.with_structured_output.return_value = mock_structured
+
+    from mlops_agents.agents.supervisor import supervisor_node
+
+    state = make_state(
+        problem_type="classification",
+        agent_attempt_counts={"data_validator": 1},
+    )
+    supervisor_node(state)
+
+    last_msg = captured_messages[-1]
+    snapshot = json.loads(last_msg.content.replace("Pipeline state:\n", ""))
+    assert "problem_type" in snapshot
+    assert snapshot["problem_type"] == "classification"
