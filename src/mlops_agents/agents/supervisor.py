@@ -42,6 +42,7 @@ def supervisor_node(
 
     dv_has_run = bool((state.get("agent_attempt_counts") or {}).get("data_validator", 0))
     snapshot_data = {
+        "problem_type": state.get("problem_type", ""),
         "validation_passed": state.get("validation_passed") if dv_has_run else None,
         "evaluation_passed": state.get("evaluation_passed"),
         "deployment_decision": state.get("deployment_decision", "pending"),

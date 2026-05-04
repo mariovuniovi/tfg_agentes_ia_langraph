@@ -64,6 +64,8 @@ def _build_data_validator_context(
 
 def _build_trainer_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
+        f"Problem type: {state.get('problem_type', '')}\n"
+        f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
         f"Canonical dataset: {state.get('dataset_path', '')}\n"
         f"Dataset summary: {json.dumps(state.get('dataset_summary') or {})}"
     ))
@@ -71,6 +73,8 @@ def _build_trainer_context(state: AgentState) -> HumanMessage:
 
 def _build_evaluator_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
+        f"Problem type: {state.get('problem_type', '')}\n"
+        f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
         f"Training run ID: {state.get('training_run_id', '')}\n"
         f"Trained model path: {state.get('trained_model_path', '')}\n"
         f"Training metrics: {json.dumps(state.get('training_metrics') or {})}"
@@ -79,10 +83,49 @@ def _build_evaluator_context(state: AgentState) -> HumanMessage:
 
 def _build_deployer_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
+        f"Problem type: {state.get('problem_type', '')}\n"
         f"Best model URI: {state.get('best_model_uri', '')}\n"
         f"Training run ID: {state.get('training_run_id', '')}\n"
         f"Evaluation report: {json.dumps(state.get('evaluation_report') or {})}"
     ))
+
+
+def _validate_schema_contract(schema_data: dict) -> None:
+    """Validate ML dataset contract fields. Raises ValueError on any violation."""
+    column_names = {c["name"] for c in schema_data.get("columns", [])}
+
+    problem_type = schema_data.get("problem_type")
+    if problem_type not in ("classification", "regression", "forecasting"):
+        raise ValueError(
+            f"Schema missing or invalid 'problem_type'. Got: {problem_type!r}. "
+            "Must be 'classification', 'regression', or 'forecasting'."
+        )
+
+    target_column = schema_data.get("target_column")
+    if not target_column or target_column not in column_names:
+        raise ValueError(
+            f"'target_column' must be declared and exist in columns. Got: {target_column!r}."
+        )
+
+    if problem_type == "forecasting":
+        required = ["datetime_column", "forecast_horizon", "frequency"]
+        missing = [f for f in required if schema_data.get(f) is None]
+        if missing:
+            raise ValueError(f"Forecasting schema missing required fields: {missing}")
+
+        if not isinstance(schema_data["forecast_horizon"], int) or schema_data["forecast_horizon"] <= 0:
+            raise ValueError(
+                f"'forecast_horizon' must be a positive integer. Got: {schema_data['forecast_horizon']!r}."
+            )
+
+        if schema_data["datetime_column"] not in column_names:
+            raise ValueError(
+                f"'datetime_column' '{schema_data['datetime_column']}' not found in columns."
+            )
+
+        for col in schema_data.get("series_id_columns", []):
+            if col not in column_names:
+                raise ValueError(f"'series_id_columns' entry '{col}' not found in columns.")
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
@@ -95,6 +138,26 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
     schema_json = schema_file.read_text() if schema_file.exists() else "{}"
     schema_path = str(schema_file.resolve())
+    schema_data = json.loads(schema_json) if schema_json != "{}" else {}
+
+    try:
+        _validate_schema_contract(schema_data)
+    except ValueError as exc:
+        error_msg = f"Schema contract violation: {exc}"
+        logger.error(f"[data_validator] {error_msg}")
+        return Command(
+            update={
+                "messages": [HumanMessage(content=error_msg, name="data_validator")],
+                "validation_passed": False,
+                "error_message": error_msg,
+                "problem_type": "",
+                "task_metadata": {},
+                "dataset_summary": {},
+                "validation_report": {},
+                "dataset_path": "",
+            },
+            goto="supervisor",
+        )
 
     agent = get_agent("data_validator")
     result = agent.invoke({"messages": [_build_data_validator_context(state, schema_json=schema_json, schema_path=schema_path)]})
@@ -133,12 +196,24 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
         except Exception:
             pass
 
+    problem_type: str = schema_data.get("problem_type", "")
+    task_metadata: dict[str, Any] = {"target_column": schema_data.get("target_column", "")}
+    if problem_type == "forecasting":
+        task_metadata.update({
+            "datetime_column": schema_data.get("datetime_column", ""),
+            "series_id_columns": schema_data.get("series_id_columns", []),
+            "forecast_horizon": schema_data.get("forecast_horizon"),
+            "frequency": schema_data.get("frequency", ""),
+        })
+
     base_update = {
         "messages": [HumanMessage(content=final_message, name="data_validator")],
         "validation_report": quality_report,
         "validation_passed": validation_passed,
         "dataset_path": processed_path,
         "dataset_summary": dataset_summary,
+        "problem_type": problem_type,
+        "task_metadata": task_metadata,
     }
 
     if not validation_passed:
@@ -333,6 +408,9 @@ def main() -> None:
         "next": "",
         "dataset_paths": dataset_paths,
         "dataset_path": "",
+        "dataset_summary": {},
+        "problem_type": "",
+        "task_metadata": {},
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",

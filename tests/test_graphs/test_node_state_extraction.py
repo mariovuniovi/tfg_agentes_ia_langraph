@@ -96,6 +96,8 @@ def _make_state() -> dict:
         "error_message": "",
         "agent_attempt_counts": {},
         "dataset_summary": {},
+        "problem_type": "",
+        "task_metadata": {},
     }
 
 
@@ -105,6 +107,197 @@ def test_agent_state_has_dataset_summary_field():
     from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "dataset_summary" in hints
+
+
+def test_agent_state_has_problem_type_field():
+    import typing
+    from mlops_agents.state.agent_state import AgentState
+    hints = typing.get_type_hints(AgentState)
+    assert "problem_type" in hints
+    assert hints["problem_type"] is str
+
+
+def test_agent_state_has_task_metadata_field():
+    import typing
+    from mlops_agents.state.agent_state import AgentState
+    hints = typing.get_type_hints(AgentState)
+    assert "task_metadata" in hints
+    assert hints["task_metadata"] is dict
+
+
+# ---------------------------------------------------------------------------
+# _validate_schema_contract
+# ---------------------------------------------------------------------------
+
+
+def test_validate_schema_contract_passes_for_valid_classification():
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "classification",
+        "target_column": "label",
+        "columns": [
+            {"name": "feature_a"},
+            {"name": "label"},
+        ],
+    }
+    _validate_schema_contract(schema)  # must not raise
+
+
+def test_validate_schema_contract_passes_for_valid_regression():
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "regression",
+        "target_column": "price",
+        "columns": [{"name": "size"}, {"name": "price"}],
+    }
+    _validate_schema_contract(schema)  # must not raise
+
+
+def test_validate_schema_contract_passes_for_valid_forecasting():
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "series_id_columns": ["store_id"],
+        "forecast_horizon": 30,
+        "frequency": "D",
+        "columns": [
+            {"name": "date"},
+            {"name": "store_id"},
+            {"name": "sales"},
+        ],
+    }
+    _validate_schema_contract(schema)  # must not raise
+
+
+def test_validate_schema_contract_raises_on_missing_problem_type():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {"target_column": "label", "columns": [{"name": "label"}]}
+    with pytest.raises(ValueError, match="problem_type"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_on_unknown_problem_type():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "clustering",
+        "target_column": "label",
+        "columns": [{"name": "label"}],
+    }
+    with pytest.raises(ValueError, match="problem_type"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_target_column_missing_from_schema():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "classification",
+        "target_column": "nonexistent",
+        "columns": [{"name": "feature_a"}],
+    }
+    with pytest.raises(ValueError, match="target_column"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_target_column_not_declared():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "regression",
+        "columns": [{"name": "price"}],
+    }
+    with pytest.raises(ValueError, match="target_column"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_on_missing_forecasting_fields():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "columns": [{"name": "sales"}],
+        # missing datetime_column, forecast_horizon, frequency
+    }
+    with pytest.raises(ValueError, match="datetime_column|forecast_horizon|frequency"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "forecast_horizon": 0,
+        "frequency": "D",
+        "columns": [{"name": "date"}, {"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="forecast_horizon"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_forecast_horizon_is_negative():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "forecast_horizon": -5,
+        "frequency": "D",
+        "columns": [{"name": "date"}, {"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="forecast_horizon"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "nonexistent_date",
+        "forecast_horizon": 7,
+        "frequency": "D",
+        "columns": [{"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="datetime_column"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_series_id_column_not_in_columns():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "series_id_columns": ["missing_store"],
+        "forecast_horizon": 7,
+        "frequency": "D",
+        "columns": [{"name": "date"}, {"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="series_id_columns"):
+        _validate_schema_contract(schema)
 
 
 def test_data_validator_node_populates_validation_report():
@@ -432,6 +625,77 @@ def test_data_validator_node_sets_empty_dataset_summary_on_failure():
     assert command.update.get("dataset_summary") == {}
 
 
+def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
+    """data_validator_node must write problem_type and task_metadata to state after agent succeeds."""
+    import os
+    import tempfile
+
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write("sepal_length,target\n5.1,setosa\n6.3,versicolor\n")
+        tmp_path = f.name
+
+    schema = json.dumps({
+        "problem_type": "classification",
+        "target_column": "target",
+        "columns": [{"name": "sepal_length"}, {"name": "target"}],
+    })
+    validation_json = json.dumps({"passed": True, "output_path": tmp_path})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            AIMessage(content="Validation passed."),
+        ]
+    }
+
+    try:
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}), \
+             patch("pathlib.Path.read_text", return_value=schema), \
+             patch("pathlib.Path.exists", return_value=True):
+            mock_agent = MagicMock()
+            mock_agent.invoke.return_value = mock_result
+            mock_get_agent.return_value = mock_agent
+
+            command = data_validator_node(_make_state())
+    finally:
+        os.unlink(tmp_path)
+
+    assert command.update.get("problem_type") == "classification"
+    assert command.update.get("task_metadata") == {"target_column": "target"}
+
+
+def test_data_validator_node_aborts_on_contract_violation():
+    """data_validator_node must return error Command immediately when schema contract is invalid."""
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    bad_schema = json.dumps({"columns": [{"name": "feature_a"}]})  # no problem_type
+
+    interrupt_called = []
+
+    def fail_if_called(payload: dict) -> dict:
+        interrupt_called.append(payload)
+        return {}
+
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called), \
+         patch("pathlib.Path.read_text", return_value=bad_schema), \
+         patch("pathlib.Path.exists", return_value=True):
+        mock_agent = MagicMock()
+        mock_get_agent.return_value = mock_agent
+
+        command = data_validator_node(_make_state())
+
+    mock_agent.invoke.assert_not_called()
+    assert len(interrupt_called) == 0
+    assert "problem_type" in command.update.get("error_message", "")
+    assert command.update.get("validation_passed") is False
+    assert command.update.get("problem_type") == ""
+    assert command.update.get("task_metadata") == {}
+    assert command.goto == "supervisor"
+
+
 def test_data_validator_node_invokes_agent_with_isolated_context():
     """data_validator_node must NOT pass state['messages'] to agent.invoke."""
     from mlops_agents.graphs.mlops_graph import data_validator_node
@@ -541,3 +805,34 @@ def test_deployer_node_invokes_agent_with_isolated_context():
     call_messages = mock_agent.invoke.call_args[0][0]["messages"]
     assert len(call_messages) == 1
     assert "Best model URI:" in call_messages[0].content
+
+
+def test_build_trainer_context_includes_problem_type_and_task_metadata():
+    from mlops_agents.graphs.mlops_graph import _build_trainer_context
+
+    state = _make_state()
+    state["problem_type"] = "classification"
+    state["task_metadata"] = {"target_column": "target"}
+    msg = _build_trainer_context(state)
+    assert "Problem type: classification" in msg.content
+    assert "target_column" in msg.content
+
+
+def test_build_evaluator_context_includes_problem_type_and_task_metadata():
+    from mlops_agents.graphs.mlops_graph import _build_evaluator_context
+
+    state = _make_state()
+    state["problem_type"] = "regression"
+    state["task_metadata"] = {"target_column": "price"}
+    msg = _build_evaluator_context(state)
+    assert "Problem type: regression" in msg.content
+    assert "target_column" in msg.content
+
+
+def test_build_deployer_context_includes_problem_type():
+    from mlops_agents.graphs.mlops_graph import _build_deployer_context
+
+    state = _make_state()
+    state["problem_type"] = "forecasting"
+    msg = _build_deployer_context(state)
+    assert "Problem type: forecasting" in msg.content
