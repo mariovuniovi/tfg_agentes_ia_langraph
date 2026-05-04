@@ -27,6 +27,7 @@ def make_state(messages=None, **kwargs):
         "dataset_summary": {},
         "problem_type": "",
         "task_metadata": {},
+        "schema_json": "",
     }
     base.update(kwargs)
     return base

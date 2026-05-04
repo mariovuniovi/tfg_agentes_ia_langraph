@@ -49,6 +49,7 @@ class AgentState(TypedDict):
 
     # Task-level metadata — written once by data_validator_node
     task_metadata: dict
+    schema_json: str
     # classification/regression: {"target_column": str}
     # forecasting: {
     #   "target_column": str,

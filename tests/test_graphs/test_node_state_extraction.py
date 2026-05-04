@@ -98,6 +98,7 @@ def _make_state() -> dict:
         "dataset_summary": {},
         "problem_type": "",
         "task_metadata": {},
+        "schema_json": "{}",
     }
 
 
@@ -123,6 +124,14 @@ def test_agent_state_has_task_metadata_field():
     hints = typing.get_type_hints(AgentState)
     assert "task_metadata" in hints
     assert hints["task_metadata"] is dict
+
+
+def test_agent_state_has_schema_json_field():
+    import typing
+    from mlops_agents.state.agent_state import AgentState
+    hints = typing.get_type_hints(AgentState)
+    assert "schema_json" in hints
+    assert hints["schema_json"] is str
 
 
 # ---------------------------------------------------------------------------
