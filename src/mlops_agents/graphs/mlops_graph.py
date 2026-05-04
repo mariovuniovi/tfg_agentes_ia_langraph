@@ -192,7 +192,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
             pass
 
     problem_type: str = schema_data.get("problem_type", "")
-    task_metadata: dict = {"target_column": schema_data.get("target_column", "")}
+    task_metadata: dict[str, Any] = {"target_column": schema_data.get("target_column", "")}
     if problem_type == "forecasting":
         task_metadata.update({
             "datetime_column": schema_data.get("datetime_column", ""),
