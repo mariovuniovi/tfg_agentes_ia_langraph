@@ -1,6 +1,7 @@
 """Pydantic schemas for structured LLM outputs and tool I/O."""
 
 from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
