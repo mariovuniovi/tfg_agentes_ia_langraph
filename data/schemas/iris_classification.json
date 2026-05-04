@@ -1,4 +1,6 @@
 {
+  "problem_type": "classification",
+  "target_column": "target",
   "name": "iris_classification",
   "description": "Iris flower classification dataset",
   "columns": [
