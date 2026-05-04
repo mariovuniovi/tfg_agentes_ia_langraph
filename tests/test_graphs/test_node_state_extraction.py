@@ -625,6 +625,77 @@ def test_data_validator_node_sets_empty_dataset_summary_on_failure():
     assert command.update.get("dataset_summary") == {}
 
 
+def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
+    """data_validator_node must write problem_type and task_metadata to state after agent succeeds."""
+    import os
+    import tempfile
+
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write("sepal_length,target\n5.1,setosa\n6.3,versicolor\n")
+        tmp_path = f.name
+
+    schema = json.dumps({
+        "problem_type": "classification",
+        "target_column": "target",
+        "columns": [{"name": "sepal_length"}, {"name": "target"}],
+    })
+    validation_json = json.dumps({"passed": True, "output_path": tmp_path})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            AIMessage(content="Validation passed."),
+        ]
+    }
+
+    try:
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}), \
+             patch("pathlib.Path.read_text", return_value=schema), \
+             patch("pathlib.Path.exists", return_value=True):
+            mock_agent = MagicMock()
+            mock_agent.invoke.return_value = mock_result
+            mock_get_agent.return_value = mock_agent
+
+            command = data_validator_node(_make_state())
+    finally:
+        os.unlink(tmp_path)
+
+    assert command.update.get("problem_type") == "classification"
+    assert command.update.get("task_metadata") == {"target_column": "target"}
+
+
+def test_data_validator_node_aborts_on_contract_violation():
+    """data_validator_node must return error Command immediately when schema contract is invalid."""
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    bad_schema = json.dumps({"columns": [{"name": "feature_a"}]})  # no problem_type
+
+    interrupt_called = []
+
+    def fail_if_called(payload: dict) -> dict:
+        interrupt_called.append(payload)
+        return {}
+
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called), \
+         patch("pathlib.Path.read_text", return_value=bad_schema), \
+         patch("pathlib.Path.exists", return_value=True):
+        mock_agent = MagicMock()
+        mock_get_agent.return_value = mock_agent
+
+        command = data_validator_node(_make_state())
+
+    mock_agent.invoke.assert_not_called()
+    assert len(interrupt_called) == 0
+    assert "problem_type" in command.update.get("error_message", "")
+    assert command.update.get("validation_passed") is False
+    assert command.update.get("problem_type") == ""
+    assert command.update.get("task_metadata") == {}
+    assert command.goto == "supervisor"
+
+
 def test_data_validator_node_invokes_agent_with_isolated_context():
     """data_validator_node must NOT pass state['messages'] to agent.invoke."""
     from mlops_agents.graphs.mlops_graph import data_validator_node
