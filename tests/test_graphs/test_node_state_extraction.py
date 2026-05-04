@@ -125,6 +125,165 @@ def test_agent_state_has_task_metadata_field():
     assert hints["task_metadata"] is dict
 
 
+# ---------------------------------------------------------------------------
+# _validate_schema_contract
+# ---------------------------------------------------------------------------
+
+
+def test_validate_schema_contract_passes_for_valid_classification():
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "classification",
+        "target_column": "label",
+        "columns": [
+            {"name": "feature_a"},
+            {"name": "label"},
+        ],
+    }
+    _validate_schema_contract(schema)  # must not raise
+
+
+def test_validate_schema_contract_passes_for_valid_regression():
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "regression",
+        "target_column": "price",
+        "columns": [{"name": "size"}, {"name": "price"}],
+    }
+    _validate_schema_contract(schema)  # must not raise
+
+
+def test_validate_schema_contract_passes_for_valid_forecasting():
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "series_id_columns": ["store_id"],
+        "forecast_horizon": 30,
+        "frequency": "D",
+        "columns": [
+            {"name": "date"},
+            {"name": "store_id"},
+            {"name": "sales"},
+        ],
+    }
+    _validate_schema_contract(schema)  # must not raise
+
+
+def test_validate_schema_contract_raises_on_missing_problem_type():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {"target_column": "label", "columns": [{"name": "label"}]}
+    with pytest.raises(ValueError, match="problem_type"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_on_unknown_problem_type():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "clustering",
+        "target_column": "label",
+        "columns": [{"name": "label"}],
+    }
+    with pytest.raises(ValueError, match="problem_type"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_target_column_missing_from_schema():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "classification",
+        "target_column": "nonexistent",
+        "columns": [{"name": "feature_a"}],
+    }
+    with pytest.raises(ValueError, match="target_column"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_target_column_not_declared():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "regression",
+        "columns": [{"name": "price"}],
+    }
+    with pytest.raises(ValueError, match="target_column"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_on_missing_forecasting_fields():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "columns": [{"name": "sales"}],
+        # missing datetime_column, forecast_horizon, frequency
+    }
+    with pytest.raises(ValueError, match="datetime_column|forecast_horizon|frequency"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "forecast_horizon": 0,
+        "frequency": "D",
+        "columns": [{"name": "date"}, {"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="forecast_horizon"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "nonexistent_date",
+        "forecast_horizon": 7,
+        "frequency": "D",
+        "columns": [{"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="datetime_column"):
+        _validate_schema_contract(schema)
+
+
+def test_validate_schema_contract_raises_when_series_id_column_not_in_columns():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "series_id_columns": ["missing_store"],
+        "forecast_horizon": 7,
+        "frequency": "D",
+        "columns": [{"name": "date"}, {"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="series_id_columns"):
+        _validate_schema_contract(schema)
+
+
 def test_data_validator_node_populates_validation_report():
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
