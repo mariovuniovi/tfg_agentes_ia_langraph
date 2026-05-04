@@ -9,7 +9,7 @@ import pandas as pd
 from langgraph.types import Command
 
 from api.services import run_store
-from dashboard.pipeline_helpers import (
+from api.services.pipeline_helpers import (
     build_initial_state,
     parse_stream_event,
     reset_tool_start_times,

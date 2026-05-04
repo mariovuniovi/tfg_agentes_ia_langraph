@@ -20,7 +20,6 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.2",
 
     # Dashboard & MLOps
-    "streamlit>=1.40",
     "mlflow>=2.18",
     "evidently>=0.5",
 
@@ -46,8 +45,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mlops-dashboard = "mlops_agents.utils.runners:run_dashboard"
-mlops-pipeline = "mlops_agents.graphs.mlops_graph:main"
+mlops-pipeline = "mlops_agents.utils.runners:run_pipeline"
 
 [dependency-groups]
 dev = [
@@ -122,7 +120,6 @@ disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-    "streamlit.*",
     "mlflow.*",
     "evidently.*",
     "langchain.*",
