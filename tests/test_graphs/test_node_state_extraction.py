@@ -98,7 +98,11 @@ def _make_state() -> dict:
         "dataset_summary": {},
         "problem_type": "",
         "task_metadata": {},
-        "schema_json": "{}",
+        "schema_json": json.dumps({
+            "problem_type": "classification",
+            "target_column": "target",
+            "columns": [{"name": "target"}],
+        }),
     }
 
 
@@ -660,14 +664,14 @@ def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
 
     try:
         with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}), \
-             patch("pathlib.Path.read_text", return_value=schema), \
-             patch("pathlib.Path.exists", return_value=True):
+             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
 
-            command = data_validator_node(_make_state())
+            state = _make_state()
+            state["schema_json"] = schema
+            command = data_validator_node(state)
     finally:
         os.unlink(tmp_path)
 
@@ -688,13 +692,13 @@ def test_data_validator_node_aborts_on_contract_violation():
         return {}
 
     with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called), \
-         patch("pathlib.Path.read_text", return_value=bad_schema), \
-         patch("pathlib.Path.exists", return_value=True):
+         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called):
         mock_agent = MagicMock()
         mock_get_agent.return_value = mock_agent
 
-        command = data_validator_node(_make_state())
+        state = _make_state()
+        state["schema_json"] = bad_schema
+        command = data_validator_node(state)
 
     mock_agent.invoke.assert_not_called()
     assert len(interrupt_called) == 0
@@ -845,3 +849,64 @@ def test_build_deployer_context_includes_problem_type():
     state["problem_type"] = "forecasting"
     msg = _build_deployer_context(state)
     assert "Problem type: forecasting" in msg.content
+
+
+def test_data_validator_node_reads_schema_json_from_state():
+    """data_validator_node must use state['schema_json'] instead of loading from disk."""
+    import os
+    import tempfile
+
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write("sepal_length,target\n5.1,setosa\n6.3,versicolor\n")
+        tmp_path = f.name
+
+    schema = json.dumps({
+        "problem_type": "classification",
+        "target_column": "target",
+        "columns": [{"name": "sepal_length", "dtype": "float"}, {"name": "target", "dtype": "str"}],
+    })
+    validation_json = json.dumps({"passed": True, "output_path": tmp_path})
+    mock_result = {
+        "messages": [
+            ToolMessage(content=validation_json, tool_call_id="1", name="validate_against_schema"),
+            AIMessage(content="Validation passed."),
+        ]
+    }
+
+    try:
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+            mock_agent = MagicMock()
+            mock_agent.invoke.return_value = mock_result
+            mock_get_agent.return_value = mock_agent
+
+            state = _make_state()
+            state["schema_json"] = schema
+            command = data_validator_node(state)
+    finally:
+        os.unlink(tmp_path)
+
+    assert command.update.get("problem_type") == "classification"
+    assert command.update.get("task_metadata") == {"target_column": "target"}
+
+
+def test_data_validator_node_aborts_when_schema_json_empty():
+    """data_validator_node must abort immediately when schema_json is empty."""
+    from mlops_agents.graphs.mlops_graph import data_validator_node
+
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
+         patch("mlops_agents.graphs.mlops_graph.interrupt") as mock_interrupt:
+        mock_agent = MagicMock()
+        mock_get_agent.return_value = mock_agent
+
+        state = _make_state()
+        state["schema_json"] = ""  # no schema uploaded
+        command = data_validator_node(state)
+
+    mock_agent.invoke.assert_not_called()
+    mock_interrupt.assert_not_called()
+    assert command.update.get("validation_passed") is False
+    assert "schema" in command.update.get("error_message", "").lower()
+    assert command.goto == "supervisor"

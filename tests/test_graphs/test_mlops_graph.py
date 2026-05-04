@@ -1,5 +1,6 @@
 """Tests for the main MLOps graph structure."""
 
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 from langchain_core.messages import HumanMessage, ToolMessage
@@ -51,6 +52,14 @@ def _make_validator_state(tmp_path=None):
         "deployment_status": "",
         "error_message": "",
         "agent_attempt_counts": {"data_validator": 1},
+        "dataset_summary": {},
+        "problem_type": "",
+        "task_metadata": {},
+        "schema_json": json.dumps({
+            "problem_type": "classification",
+            "target_column": "target",
+            "columns": [{"name": "target"}],
+        }),
     }
 
 

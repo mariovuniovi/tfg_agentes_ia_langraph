@@ -129,16 +129,29 @@ def _validate_schema_contract(schema_data: dict) -> None:
 
 
 def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    from pathlib import Path as _Path
-
     import pandas as pd
 
-    from mlops_agents.config.settings import settings
+    schema_json: str = state.get("schema_json") or ""
+    schema_path = "(uploaded via UI)" if schema_json else "(none)"
+    schema_data = json.loads(schema_json) if schema_json else {}
 
-    schema_file = _Path("data/schemas") / f"{settings.dataset_schema}.json"
-    schema_json = schema_file.read_text() if schema_file.exists() else "{}"
-    schema_path = str(schema_file.resolve())
-    schema_data = json.loads(schema_json) if schema_json != "{}" else {}
+    if not schema_json:
+        error_msg = "No schema uploaded. Upload a schema JSON before running the pipeline."
+        logger.error(f"[data_validator] {error_msg}")
+        return Command(
+            update={
+                "messages": [HumanMessage(content=error_msg, name="data_validator")],
+                "validation_passed": False,
+                "error_message": error_msg,
+                "problem_type": "",
+                "task_metadata": {},
+                "dataset_summary": {},
+                "validation_report": {},
+                "dataset_path": "",
+                "schema_json": "",
+            },
+            goto="supervisor",
+        )
 
     try:
         _validate_schema_contract(schema_data)
@@ -155,6 +168,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
                 "dataset_summary": {},
                 "validation_report": {},
                 "dataset_path": "",
+                "schema_json": schema_json,
             },
             goto="supervisor",
         )
@@ -214,6 +228,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
         "dataset_summary": dataset_summary,
         "problem_type": problem_type,
         "task_metadata": task_metadata,
+        "schema_json": schema_json,
     }
 
     if not validation_passed:
@@ -423,6 +438,7 @@ def main() -> None:
         "deployment_status": "",
         "error_message": "",
         "agent_attempt_counts": {},
+        "schema_json": "",
     }
 
     print(f"\n{'='*60}")
