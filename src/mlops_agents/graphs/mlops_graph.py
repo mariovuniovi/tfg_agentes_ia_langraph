@@ -104,7 +104,7 @@ def _validate_schema_contract(schema_data: dict) -> None:
 
     if problem_type == "forecasting":
         required = ["datetime_column", "forecast_horizon", "frequency"]
-        missing = [f for f in required if not schema_data.get(f)]
+        missing = [f for f in required if schema_data.get(f) is None]
         if missing:
             raise ValueError(f"Forecasting schema missing required fields: {missing}")
 

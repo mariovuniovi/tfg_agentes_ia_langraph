@@ -251,6 +251,22 @@ def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
         _validate_schema_contract(schema)
 
 
+def test_validate_schema_contract_raises_when_forecast_horizon_is_negative():
+    import pytest
+    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+
+    schema = {
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "forecast_horizon": -5,
+        "frequency": "D",
+        "columns": [{"name": "date"}, {"name": "sales"}],
+    }
+    with pytest.raises(ValueError, match="forecast_horizon"):
+        _validate_schema_contract(schema)
+
+
 def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
     import pytest
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
