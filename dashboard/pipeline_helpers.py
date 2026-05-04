@@ -54,7 +54,7 @@ def event_to_log_line(event: dict) -> str | None:
     return f"✅ `[{node_name}]` completed"
 
 
-def build_initial_state(dataset_paths: list[str]) -> dict:
+def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict:
     """Build the initial LangGraph state dict for a pipeline run."""
     paths_display = ", ".join(dataset_paths)
     return {
@@ -62,6 +62,10 @@ def build_initial_state(dataset_paths: list[str]) -> dict:
         "next": "",
         "dataset_paths": dataset_paths,
         "dataset_path": "",
+        "schema_json": schema_json,
+        "dataset_summary": {},
+        "problem_type": "",
+        "task_metadata": {},
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",

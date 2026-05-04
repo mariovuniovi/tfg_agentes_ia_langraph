@@ -178,3 +178,28 @@ def test_parse_stream_event_empty_content_no_tool_calls_returns_none():
     metadata = {"langgraph_node": "data_validator"}
     result = parse_stream_event((chunk, metadata))
     assert result is None
+
+
+def test_build_initial_state_includes_schema_json():
+    schema = '{"problem_type": "classification"}'
+    state = build_initial_state(["./data/samples/iris.csv"], schema_json=schema)
+    assert state["schema_json"] == schema
+
+
+def test_build_initial_state_schema_json_defaults_to_empty():
+    state = build_initial_state(["./data/samples/iris.csv"])
+    assert state["schema_json"] == ""
+
+
+def test_build_initial_state_includes_problem_type_and_task_metadata():
+    state = build_initial_state(["./data/samples/iris.csv"])
+    assert "problem_type" in state
+    assert state["problem_type"] == ""
+    assert "task_metadata" in state
+    assert state["task_metadata"] == {}
+
+
+def test_build_initial_state_includes_dataset_summary():
+    state = build_initial_state(["./data/samples/iris.csv"])
+    assert "dataset_summary" in state
+    assert state["dataset_summary"] == {}
