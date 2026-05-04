@@ -116,6 +116,7 @@ def test_agent_state_has_dataset_summary_field():
 
 def test_agent_state_has_problem_type_field():
     import typing
+
     from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "problem_type" in hints
@@ -124,6 +125,7 @@ def test_agent_state_has_problem_type_field():
 
 def test_agent_state_has_task_metadata_field():
     import typing
+
     from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "task_metadata" in hints
@@ -132,6 +134,7 @@ def test_agent_state_has_task_metadata_field():
 
 def test_agent_state_has_schema_json_field():
     import typing
+
     from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "schema_json" in hints
@@ -189,6 +192,7 @@ def test_validate_schema_contract_passes_for_valid_forecasting():
 
 def test_validate_schema_contract_raises_on_missing_problem_type():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {"target_column": "label", "columns": [{"name": "label"}]}
@@ -198,6 +202,7 @@ def test_validate_schema_contract_raises_on_missing_problem_type():
 
 def test_validate_schema_contract_raises_on_unknown_problem_type():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -211,6 +216,7 @@ def test_validate_schema_contract_raises_on_unknown_problem_type():
 
 def test_validate_schema_contract_raises_when_target_column_missing_from_schema():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -224,6 +230,7 @@ def test_validate_schema_contract_raises_when_target_column_missing_from_schema(
 
 def test_validate_schema_contract_raises_when_target_column_not_declared():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -236,6 +243,7 @@ def test_validate_schema_contract_raises_when_target_column_not_declared():
 
 def test_validate_schema_contract_raises_on_missing_forecasting_fields():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -250,6 +258,7 @@ def test_validate_schema_contract_raises_on_missing_forecasting_fields():
 
 def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -266,6 +275,7 @@ def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
 
 def test_validate_schema_contract_raises_when_forecast_horizon_is_negative():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -282,6 +292,7 @@ def test_validate_schema_contract_raises_when_forecast_horizon_is_negative():
 
 def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
@@ -298,6 +309,7 @@ def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
 
 def test_validate_schema_contract_raises_when_series_id_column_not_in_columns():
     import pytest
+
     from mlops_agents.graphs.mlops_graph import _validate_schema_contract
 
     schema = {
