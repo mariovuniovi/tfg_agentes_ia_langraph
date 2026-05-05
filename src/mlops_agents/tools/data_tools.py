@@ -286,8 +286,11 @@ def detect_temporal_gaps(
     if target_column not in df.columns:
         raise ValueError(f"target_column '{target_column}' not found in dataset")
 
-    # Validate frequency alias
-    offset = to_offset(frequency)
+    # Validate frequency alias — to_offset raises ValueError for bad aliases
+    try:
+        offset = to_offset(frequency)
+    except ValueError:
+        raise ValueError(f"Invalid pandas frequency alias: {frequency!r}")
     if offset is None:
         raise ValueError(f"Invalid pandas frequency alias: {frequency!r}")
 
