@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 from langchain_core.tools import tool
+from pandas.tseries.frequencies import to_offset
 
 from mlops_agents.config.constants import MAX_DRIFT_SCORE
 from mlops_agents.utils.logging import get_logger
@@ -223,6 +224,141 @@ def merge_datasets(join_spec_json: str, output_path: str) -> str:
     }
     logger.info(f"Merged {len(file_specs)} files → {len(merged)} rows, {len(merged.columns)} columns → {output_path}")
     return json.dumps(result)
+
+
+@tool
+def detect_temporal_gaps(
+    dataset_path: str,
+    datetime_col: str,
+    series_id_cols: list[str],
+    frequency: str,
+    target_column: str,
+    output_path: str = "",
+) -> str:
+    """Validate critical forecasting keys and detect missing time periods per series.
+
+    Raises ValueError immediately if:
+    - datetime_col does not exist or has nulls/unparseable values
+    - any series_id_col has nulls
+    - target_column is not present in the dataset
+    - frequency is not a valid pandas offset alias
+    - duplicate (series_id, datetime) pairs are found
+
+    Writes a full gap report JSON artifact and returns a compact summary.
+
+    Args:
+        dataset_path: Path to the sorted CSV.
+        datetime_col: Name of the datetime column.
+        series_id_cols: Columns that identify each individual series.
+        frequency: Pandas offset alias for expected cadence (e.g. "D", "W", "MS").
+        target_column: Name of the target column (existence is validated here).
+        output_path: Path to write the full gap report JSON artifact.
+
+    Returns:
+        JSON with {has_gaps, total_missing_periods, n_series_with_gaps,
+        gap_examples (up to 5), artifact_path}.
+    """
+    path = Path(dataset_path)
+    if not path.exists():
+        return json.dumps({"error": f"File not found: {dataset_path}"})
+
+    df = pd.read_csv(path)
+
+    # Validate datetime_col exists before parsing (clean error, not a parse error)
+    if datetime_col not in df.columns:
+        raise ValueError(f"datetime_col '{datetime_col}' not found in dataset")
+
+    df[datetime_col] = pd.to_datetime(df[datetime_col], errors="coerce")
+
+    # Critical key validation
+    if df[datetime_col].isnull().any():
+        raise ValueError(
+            f"datetime_col '{datetime_col}' has {int(df[datetime_col].isnull().sum())} "
+            "null or unparseable value(s)"
+        )
+    for col in series_id_cols:
+        if col not in df.columns:
+            raise ValueError(f"series_id_col '{col}' not found in dataset")
+        if df[col].isnull().any():
+            raise ValueError(
+                f"series_id_col '{col}' has {int(df[col].isnull().sum())} null value(s)"
+            )
+    if target_column not in df.columns:
+        raise ValueError(f"target_column '{target_column}' not found in dataset")
+
+    # Validate frequency alias
+    offset = to_offset(frequency)
+    if offset is None:
+        raise ValueError(f"Invalid pandas frequency alias: {frequency!r}")
+
+    # Duplicate detection
+    key_cols = [datetime_col] + list(series_id_cols)
+    dup_count = int(df.duplicated(subset=key_cols).sum())
+    if dup_count > 0:
+        raise ValueError(
+            f"Found {dup_count} duplicate (series_id, datetime) pair(s) — "
+            "each (series, timestamp) must be unique"
+        )
+
+    # Gap detection per series
+    def _gaps_for_group(grp: pd.DataFrame, series_id: dict) -> dict | None:
+        actual = set(grp[datetime_col])
+        expected = pd.date_range(
+            grp[datetime_col].min(), grp[datetime_col].max(), freq=frequency
+        )
+        missing = sorted(set(expected) - actual)
+        if not missing:
+            return None
+        return {
+            "series_id": series_id,
+            "n_missing_periods": len(missing),
+            "first_missing": str(missing[0].date()),
+            "last_missing": str(missing[-1].date()),
+            "all_missing_dates": [str(d.date()) for d in missing],
+            "sample_missing_dates": [str(d.date()) for d in missing[:3]],
+        }
+
+    all_gaps: list[dict] = []
+    if series_id_cols:
+        for keys, grp in df.groupby(series_id_cols):
+            if not isinstance(keys, tuple):
+                keys = (keys,)
+            gap = _gaps_for_group(grp, dict(zip(series_id_cols, keys)))
+            if gap:
+                all_gaps.append(gap)
+    else:
+        gap = _gaps_for_group(df, {})
+        if gap:
+            all_gaps.append(gap)
+
+    all_gaps.sort(key=lambda g: g["n_missing_periods"], reverse=True)
+    total_missing = sum(g["n_missing_periods"] for g in all_gaps)
+
+    gap_examples = [
+        {k: v for k, v in g.items() if k != "all_missing_dates"}
+        for g in all_gaps[:5]
+    ]
+
+    # Write full artifact (stem-based path to avoid overwriting between runs)
+    artifact_path = output_path or f"artifacts/temporal_gaps_{path.stem}.json"
+    Path(artifact_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(artifact_path).write_text(
+        json.dumps(
+            {"gaps": all_gaps, "total_missing_periods": total_missing}, default=str
+        )
+    )
+
+    result = {
+        "has_gaps": total_missing > 0,
+        "total_missing_periods": total_missing,
+        "n_series_with_gaps": len(all_gaps),
+        "gap_examples": gap_examples,
+        "artifact_path": artifact_path,
+    }
+    logger.info(
+        f"Gap detection: {total_missing} missing periods across {len(all_gaps)} series"
+    )
+    return json.dumps(result, default=str)
 
 
 @tool

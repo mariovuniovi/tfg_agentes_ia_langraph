@@ -663,3 +663,210 @@ def test_parse_datetime_column_returns_error_for_missing_file():
         "datetime_col": "date",
     }))
     assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# detect_temporal_gaps
+# ---------------------------------------------------------------------------
+
+import pytest
+from mlops_agents.tools.data_tools import detect_temporal_gaps
+
+
+@pytest.fixture()
+def daily_series_csv(tmp_path: Path) -> Path:
+    """Daily time series with one gap on 2024-01-03."""
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-04", "2024-01-05"],
+        "sales": [10.0, 20.0, 40.0, 50.0],
+        "store_id": ["S01"] * 4,
+    })
+    path = tmp_path / "series.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture()
+def daily_series_no_gaps_csv(tmp_path: Path) -> Path:
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "sales": [10.0, 20.0, 30.0],
+        "store_id": ["S01"] * 3,
+    })
+    path = tmp_path / "series_ok.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+def test_detect_temporal_gaps_finds_gap(tmp_path, daily_series_csv):
+    artifact = tmp_path / "gaps.json"
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    }))
+    assert result["has_gaps"] is True
+    assert result["total_missing_periods"] == 1
+    assert result["n_series_with_gaps"] == 1
+    assert len(result["gap_examples"]) == 1
+    assert result["gap_examples"][0]["first_missing"] == "2024-01-03"
+
+
+def test_detect_temporal_gaps_no_gaps(tmp_path, daily_series_no_gaps_csv):
+    artifact = tmp_path / "gaps.json"
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_no_gaps_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    }))
+    assert result["has_gaps"] is False
+    assert result["total_missing_periods"] == 0
+    assert result["gap_examples"] == []
+
+
+def test_detect_temporal_gaps_compact_format(tmp_path, daily_series_csv):
+    artifact = tmp_path / "gaps.json"
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    }))
+    ex = result["gap_examples"][0]
+    assert "series_id" in ex
+    assert "n_missing_periods" in ex
+    assert "first_missing" in ex
+    assert "last_missing" in ex
+    assert "sample_missing_dates" in ex
+    assert "artifact_path" in result
+
+
+def test_detect_temporal_gaps_raises_if_datetime_col_missing(tmp_path):
+    df = pd.DataFrame({"sales": [1.0, 2.0], "store_id": ["S01", "S01"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="not found"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_datetime_null(tmp_path):
+    df = pd.DataFrame({
+        "date": [None, "2024-01-02"],
+        "sales": [1.0, 2.0],
+        "store_id": ["S01", "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_series_id_null(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02"],
+        "sales": [1.0, 2.0],
+        "store_id": [None, "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_target_missing(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02"],
+        "store_id": ["S01", "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="target_column"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_invalid_frequency(tmp_path, daily_series_csv):
+    with pytest.raises(ValueError, match="frequency"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(daily_series_csv),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "INVALID_FREQ",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_duplicates(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-01"],
+        "sales": [1.0, 2.0],
+        "store_id": ["S01", "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="duplicate"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_writes_artifact(tmp_path, daily_series_csv):
+    artifact = tmp_path / "gaps.json"
+    detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    })
+    assert artifact.exists()
+    import json as _json
+    data = _json.loads(artifact.read_text())
+    assert "gaps" in data
+
+
+def test_detect_temporal_gaps_default_artifact_uses_stem(tmp_path, daily_series_csv):
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+    }))
+    assert "series" in result["artifact_path"]  # stem of "series.csv"
