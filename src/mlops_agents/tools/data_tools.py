@@ -381,7 +381,7 @@ def impute_missing_values(
     problem_type: str,
     target_column: str,
     datetime_column: str | None = None,
-    series_id_columns: list[str] | None = None,
+    series_id_columns: list[str] = [],  # noqa: B006
     max_interpolation_gap: int = 3,
     output_path: str = "",
 ) -> str:
@@ -417,7 +417,7 @@ def impute_missing_values(
         return json.dumps({"error": f"File not found: {dataset_path}"})
 
     df = pd.read_csv(path)
-    cols = list(series_id_columns or [])
+    cols = list(series_id_columns)
     dest = Path(output_path) if output_path else path
     dest.parent.mkdir(parents=True, exist_ok=True)
 
