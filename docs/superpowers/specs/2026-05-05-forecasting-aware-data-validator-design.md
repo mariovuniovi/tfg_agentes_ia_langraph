@@ -40,14 +40,16 @@ def impute_missing_values(
 - Dispatch to `TabularImputer` for `"classification"` / `"regression"`, `ForecastingImputer` for `"forecasting"`
 
 **`TabularImputer`** (classification / regression):
-- Mean for numeric columns, mode for categoricals, including the target column
-- Returns `{"output_path": ..., "columns_imputed": [...], "rows_affected": int}`
+- Target column: rows with missing target are **dropped** (never imputed — missing labels are invalid for supervised learning). Rows dropped are reported in `warnings`.
+- Numeric non-target columns: mean imputation
+- Categorical non-target columns: mode imputation
+- Returns `{"output_path": ..., "columns_imputed": [...], "rows_affected": int, "warnings": [...]}`
 
 **`ForecastingImputer`** (forecasting):
 - `datetime_column` and all `series_id_columns`: protected — if any null value exists, raise immediately (never impute)
-- `target_column`: short-gap linear interpolation only (gap ≤ `max_interpolation_gap` consecutive periods); gaps larger than the threshold are flagged in the return value as warnings, never silently filled
-- All other columns (exogenous features): forward-fill followed by linear interpolation
-- Returns `{"output_path": ..., "columns_imputed": [...], "rows_affected": int, "target_large_gaps": [{"series_id": {...}, "gap_size": int}]}`
+- `target_column`: only **short internal gaps** are interpolated. A gap is interpolated only if (1) gap length ≤ `max_interpolation_gap` AND (2) bounded by known values on both sides. Gaps that exceed the threshold or sit at series boundaries are left entirely unchanged and reported in `target_large_gaps`.
+- Exogenous (all other columns): dtype-aware — numeric columns get forward-fill + linear interpolation + back-fill; categorical/object columns get forward-fill + back-fill + mode fallback.
+- Returns `{"output_path": ..., "columns_imputed": [...], "rows_affected": int, "target_large_gaps": [{"series_id": {...}, "gap_sizes": [int, ...]}]}`
 
 ---
 
@@ -59,12 +61,13 @@ def impute_missing_values(
 def parse_datetime_column(
     dataset_path: str,
     datetime_col: str,
+    series_id_cols: list[str] | None = None,
     output_path: str = "",
 ) -> dict
 ```
 
-- Parses the column with `pd.to_datetime`, raises `ValueError` if parsing fails or the column contains any nulls after parsing
-- Sorts the dataset by `datetime_col` (and `series_id_columns` if provided)
+- Parses the column with `pd.to_datetime(errors="coerce")` — coerces both original nulls and unparseable strings to NaT, then raises `ValueError` with a single consistent message if `null_count > 0`
+- Sorts the dataset by `series_id_cols + [datetime_col]` (important for multi-series panel data where rows must be grouped by series before sorting chronologically)
 - Writes sorted dataset to `output_path` (or overwrites `dataset_path` if empty)
 - Returns `{"output_path": ..., "dtype": "datetime64", "null_count": 0}`
 
@@ -82,9 +85,11 @@ def detect_temporal_gaps(
 ```
 
 **Critical key validation** (runs first, raises if any fail):
-- `datetime_col` column exists and has no nulls
+- `datetime_col` column exists (checked before parse_dates to produce a clean error)
+- `datetime_col` has no nulls after `pd.to_datetime(errors="coerce")`
 - All `series_id_cols` columns exist and have no nulls
 - `target_column` exists in the dataset
+- `frequency` is a valid pandas offset alias (validated via `to_offset`)
 
 **Gap detection:**
 - Per series (grouped by `series_id_cols`), generate the expected date range from min to max at `frequency`
@@ -110,7 +115,7 @@ def detect_temporal_gaps(
 }
 ```
 
-The full gap report (all series, all missing dates) is written to `output_path` / `artifacts/temporal_gaps.json` as a JSON artifact for auditability. `detect_temporal_gaps` also detects duplicate (series_id, datetime) pairs and raises if any are found.
+The full gap report (all series, all missing dates) is written to `output_path` or `artifacts/temporal_gaps_{dataset_stem}.json` (stem-based default to avoid overwriting between runs) as a JSON artifact for auditability. `detect_temporal_gaps` also detects duplicate (series_id, datetime) pairs and raises if any are found.
 
 ---
 
