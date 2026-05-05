@@ -11,6 +11,7 @@ from mlops_agents.tools.data_tools import (
     impute_missing_values,
     load_dataset,
     merge_datasets,
+    parse_datetime_column,
     validate_against_schema,
 )
 
@@ -584,9 +585,6 @@ def test_impute_file_not_found_returns_error():
 # parse_datetime_column
 # ---------------------------------------------------------------------------
 
-from mlops_agents.tools.data_tools import parse_datetime_column
-
-
 def test_parse_datetime_column_parses_and_sorts(tmp_path):
     df = pd.DataFrame({
         "date": ["2024-01-03", "2024-01-01", "2024-01-02"],
@@ -600,6 +598,7 @@ def test_parse_datetime_column_parses_and_sorts(tmp_path):
     }))
     assert result["null_count"] == 0
     assert result["dtype"] == "datetime64"
+    assert result["output_path"] == str(path)  # overwrites input when output_path omitted
     df_after = pd.read_csv(path, parse_dates=["date"])
     assert list(df_after["val"]) == [1, 2, 3]
 
