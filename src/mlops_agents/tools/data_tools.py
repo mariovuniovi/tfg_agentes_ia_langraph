@@ -225,6 +225,59 @@ def merge_datasets(join_spec_json: str, output_path: str) -> str:
     return json.dumps(result)
 
 
+@tool
+def parse_datetime_column(
+    dataset_path: str,
+    datetime_col: str,
+    series_id_cols: list[str] | None = None,
+    output_path: str = "",
+) -> str:
+    """Parse a string column as datetime, sort the dataset, and write the result.
+
+    Uses errors="coerce" so both original nulls and unparseable strings become NaT
+    and are caught by a single null check with a clear error message.
+
+    Sorts by series_id_cols + [datetime_col] so multi-series panel data is grouped
+    correctly before gap detection and position-based interpolation.
+
+    Args:
+        dataset_path: Path to the CSV file.
+        datetime_col: Name of the column to parse as datetime.
+        series_id_cols: Optional series identifier columns — sort by these first.
+        output_path: Destination path for sorted CSV. Defaults to overwrite input.
+
+    Returns:
+        JSON with {output_path, dtype, null_count} or {error}.
+    """
+    path = Path(dataset_path)
+    if not path.exists():
+        return json.dumps({"error": f"File not found: {dataset_path}"})
+
+    df = pd.read_csv(path)
+
+    if datetime_col not in df.columns:
+        return json.dumps({"error": f"Column '{datetime_col}' not found in dataset"})
+
+    df[datetime_col] = pd.to_datetime(df[datetime_col], errors="coerce")
+
+    null_count = int(df[datetime_col].isnull().sum())
+    if null_count > 0:
+        raise ValueError(
+            f"datetime_column '{datetime_col}' has {null_count} null or unparseable "
+            "value(s) — temporal forecasting requires a complete, parseable time index"
+        )
+
+    sort_cols = list(series_id_cols or []) + [datetime_col]
+    df = df.sort_values(by=sort_cols).reset_index(drop=True)
+
+    dest = Path(output_path) if output_path else path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(dest, index=False)
+
+    logger.info(f"Parsed and sorted '{datetime_col}' in {dest.name}")
+    return json.dumps({"output_path": str(dest), "dtype": "datetime64", "null_count": 0})
+
+
 def _interpolate_short_internal_gaps(s: pd.Series, max_gap: int) -> tuple[pd.Series, list[int]]:
     """Interpolate only short internal gaps; leave large or boundary gaps fully unchanged.
 

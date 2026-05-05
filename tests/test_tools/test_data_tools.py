@@ -578,3 +578,89 @@ def test_impute_file_not_found_returns_error():
         "target_column": "target",
     }))
     assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# parse_datetime_column
+# ---------------------------------------------------------------------------
+
+from mlops_agents.tools.data_tools import parse_datetime_column
+
+
+def test_parse_datetime_column_parses_and_sorts(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-03", "2024-01-01", "2024-01-02"],
+        "val": [3, 1, 2],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(parse_datetime_column.invoke({
+        "dataset_path": str(path),
+        "datetime_col": "date",
+    }))
+    assert result["null_count"] == 0
+    assert result["dtype"] == "datetime64"
+    df_after = pd.read_csv(path, parse_dates=["date"])
+    assert list(df_after["val"]) == [1, 2, 3]
+
+
+def test_parse_datetime_column_sorts_by_series_then_date(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-02", "2024-01-01", "2024-01-02", "2024-01-01"],
+        "store_id": ["B", "A", "A", "B"],
+        "sales": [20, 10, 30, 40],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    parse_datetime_column.invoke({
+        "dataset_path": str(path),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+    })
+    df_after = pd.read_csv(path)
+    # Should be sorted: A 2024-01-01, A 2024-01-02, B 2024-01-01, B 2024-01-02
+    assert list(df_after["store_id"]) == ["A", "A", "B", "B"]
+    assert list(df_after["sales"]) == [10, 30, 40, 20]
+
+
+def test_parse_datetime_column_raises_if_nulls(tmp_path):
+    df = pd.DataFrame({"date": [None, "2024-01-02"], "val": [1, 2]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null"):
+        parse_datetime_column.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+        })
+
+
+def test_parse_datetime_column_raises_if_unparseable(tmp_path):
+    df = pd.DataFrame({"date": ["not-a-date", "2024-01-02"], "val": [1, 2]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null|unparseable"):
+        parse_datetime_column.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+        })
+
+
+def test_parse_datetime_column_writes_to_output_path(tmp_path):
+    df = pd.DataFrame({"date": ["2024-01-01", "2024-01-02"], "val": [1, 2]})
+    path = tmp_path / "data.csv"
+    out = tmp_path / "sorted.csv"
+    df.to_csv(path, index=False)
+    parse_datetime_column.invoke({
+        "dataset_path": str(path),
+        "datetime_col": "date",
+        "output_path": str(out),
+    })
+    assert out.exists()
+
+
+def test_parse_datetime_column_returns_error_for_missing_file():
+    result = json.loads(parse_datetime_column.invoke({
+        "dataset_path": "/nonexistent/data.csv",
+        "datetime_col": "date",
+    }))
+    assert "error" in result
