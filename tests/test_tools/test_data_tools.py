@@ -4,10 +4,12 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from mlops_agents.tools.data_tools import (
     apply_column_mapping,
     check_missing_values,
+    detect_temporal_gaps,
     impute_missing_values,
     load_dataset,
     merge_datasets,
@@ -313,8 +315,6 @@ def test_merge_datasets_returns_error_when_join_produces_zero_rows(tmp_path):
 # ---------------------------------------------------------------------------
 # impute_missing_values — role-aware dispatcher
 # ---------------------------------------------------------------------------
-
-import pytest
 
 
 def test_impute_invalid_problem_type_raises(tmp_path):
@@ -668,9 +668,6 @@ def test_parse_datetime_column_returns_error_for_missing_file():
 # ---------------------------------------------------------------------------
 # detect_temporal_gaps
 # ---------------------------------------------------------------------------
-
-import pytest
-from mlops_agents.tools.data_tools import detect_temporal_gaps
 
 
 @pytest.fixture()
