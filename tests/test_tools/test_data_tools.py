@@ -550,6 +550,27 @@ def test_impute_forecasting_exogenous_categorical_filled(tmp_path):
     assert df_after["category"].isnull().sum() == 0
 
 
+def test_impute_forecasting_multi_series_no_index_collision(tmp_path):
+    """Multi-series concat must reset index so get_loc in gap helper never sees duplicates."""
+    csv = tmp_path / "multi.csv"
+    pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-01", "2024-01-02", "2024-01-03"],
+        "sid": ["s1", "s1", "s1", "s2", "s2", "s2"],
+        "sales": [1.0, None, 3.0, 4.0, None, 6.0],
+    }).to_csv(csv, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(csv),
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "series_id_columns": ["sid"],
+        "max_interpolation_gap": 3,
+    }))
+    out = pd.read_csv(result["output_path"])
+    assert out["sales"].isnull().sum() == 0
+    assert len(out) == 6
+
+
 def test_impute_file_not_found_returns_error():
     result = json.loads(impute_missing_values.invoke({
         "dataset_path": "/nonexistent/file.csv",

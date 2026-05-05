@@ -267,6 +267,7 @@ def _tabular_impute(df: pd.DataFrame, target_column: str) -> dict:
     Target column rows with missing values are dropped (not imputed).
     All other columns: mean for numeric, mode for categorical.
     """
+    df = df.copy()
     warnings_list: list[str] = []
 
     if target_column in df.columns:
@@ -286,7 +287,7 @@ def _tabular_impute(df: pd.DataFrame, target_column: str) -> dict:
         null_count = int(df[col].isnull().sum())
         if null_count == 0:
             continue
-        if df[col].dtype in ("float64", "int64"):
+        if pd.api.types.is_numeric_dtype(df[col]):
             df[col] = df[col].fillna(float(df[col].mean()))
         else:
             mode = df[col].mode()
@@ -353,8 +354,10 @@ def _forecasting_impute(
                     if g[col].isnull().any():
                         mode = g[col].mode()
                         g[col] = g[col].fillna(mode.iloc[0] if not mode.empty else "unknown")
-                imputed_cols.add(col)
-                rows_affected += null_count
+                filled = null_count - int(g[col].isnull().sum())
+                if filled > 0:
+                    imputed_cols.add(col)
+                    rows_affected += filled
         return g
 
     if series_id_columns:
@@ -363,7 +366,7 @@ def _forecasting_impute(
             if not isinstance(keys, tuple):
                 keys = (keys,)
             parts.append(_process(grp, dict(zip(series_id_columns, keys))))
-        df = pd.concat(parts)
+        df = pd.concat(parts).reset_index(drop=True)
     else:
         df = _process(df, {})
 
