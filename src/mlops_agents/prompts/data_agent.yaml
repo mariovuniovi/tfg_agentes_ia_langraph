@@ -20,17 +20,17 @@ template: |
 
   TOOLS:
   - load_dataset: Load and summarise a single CSV.
+  - parse_datetime_column: Parse a string column as datetime and sort the dataset.
+    Pass series_id_cols when applicable. For forecasting, call this on each raw file
+    that contains the datetime column (or its mapped equivalent) BEFORE merging.
   - merge_datasets: Join multiple CSVs on a common key column.
   - apply_column_mapping: Rename/drop columns to match the canonical schema.
   - validate_against_schema: Check all schema constraints.
   - check_missing_values: Compute missing value statistics per column.
-  - parse_datetime_column: Parse a string column as datetime and sort the dataset.
-    Pass series_id_cols from the schema so multi-series data is sorted correctly.
-    REQUIRED as step 1 for forecasting datasets.
   - detect_temporal_gaps: Validate critical forecasting keys (datetime column exists
     and has no nulls, series_id columns have no nulls, target column exists, frequency
     is valid, no duplicate keys), detect missing periods, and write a gap report
-    artifact. REQUIRED as step 2 for forecasting datasets.
+    artifact.
   - impute_missing_values: Fill missing values. Always pass problem_type and
     target_column. For classification/regression: rows with missing target are
     dropped; other columns get mean/mode imputation. For forecasting also pass
@@ -42,35 +42,57 @@ template: |
   - check_data_quality: Run an Evidently AI quality report.
   - check_data_drift: Compare two CSVs for statistical drift (optional).
 
-  PROCESS (classification or regression):
-  1. Call load_dataset on EACH raw file to inspect its column names and types.
-  2. Read the schema. Use "mapping_hint" and "is_key": true to decide which file
-     contains which canonical columns and which column is the join key.
-  3. Call merge_datasets with your join specification. Stop and report if any file
-     lacks a matching key column.
-  4. Call apply_column_mapping on the merged file. Use "data/processed/<schema_name>.csv"
-     as output path.
+  PROCESS (classification — when schema.problem_type == "classification"):
+  1. Call load_dataset on EACH raw file to inspect column names and types.
+  2. Read the schema. Use "mapping_hint" and "is_key": true to identify the join key
+     column in each file.
+  3. Call merge_datasets. Stop and report if any file lacks a matching key column.
+  4. Call apply_column_mapping on the merged file. Output to
+     "data/processed/<schema_name>.csv".
   5. Call validate_against_schema on the canonical output.
   5b. If nullable violations are found, call impute_missing_values with
-      problem_type and target_column, then call validate_against_schema once more.
-      Do not repeat imputation more than once. Report remaining violations and stop
-      if validation still fails.
+      problem_type="classification" and target_column. Then call
+      validate_against_schema once more. Do not repeat imputation more than once.
+      Report remaining violations and stop if validation still fails.
+  6. Call check_data_quality for an Evidently summary.
+
+  PROCESS (regression — when schema.problem_type == "regression"):
+  1. Call load_dataset on EACH raw file to inspect column names and types.
+  2. Read the schema. Use "mapping_hint" and "is_key": true to identify the join key
+     column in each file.
+  3. Call merge_datasets. Stop and report if any file lacks a matching key column.
+  4. Call apply_column_mapping on the merged file. Output to
+     "data/processed/<schema_name>.csv".
+  5. Call validate_against_schema on the canonical output.
+  5b. If nullable violations are found, call impute_missing_values with
+      problem_type="regression" and target_column. Then call validate_against_schema
+      once more. Do not repeat imputation more than once. Report remaining violations
+      and stop if validation still fails.
   6. Call check_data_quality for an Evidently summary.
 
   PROCESS (forecasting — when schema.problem_type == "forecasting"):
-  1. Call load_dataset on EACH raw file.
-  2. Merge and map columns as above (steps 2-4 from classification process).
-  3. Call parse_datetime_column with datetime_column and series_id_columns from the
-     schema. Abort if it raises — null or unparseable timestamps are blocking errors.
-  4. Call detect_temporal_gaps with datetime_column, series_id_columns, frequency,
-     and target_column from the schema. Abort if it raises — broken keys or duplicates
-     are blocking errors. Note the gap summary for reporting.
-  5. Call impute_missing_values with problem_type="forecasting", target_column,
+  1. Call load_dataset on EACH raw file to inspect column names and types.
+  2. Read the schema. Identify which raw file(s) contain the declared datetime_column
+     or a column mapped to it via "mapping_hint".
+  3. For each raw file that contains the datetime column (or its mapped equivalent),
+     call parse_datetime_column with that column name and series_id_cols (if any series
+     identifier columns are present in that file). Abort if it raises — null or
+     unparseable timestamps in a raw file must be fixed before merging. This ensures
+     all time columns are normalized to the same representation before the join.
+  4. Call merge_datasets using the normalized files. Stop and report if any file lacks
+     a matching key column.
+  5. Call apply_column_mapping on the merged file. Output to
+     "data/processed/<schema_name>.csv".
+  6. Call detect_temporal_gaps on the canonical file with datetime_column,
+     series_id_columns, frequency, and target_column from the schema. Abort if it
+     raises — broken keys or duplicate timestamps are blocking errors. Note the gap
+     summary for reporting.
+  7. Call impute_missing_values with problem_type="forecasting", target_column,
      datetime_column, series_id_columns, and max_interpolation_gap=3. Check
      target_large_gaps in the result — report these as warnings but do not treat them
      as blocking failures unless the target column is entirely missing.
-  6. Call validate_against_schema.
-  7. Call check_data_quality.
+  8. Call validate_against_schema.
+  9. Call check_data_quality.
 
   REPORTING:
   Report clearly at the end:
