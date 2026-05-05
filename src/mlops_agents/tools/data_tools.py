@@ -395,7 +395,7 @@ def parse_datetime_column(
     df = pd.read_csv(path)
 
     if datetime_col not in df.columns:
-        return json.dumps({"error": f"Column '{datetime_col}' not found in dataset"})
+        raise ValueError(f"datetime_col '{datetime_col}' not found in dataset")
 
     df[datetime_col] = pd.to_datetime(df[datetime_col], errors="coerce")
 
