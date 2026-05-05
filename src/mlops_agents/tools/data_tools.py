@@ -12,7 +12,6 @@ import pandas as pd
 from langchain_core.tools import tool
 
 from mlops_agents.config.constants import MAX_DRIFT_SCORE
-from mlops_agents.config.settings import settings
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -226,59 +225,211 @@ def merge_datasets(join_spec_json: str, output_path: str) -> str:
     return json.dumps(result)
 
 
-@tool
-def impute_missing_values(path: str) -> str:
-    """Impute missing values in a canonical CSV using strategies from settings.
+def _interpolate_short_internal_gaps(s: pd.Series, max_gap: int) -> tuple[pd.Series, list[int]]:
+    """Interpolate only short internal gaps; leave large or boundary gaps fully unchanged.
 
-    Numeric columns (float64, int64): uses settings.imputation_strategy_numeric
-    Categorical columns (object): uses settings.imputation_strategy_categorical
+    A gap is interpolated only when:
+      (1) its length is <= max_gap, AND
+      (2) it is bounded by known (non-null) values on both sides.
+    Leading/trailing gaps and any gap longer than max_gap are left as-is.
 
-    Writes the result back to the same path (in-place).
-
-    Args:
-        path: Path to the canonical CSV file to impute.
-
-    Returns:
-        JSON with {output_path, imputed_columns} where each imputed column
-        maps to {strategy, fill_value, rows_affected}.
+    Returns the imputed series and a list of gap sizes that were NOT filled.
     """
-    csv_path = Path(path)
-    if not csv_path.exists():
-        return json.dumps({"error": f"File not found: {path}"})
+    missing = s.isna()
+    if not missing.any():
+        return s.copy(), []
 
-    df = pd.read_csv(csv_path)
-    imputed: dict[str, dict] = {}
+    interpolated = s.interpolate(method="linear", limit_area="inside")
+    result = s.copy()
+    large_gaps: list[int] = []
 
-    numeric_strategy = settings.imputation_strategy_numeric
-    categorical_strategy = settings.imputation_strategy_categorical
+    group_id = (missing != missing.shift()).cumsum()
+
+    for _, idx in s[missing].groupby(group_id[missing]).groups.items():
+        idx = list(idx)
+        gap_size = len(idx)
+        positions = [s.index.get_loc(i) for i in idx]
+        min_pos, max_pos = min(positions), max(positions)
+        has_before = min_pos > 0 and pd.notna(s.iloc[min_pos - 1])
+        has_after = max_pos < len(s) - 1 and pd.notna(s.iloc[max_pos + 1])
+
+        if gap_size <= max_gap and has_before and has_after:
+            result.loc[idx] = interpolated.loc[idx]
+        else:
+            large_gaps.append(gap_size)
+
+    return result, large_gaps
+
+
+def _tabular_impute(df: pd.DataFrame, target_column: str) -> dict:
+    """Mean/mode imputation for classification and regression datasets.
+
+    Target column rows with missing values are dropped (not imputed).
+    All other columns: mean for numeric, mode for categorical.
+    """
+    warnings_list: list[str] = []
+
+    if target_column in df.columns:
+        missing_target = int(df[target_column].isnull().sum())
+        if missing_target > 0:
+            df = df.dropna(subset=[target_column])
+            warnings_list.append(
+                f"Dropped {missing_target} row(s) with missing target '{target_column}'."
+            )
+
+    imputed_cols: list[str] = []
+    rows_affected = 0
 
     for col in df.columns:
+        if col == target_column:
+            continue
         null_count = int(df[col].isnull().sum())
         if null_count == 0:
             continue
-
         if df[col].dtype in ("float64", "int64"):
-            if numeric_strategy == "mean":
-                fill_value = float(df[col].mean())
-            elif numeric_strategy == "median":
-                fill_value = float(df[col].median())
-            else:  # "zero"
-                fill_value = 0.0
-            df[col] = df[col].fillna(fill_value)
-            imputed[col] = {"strategy": numeric_strategy, "fill_value": fill_value, "rows_affected": null_count}
+            df[col] = df[col].fillna(float(df[col].mean()))
+        else:
+            mode = df[col].mode()
+            df[col] = df[col].fillna(str(mode.iloc[0]) if not mode.empty else "unknown")
+        imputed_cols.append(col)
+        rows_affected += null_count
 
-        elif df[col].dtype == object:
-            if categorical_strategy == "mode":
-                fill_value = str(df[col].mode().iloc[0]) if not df[col].mode().empty else "unknown"
-                df[col] = df[col].fillna(fill_value)
-                imputed[col] = {"strategy": "mode", "fill_value": fill_value, "rows_affected": null_count}
-            elif categorical_strategy == "unknown":
-                df[col] = df[col].fillna("unknown")
-                imputed[col] = {"strategy": "unknown", "fill_value": "unknown", "rows_affected": null_count}
-            else:  # "drop_row"
-                df = df.dropna(subset=[col])
-                imputed[col] = {"strategy": "drop_row", "fill_value": None, "rows_affected": null_count}
+    return {
+        "df": df,
+        "columns_imputed": imputed_cols,
+        "rows_affected": rows_affected,
+        "warnings": warnings_list,
+    }
 
-    df.to_csv(csv_path, index=False)
-    logger.info(f"Imputed {len(imputed)} column(s) in {csv_path.name}")
-    return json.dumps({"output_path": str(csv_path), "imputed_columns": imputed}, default=str)
+
+def _forecasting_impute(
+    df: pd.DataFrame,
+    target_column: str,
+    datetime_column: str,
+    series_id_columns: list[str],
+    max_interpolation_gap: int,
+) -> dict:
+    """Time-aware imputation for forecasting datasets."""
+    if df[datetime_column].isnull().any():
+        raise ValueError(
+            f"datetime_column '{datetime_column}' contains null values — cannot impute"
+        )
+    for col in series_id_columns:
+        if df[col].isnull().any():
+            raise ValueError(
+                f"series_id_column '{col}' contains null values — cannot impute"
+            )
+
+    protected = {datetime_column} | set(series_id_columns)
+    imputed_cols: set[str] = set()
+    rows_affected = 0
+    target_large_gaps: list[dict] = []
+
+    def _process(grp: pd.DataFrame, series_id: dict) -> pd.DataFrame:
+        nonlocal rows_affected
+        g = grp.copy()
+        for col in g.columns:
+            if col in protected:
+                continue
+            null_count = int(g[col].isnull().sum())
+            if null_count == 0:
+                continue
+            if col == target_column:
+                new_series, large = _interpolate_short_internal_gaps(
+                    g[col], max_interpolation_gap
+                )
+                filled = null_count - int(new_series.isna().sum())
+                g[col] = new_series
+                if filled > 0:
+                    imputed_cols.add(col)
+                    rows_affected += filled
+                if large:
+                    target_large_gaps.append({"series_id": series_id, "gap_sizes": large})
+            else:
+                if pd.api.types.is_numeric_dtype(g[col]):
+                    g[col] = g[col].ffill().interpolate(method="linear").bfill()
+                else:
+                    g[col] = g[col].ffill().bfill()
+                    if g[col].isnull().any():
+                        mode = g[col].mode()
+                        g[col] = g[col].fillna(mode.iloc[0] if not mode.empty else "unknown")
+                imputed_cols.add(col)
+                rows_affected += null_count
+        return g
+
+    if series_id_columns:
+        parts = []
+        for keys, grp in df.groupby(series_id_columns, group_keys=False):
+            if not isinstance(keys, tuple):
+                keys = (keys,)
+            parts.append(_process(grp, dict(zip(series_id_columns, keys))))
+        df = pd.concat(parts)
+    else:
+        df = _process(df, {})
+
+    return {
+        "df": df,
+        "columns_imputed": list(imputed_cols),
+        "rows_affected": rows_affected,
+        "target_large_gaps": target_large_gaps,
+    }
+
+
+@tool
+def impute_missing_values(
+    dataset_path: str,
+    problem_type: str,
+    target_column: str,
+    datetime_column: str | None = None,
+    series_id_columns: list[str] | None = None,
+    max_interpolation_gap: int = 3,
+    output_path: str = "",
+) -> str:
+    """Impute missing values using a strategy appropriate for the problem type.
+
+    For classification/regression: rows with missing target are dropped; mean for
+    numeric non-target columns, mode for categoricals.
+    For forecasting: protected datetime/series_id columns (raise if null); only short
+    internal gaps in the target are interpolated (<= max_interpolation_gap, bounded on
+    both sides); exogenous features get dtype-aware forward-fill/interpolation.
+
+    Args:
+        dataset_path: Path to the CSV file to impute.
+        problem_type: One of "classification", "regression", "forecasting".
+        target_column: Name of the target/label column.
+        datetime_column: Required for forecasting — the datetime index column.
+        series_id_columns: Required for forecasting — columns that identify each series.
+        max_interpolation_gap: Max consecutive missing periods to interpolate in target.
+        output_path: Destination path for imputed CSV. Defaults to overwrite input.
+
+    Returns:
+        JSON with {output_path, columns_imputed, rows_affected, warnings} plus
+        target_large_gaps for forecasting.
+    """
+    valid = {"classification", "regression", "forecasting"}
+    if problem_type not in valid:
+        raise ValueError(
+            f"problem_type must be one of {sorted(valid)}, got {problem_type!r}"
+        )
+
+    path = Path(dataset_path)
+    if not path.exists():
+        return json.dumps({"error": f"File not found: {dataset_path}"})
+
+    df = pd.read_csv(path)
+    cols = list(series_id_columns or [])
+    dest = Path(output_path) if output_path else path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    if problem_type in ("classification", "regression"):
+        info = _tabular_impute(df, target_column)
+    else:
+        if datetime_column is None:
+            raise ValueError("datetime_column is required for forecasting imputation")
+        info = _forecasting_impute(df, target_column, datetime_column, cols, max_interpolation_gap)
+
+    result_df: pd.DataFrame = info.pop("df")
+    result_df.to_csv(dest, index=False)
+    info["output_path"] = str(dest)
+    logger.info(f"Imputed {len(info['columns_imputed'])} column(s) in {dest.name}")
+    return json.dumps(info, default=str)
