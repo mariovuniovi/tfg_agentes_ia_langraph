@@ -349,10 +349,23 @@ The executor logs the effective (narrowed) search space to the MLflow child run 
 
 3. **Allocate trials** (3.3).
 
-4. **Open MLflow parent run** with name `pipeline_<timestamp>`.
+4. **Open MLflow parent run** with name `pipeline_<timestamp>`. Use the explicit nested-run pattern so child runs attach correctly:
+
+    ```python
+    mlflow.set_experiment(mlflow_experiment)
+    with mlflow.start_run(run_name=f"pipeline_{ts}") as parent:
+        for candidate in plan.candidates:
+            with mlflow.start_run(run_name=candidate.model_key, nested=True) as child:
+                # train + log this candidate
+                ...
+        # after the loop, retrain champion *inside* the parent run
+        # by re-opening the champion's child run by run_id and logging the model artifact there
+    ```
+
+    `nested=True` on the inner `start_run` is required — without it, MLflow opens a sibling run and the parent/child relationship is lost.
 
 5. **For each candidate (priority order):**
-    a. Open MLflow child run named after `model_key`.
+    a. Open MLflow child run named after `model_key` (using the `nested=True` pattern above).
     b. Resolve effective search space: registry default ∩ `search_space_override` (validated above).
     c. Compose Optuna study and objective using native direction (no metric negation):
         - **classification**: `optuna.create_study(direction="maximize")`. StratifiedKFold (n_splits=5 default) on train_pool. Objective returns mean macro F1 across folds.
