@@ -202,11 +202,32 @@ src/mlops_agents/contracts/
 ### 2.2 `contracts/training.py`
 
 ```python
+class SearchParamOverride(BaseModel):
+    """Explicit override schema — no JSON tuple/list ambiguity.
+
+    For int/float params: provide either {low, high} OR {choices: [...]}.
+    For categorical params: provide {choices: [...]}.
+    """
+    low: int | float | None = None
+    high: int | float | None = None
+    choices: list[Any] | None = None
+
+    @model_validator(mode="after")
+    def either_range_or_choices(self):
+        has_range = self.low is not None and self.high is not None
+        has_choices = self.choices is not None
+        if has_range == has_choices:  # both or neither
+            raise ValueError("Provide exactly one of {low, high} or {choices}.")
+        if has_range and self.low > self.high:
+            raise ValueError(f"low ({self.low}) must be <= high ({self.high}).")
+        return self
+
+
 class TrainingPlanCandidate(BaseModel):
     priority: int                         # unique within a plan
     model_key: str
     initial_hyperparameters: dict[str, Any] = Field(default_factory=dict)
-    search_space_override: dict[str, Any] | None = None
+    search_space_override: dict[str, SearchParamOverride] | None = None
     requested_trials: int | None = None   # advisory — see Section 3.3
     reason: str = ""
 
@@ -275,16 +296,36 @@ class TrainingResult(BaseModel):
 
 ### 3.2 `search_space_override` validation rules
 
-For each parameter `p` in the override:
+The override is a `dict[str, SearchParamOverride]` (Section 2.2). Each `SearchParamOverride` carries either `{low, high}` **or** `{choices}` — never both, never neither. JSON-serializable, unambiguous.
 
-1. **`p` must exist** in the registry's `search_space.params`. Unknown name → `ValueError`.
-2. **Type compatibility**: override entries must match the YAML param type.
-3. **Range/choice subset check**:
-    - `int` / `float`: override is either a list of explicit values *all inside* `[low, high]`, or a `(low, high)` pair where both endpoints are inside the registry range. Disjoint or out-of-range → `ValueError`.
-    - `categorical`: override choices must all be in the YAML `choices` list.
-4. After validation, the executor builds a *narrowed* `SearchSpaceSpec` and feeds it to `build_suggest_fn`.
+Example override:
 
-The executor logs the effective (narrowed) search space to the MLflow child run.
+```json
+{
+  "search_space_override": {
+    "learning_rate": { "low": 0.01, "high": 0.1 },
+    "n_estimators":  { "choices": [300, 500, 800] }
+  }
+}
+```
+
+For each `(param_name, override)` pair:
+
+1. **`param_name` must exist** in the registry's `search_space.params`. Unknown name → `ValueError`.
+2. **Type compatibility**:
+    - Registry param is `int` or `float`: override may use `{low, high}` (continuous narrowing) **or** `{choices}` (discrete narrowing).
+    - Registry param is `categorical`: override must use `{choices}`. Using `{low, high}` on a categorical → `ValueError`.
+3. **Subset check** (per registry type):
+    - Registry `int` / `float`:
+        - If override has `{low, high}`: both must satisfy `registry.low <= override.low <= override.high <= registry.high`. Otherwise → `ValueError("override range disjoint or wider than registry")`.
+        - If override has `{choices}`: every choice must be inside `[registry.low, registry.high]`. Otherwise → `ValueError`.
+    - Registry `categorical`: every entry in `override.choices` must be in `registry.choices`. Otherwise → `ValueError`.
+4. After validation, the executor builds a *narrowed* `SearchSpaceSpec` for that param:
+    - `{low, high}` override → `SearchParamSpec(type=registry.type, low=override.low, high=override.high, log=registry.log, step=registry.step)`.
+    - `{choices}` override → `SearchParamSpec(type="categorical", choices=override.choices)` (collapses an int/float to a discrete categorical for that param only).
+5. Params not in the override keep the registry's default spec unchanged.
+
+The executor logs the effective (narrowed) search space to the MLflow child run as a JSON artifact.
 
 ### 3.3 Trial budget allocation
 
