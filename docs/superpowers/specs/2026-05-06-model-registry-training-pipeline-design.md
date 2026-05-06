@@ -42,7 +42,7 @@ Dataset + Schema  ─────┘         │
                         └────────────────────────────┘
 ```
 
-The executor never reads from raw inputs — it consumes the canonical processed CSV produced by the data_validator (`state["dataset_path"]`).
+The executor never reads from raw inputs — it consumes the canonical processed CSV produced by the data_validator (`state["processed_dataset_path"]`).
 
 ---
 
@@ -249,7 +249,7 @@ class TrainingPlan(BaseModel):
 ```python
 def run_training_plan(
     plan: TrainingPlan,
-    dataset_path: Path,
+    processed_dataset_path: Path,
     target_column: str,
     task_metadata: dict[str, Any],
     output_dir: Path,
@@ -554,7 +554,7 @@ def default_training_plan(
 ```python
 def trainer_node(state: AgentState) -> Command:
     profile = build_dataset_profile(
-        Path(state["dataset_path"]),       # canonical processed CSV from data_validator
+        Path(state["processed_dataset_path"]),       # canonical processed CSV from data_validator
         state["task_metadata"],
     )
     plan_dict = state.get("training_plan")
@@ -565,7 +565,7 @@ def trainer_node(state: AgentState) -> Command:
 
     result = run_training_plan(
         plan=plan,
-        dataset_path=Path(state["dataset_path"]),
+        processed_dataset_path=Path(state["processed_dataset_path"]),
         target_column=state["task_metadata"]["target_column"],
         task_metadata=state["task_metadata"],
         output_dir=Path("data/processed"),
@@ -588,22 +588,33 @@ def trainer_node(state: AgentState) -> Command:
     )
 ```
 
-The trainer node reads `state["dataset_path"]` — by existing convention this is the canonical processed CSV written by `data_validator_node`. The trainer **never** reads `state["dataset_paths"]` (raw inputs).
+The trainer node reads `state["processed_dataset_path"]` — the canonical processed CSV written by `data_validator_node`. The trainer **never** reads `state["dataset_paths"]` (raw inputs).
+
+> **Migration note (part of SP3):** the existing state field is currently named `dataset_path`. SP3 renames it to `processed_dataset_path` for clarity (paired with `dataset_paths` plural was confusing). The rename touches:
+> - `src/mlops_agents/state/agent_state.py` (the field declaration)
+> - `src/mlops_agents/graphs/mlops_graph.py` (line ~69 in supervisor context, plus all node read/write sites in `data_validator_node`, `trainer_node`, `evaluator_node`, `deployer_node`)
+> - `tests/test_api/test_pipeline_helpers.py`
+> - `tests/test_graphs/test_mlops_graph.py`
+> - `tests/test_graphs/test_node_state_extraction.py`
+>
+> Done as a single mechanical rename commit at the start of SP3 implementation, before any new code is added.
 
 ### State additions in `agent_state.py`
 
 ```python
 class AgentState(TypedDict, total=False):
+    dataset_paths: list[str]                # raw CSV files (unchanged)
+    processed_dataset_path: str             # RENAMED from `dataset_path`
     ...existing fields...
-    training_plan: dict | None              # Pydantic-dumped TrainingPlan
-    train_pool_path: str | None
-    test_path: str | None
-    split_metadata_path: str | None
-    champion_candidate: dict | None
-    experience_record_path: str | None
+    training_plan: dict | None              # Pydantic-dumped TrainingPlan (NEW)
+    train_pool_path: str | None             # NEW
+    test_path: str | None                   # NEW
+    split_metadata_path: str | None         # NEW
+    champion_candidate: dict | None         # NEW
+    experience_record_path: str | None      # NEW
 ```
 
-Existing fields kept: `trained_model_path`, `training_run_id`, `training_metrics`.
+Existing fields kept (not renamed): `trained_model_path`, `training_run_id`, `training_metrics`.
 
 ---
 
