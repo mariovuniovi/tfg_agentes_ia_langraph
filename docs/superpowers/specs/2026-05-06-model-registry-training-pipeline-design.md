@@ -354,10 +354,12 @@ The executor logs the effective (narrowed) search space to the MLflow child run 
 5. **For each candidate (priority order):**
     a. Open MLflow child run named after `model_key`.
     b. Resolve effective search space: registry default ∩ `search_space_override` (validated above).
-    c. Compose Optuna objective:
-        - **classification**: StratifiedKFold (n_splits=5 default) on train_pool. Score = mean folds of macro F1.
-        - **regression**: KFold(shuffle=True, n_splits=5) on train_pool. Score = mean folds of negative RMSE (Optuna maximizes).
-        - **forecasting**: single temporal holdout inside train_pool — last `forecast_horizon` periods of each series form the **candidate validation slice**; everything before is candidate train. Score = chosen metric on validation slice.
+    c. Compose Optuna study and objective using native direction (no metric negation):
+        - **classification**: `optuna.create_study(direction="maximize")`. StratifiedKFold (n_splits=5 default) on train_pool. Objective returns mean macro F1 across folds.
+        - **regression**: `optuna.create_study(direction="minimize")`. KFold(shuffle=True, n_splits=5) on train_pool. Objective returns mean RMSE across folds.
+        - **forecasting**: `optuna.create_study(direction="minimize")`. Single temporal holdout inside train_pool — last `forecast_horizon` periods of each series form the **candidate validation slice**; everything before is candidate train. Objective returns RMSE on the validation slice.
+        
+        If `plan.metric_to_optimize` overrides the default, the executor looks up the direction from a metric→direction map (Section 3.5) and configures the study accordingly.
     d. Run Optuna study with the candidate's allocated `n_trials`. Sampler = TPE; pruner = MedianPruner.
     e. **Per-trial failures**: caught inside the objective; the trial is marked FAIL by Optuna and the study continues with the next trial. We do **not** retry the same trial.
     f. **Candidate failure** = no successful trial produced a valid score. On candidate failure: retry **once** with `default_params` (no Optuna). If still failing → mark `status: "failed"`, log error info, close child run, continue to next candidate.
