@@ -30,6 +30,13 @@ class AgentState(TypedDict):
     trained_model_path: str
     training_run_id: str      # MLflow run ID
     training_metrics: dict
+    # SP3 training (new)
+    training_plan: dict | None              # Pydantic-dumped TrainingPlan
+    train_pool_path: str | None
+    test_path: str | None
+    split_metadata_path: str | None
+    champion_candidate: dict | None
+    experience_record_path: str | None
     evaluation_passed: bool
     evaluation_report: dict
     best_model_uri: str

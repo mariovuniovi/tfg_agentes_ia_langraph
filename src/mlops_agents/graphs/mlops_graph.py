@@ -22,6 +22,7 @@ from langgraph.types import Command, interrupt
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.agents.supervisor import supervisor_node
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
+from mlops_agents.config.settings import settings
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.utils.logging import get_logger
 
@@ -61,14 +62,6 @@ def _build_data_validator_context(
         f"Target schema:\n{schema_json}"
     ))
 
-
-def _build_trainer_context(state: AgentState) -> HumanMessage:
-    return HumanMessage(content=(
-        f"Problem type: {state.get('problem_type', '')}\n"
-        f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
-        f"Canonical dataset: {state.get('processed_dataset_path', '')}\n"
-        f"Dataset summary: {json.dumps(state.get('dataset_summary') or {})}"
-    ))
 
 
 def _build_evaluator_context(state: AgentState) -> HumanMessage:
@@ -289,28 +282,46 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
 
 def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    agent = get_agent("trainer")
-    result = agent.invoke({"messages": [_build_trainer_context(state)]})
-    final_message = result["messages"][-1].content
+    from pathlib import Path as _Path
+    from mlops_agents.contracts.training import TrainingPlan
+    from mlops_agents.training.default_plans import default_training_plan
+    from mlops_agents.training.executor import run_training_plan
+    from mlops_agents.training.profiler import build_dataset_profile
 
-    train_result: dict = _extract_tool_json(result["messages"], "train_model")
-    mlflow_result: dict = _extract_tool_json(result["messages"], "log_experiment")
+    processed_path = _Path(state["processed_dataset_path"])
+    task_meta = state.get("task_metadata") or {}
 
-    training_metrics = {
-        "model_type": train_result.get("model_type", ""),
-        "train_accuracy": train_result.get("train_accuracy", 0.0),
-        "val_accuracy": train_result.get("val_accuracy", 0.0),
-    }
+    profile = build_dataset_profile(processed_path, task_meta)
+    plan_dict = state.get("training_plan")
+    if plan_dict:
+        plan = TrainingPlan.model_validate(plan_dict)
+    else:
+        problem_type = state.get("problem_type", task_meta.get("problem_type", "classification"))
+        plan = default_training_plan(problem_type, profile)
+
+    result = run_training_plan(
+        plan=plan,
+        processed_dataset_path=processed_path,
+        target_column=task_meta.get("target_column", "target"),
+        task_metadata=task_meta,
+        output_dir=_Path("data/processed"),
+        mlflow_experiment=settings.mlflow_experiment_name,
+    )
 
     logger.info("[trainer] completed — routing back to supervisor")
     return Command(
-        update={
-            "messages": [HumanMessage(content=final_message, name="trainer")],
-            "training_metrics": training_metrics,
-            "training_run_id": mlflow_result.get("run_id", ""),
-            "trained_model_path": train_result.get("model_path", ""),
-        },
         goto="supervisor",
+        update={
+            "training_plan": plan.model_dump(),
+            "train_pool_path": result.train_pool_path,
+            "test_path": result.test_path,
+            "split_metadata_path": result.split_metadata_path,
+            "trained_model_path": result.champion_model_path,
+            "training_run_id": result.mlflow_parent_run_id,
+            "training_metrics": result.champion_metrics,
+            "champion_candidate": result.champion_candidate,
+            "experience_record_path": result.experience_record_path,
+        },
     )
 
 

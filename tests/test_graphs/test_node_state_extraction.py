@@ -383,39 +383,31 @@ def test_data_validator_node_passed_false_when_no_tool_output():
 # ---------------------------------------------------------------------------
 
 
-def test_trainer_node_populates_training_metrics():
+def test_trainer_node_returns_to_supervisor(tmp_path):
+    """trainer_node (deterministic) routes to supervisor and populates training state fields."""
+    import pandas as pd
+    from sklearn.datasets import load_iris
     from mlops_agents.graphs.mlops_graph import trainer_node
 
-    train_json = json.dumps(
-        {
-            "model_type": "random_forest",
-            "model_path": "./models/random_forest_model.pkl",
-            "hyperparameters": {"n_estimators": 100},
-            "train_accuracy": 0.98,
-            "val_accuracy": 0.95,
-            "classification_report": {},
-        }
-    )
-    mlflow_json = json.dumps({"run_id": "abc123", "model_uri": "runs:/abc123/model"})
-    mock_result = {
-        "messages": [
-            ToolMessage(content=train_json, tool_call_id="1", name="train_model"),
-            ToolMessage(content=mlflow_json, tool_call_id="2", name="log_experiment"),
-            AIMessage(content="Training complete."),
-        ]
-    }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = mock_result
-        mock_get_agent.return_value = mock_agent
+    data = load_iris(as_frame=True)
+    df = pd.concat([data.data, data.target.rename("target")], axis=1)
+    csv_path = tmp_path / "iris.csv"
+    df.to_csv(csv_path, index=False)
 
-        command = trainer_node(_make_state())
+    state = _make_state()
+    state["processed_dataset_path"] = str(csv_path)
+    state["problem_type"] = "classification"
+    state["task_metadata"] = {"target_column": "target", "problem_type": "classification"}
 
-    assert command.update["training_metrics"]["model_type"] == "random_forest"
-    assert command.update["training_metrics"]["val_accuracy"] == 0.95
-    assert command.update["training_run_id"] == "abc123"
-    assert command.update["trained_model_path"] == "./models/random_forest_model.pkl"
+    command = trainer_node(state)
+
     assert command.goto == "supervisor"
+    assert "trained_model_path" in command.update
+    assert "training_run_id" in command.update
+    assert "training_metrics" in command.update
+    assert "champion_candidate" in command.update
+    assert "experience_record_path" in command.update
+    assert isinstance(command.update["training_metrics"], dict)
 
 
 # ---------------------------------------------------------------------------
@@ -557,18 +549,6 @@ def test_build_data_validator_context_includes_schema_path():
     assert "/data/schemas/iris.json" in msg.content
     assert "Target schema:" in msg.content
     assert '"target"' in msg.content
-
-
-def test_build_trainer_context_includes_dataset_path_and_summary():
-    from mlops_agents.graphs.mlops_graph import _build_trainer_context
-
-    state = _make_state()
-    state["processed_dataset_path"] = "data/processed/iris.csv"
-    state["dataset_summary"] = {"row_count": 150, "column_names": ["a", "b"]}
-    msg = _build_trainer_context(state)
-    assert "data/processed/iris.csv" in msg.content
-    assert "row_count" in msg.content
-    assert "150" in msg.content
 
 
 def test_build_evaluator_context_includes_run_id_and_metrics():
@@ -752,35 +732,33 @@ def test_data_validator_node_invokes_agent_with_isolated_context():
     )
 
 
-def test_trainer_node_invokes_agent_with_isolated_context():
-    """trainer_node must pass exactly one context message — not state['messages']."""
+def test_trainer_node_uses_plan_from_state_when_present(tmp_path):
+    """trainer_node must use training_plan from state when provided."""
+    import pandas as pd
+    from sklearn.datasets import load_iris
     from mlops_agents.graphs.mlops_graph import trainer_node
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
 
-    train_json = json.dumps({
-        "model_type": "random_forest", "model_path": "rf.pkl",
-        "train_accuracy": 0.98, "val_accuracy": 0.95,
-    })
-    mock_result = {
-        "messages": [
-            ToolMessage(content=train_json, tool_call_id="1", name="train_model"),
-            AIMessage(content="Training complete."),
-        ]
-    }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = mock_result
-        mock_get_agent.return_value = mock_agent
+    data = load_iris(as_frame=True)
+    df = pd.concat([data.data, data.target.rename("target")], axis=1)
+    csv_path = tmp_path / "iris.csv"
+    df.to_csv(csv_path, index=False)
 
-        state = _make_state()
-        state["messages"] = [
-            HumanMessage(content="supervisor msg 1"),
-            HumanMessage(content="supervisor msg 2"),
-        ]
-        trainer_node(state)
+    plan = TrainingPlan(
+        problem_type="classification",
+        candidates=[TrainingPlanCandidate(priority=1, model_key="logistic_regression")],
+        trial_budget=TrialBudget(total_trials=3, min_trials_per_candidate=3, max_trials_per_candidate=3),
+    )
+    state = _make_state()
+    state["processed_dataset_path"] = str(csv_path)
+    state["problem_type"] = "classification"
+    state["task_metadata"] = {"target_column": "target", "problem_type": "classification"}
+    state["training_plan"] = plan.model_dump()
 
-    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
-    assert len(call_messages) == 1
-    assert "Canonical dataset:" in call_messages[0].content
+    command = trainer_node(state)
+
+    assert command.goto == "supervisor"
+    assert command.update["training_plan"]["candidates"][0]["model_key"] == "logistic_regression"
 
 
 def test_evaluator_node_invokes_agent_with_isolated_context():
@@ -830,17 +808,6 @@ def test_deployer_node_invokes_agent_with_isolated_context():
     call_messages = mock_agent.invoke.call_args[0][0]["messages"]
     assert len(call_messages) == 1
     assert "Best model URI:" in call_messages[0].content
-
-
-def test_build_trainer_context_includes_problem_type_and_task_metadata():
-    from mlops_agents.graphs.mlops_graph import _build_trainer_context
-
-    state = _make_state()
-    state["problem_type"] = "classification"
-    state["task_metadata"] = {"target_column": "target"}
-    msg = _build_trainer_context(state)
-    assert "Problem type: classification" in msg.content
-    assert "target_column" in msg.content
 
 
 def test_build_evaluator_context_includes_problem_type_and_task_metadata():
