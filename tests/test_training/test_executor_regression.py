@@ -1,0 +1,42 @@
+"""End-to-end test: executor on California Housing regression."""
+import json
+from pathlib import Path
+import pandas as pd
+import pytest
+from sklearn.datasets import fetch_california_housing
+from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+from mlops_agents.training.executor import run_training_plan
+
+
+@pytest.fixture
+def housing_csv(tmp_path):
+    data = fetch_california_housing(as_frame=True)
+    df = pd.concat([data.data, data.target.rename("target")], axis=1).head(1500)
+    p = tmp_path / "housing.csv"
+    df.to_csv(p, index=False)
+    return p
+
+
+def test_executor_housing_regression_endtoend(housing_csv, tmp_path):
+    plan = TrainingPlan(
+        problem_type="regression",
+        candidates=[
+            TrainingPlanCandidate(priority=1, model_key="ridge"),
+            TrainingPlanCandidate(priority=2, model_key="random_forest_regressor"),
+        ],
+        trial_budget=TrialBudget(total_trials=10, min_trials_per_candidate=3, max_trials_per_candidate=10),
+    )
+    result = run_training_plan(
+        plan=plan,
+        processed_dataset_path=housing_csv,
+        target_column="target",
+        task_metadata={"problem_type": "regression", "target_column": "target"},
+        output_dir=tmp_path / "splits",
+        mlflow_experiment="test-housing",
+        random_state=42,
+    )
+    assert Path(result.champion_model_path).exists()
+    record = json.loads(Path(result.experience_record_path).read_text())
+    assert record["problem_type"] == "regression"
+    assert record["metric_direction"] == "minimize"
+    assert record["selected_solution"]["validation_score"] > 0
