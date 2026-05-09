@@ -122,3 +122,46 @@ def test_catboost_regressor_factory(tabular_regression_xy):
         {"iterations": 50, "learning_rate": 0.1, "depth": 4, "random_seed": 0, "verbose": False},
         tabular_regression_xy,
     )
+
+
+@pytest.fixture
+def panel_dataframe():
+    """Multi-series panel data: 2 series x 36 monthly periods."""
+    import pandas as pd
+    dates = pd.date_range("2020-01-01", periods=36, freq="MS")
+    rows = []
+    for sid in ["s1", "s2"]:
+        for i, d in enumerate(dates):
+            rows.append({"unique_id": sid, "ds": d, "y": float(i) + (1.0 if sid == "s1" else 5.0)})
+    return pd.DataFrame(rows)
+
+
+def _check_stat_forecaster_fits_and_predicts(factory_name: str, params: dict, panel):
+    factory = FACTORY_REGISTRY[factory_name]
+    sf = factory({"task_metadata": {"frequency": "MS", "forecast_horizon": 6}, "params": params})
+    sf.fit(panel)
+    fcst = sf.predict(h=6)
+    assert len(fcst) == 6 * 2     # 6 horizons x 2 series
+    assert "unique_id" in fcst.columns and "ds" in fcst.columns
+
+
+def test_naive_factory(panel_dataframe):
+    _check_stat_forecaster_fits_and_predicts("build_naive", {}, panel_dataframe)
+
+
+def test_seasonal_naive_factory(panel_dataframe):
+    _check_stat_forecaster_fits_and_predicts(
+        "build_seasonal_naive", {"season_length": 12}, panel_dataframe,
+    )
+
+
+def test_ets_factory(panel_dataframe):
+    _check_stat_forecaster_fits_and_predicts(
+        "build_ets", {"season_length": 12}, panel_dataframe,
+    )
+
+
+def test_auto_arima_factory(panel_dataframe):
+    _check_stat_forecaster_fits_and_predicts(
+        "build_auto_arima", {"season_length": 12}, panel_dataframe,
+    )
