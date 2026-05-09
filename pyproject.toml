@@ -24,10 +24,15 @@ dependencies = [
     "evidently>=0.5",
 
     # ML & Data
+    "catboost>=1.2",
+    "lightgbm>=4.0",
     "scikit-learn>=1.6",
     "pandas>=2.2",
     "numpy>=2.0",
     "optuna>=4.0",
+    "skforecast>=0.13",
+    "statsforecast>=1.7",
+    "xgboost>=2.0",
 
     # Configuration & Validation
     "pydantic>=2.10",

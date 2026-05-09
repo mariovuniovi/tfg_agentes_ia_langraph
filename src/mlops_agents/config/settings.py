@@ -1,5 +1,6 @@
 """Application configuration via Pydantic Settings (reads from .env)."""
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,6 +45,17 @@ class Settings(BaseSettings):
     max_attempts_per_agent: int = 3
     imputation_strategy_numeric: Literal["mean", "median", "zero"] = "mean"
     imputation_strategy_categorical: Literal["mode", "unknown", "drop_row"] = "mode"
+
+    # Training executor (SP3)
+    train_test_split_ratio: float = 0.2
+    cv_folds: int = 5
+    optuna_total_trials: int = 60
+    optuna_min_trials_per_candidate: int = 5
+    optuna_max_trials_per_candidate: int = 30
+    log_non_champion_models: bool = False
+    tie_tolerance_relative: float = 0.01
+    forecasting_min_train_points: int = 30
+    experience_pool_dir: Path = Path("experience_pool")
 
 
 settings = Settings()
