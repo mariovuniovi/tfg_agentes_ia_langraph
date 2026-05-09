@@ -36,7 +36,13 @@ def test_executor_housing_regression_endtoend(housing_csv, tmp_path):
         random_state=42,
     )
     assert Path(result.champion_model_path).exists()
+    assert Path(result.train_pool_path).exists()
+    assert Path(result.test_path).exists()
+    assert Path(result.experience_record_path).exists()
     record = json.loads(Path(result.experience_record_path).read_text())
     assert record["problem_type"] == "regression"
     assert record["metric_direction"] == "minimize"
-    assert record["selected_solution"]["validation_score"] > 0
+    # RMSE on California Housing with RF should beat trivially (< mean prediction)
+    # Ridge baseline is typically RMSE ~0.9; any finite positive score qualifies
+    assert 0 < record["selected_solution"]["validation_score"] < 100
+    assert {c["model_key"] for c in record["models_tested"]} == {"ridge", "random_forest_regressor"}
