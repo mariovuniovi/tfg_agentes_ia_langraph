@@ -63,3 +63,62 @@ def test_catboost_classifier_factory(tabular_classification_xy):
         {"iterations": 50, "learning_rate": 0.1, "depth": 4, "random_seed": 0, "verbose": False},
         tabular_classification_xy,
     )
+
+
+@pytest.fixture
+def tabular_regression_xy():
+    rng = np.random.default_rng(42)
+    X = rng.normal(size=(60, 4))
+    y = X[:, 0] + 0.5 * X[:, 1] + rng.normal(scale=0.1, size=60)
+    return X, y
+
+
+def _check_regressor_fits_and_predicts(factory_name: str, params: dict, xy):
+    X, y = xy
+    factory = FACTORY_REGISTRY[factory_name]
+    model = factory(params)
+    model.fit(X, y)
+    preds = model.predict(X)
+    assert preds.shape == y.shape
+    assert np.isfinite(preds).all()
+
+
+def test_ridge_factory(tabular_regression_xy):
+    _check_regressor_fits_and_predicts(
+        "build_ridge",
+        {"alpha": 1.0, "random_state": 0},
+        tabular_regression_xy,
+    )
+
+
+def test_random_forest_regressor_factory(tabular_regression_xy):
+    _check_regressor_fits_and_predicts(
+        "build_random_forest_regressor",
+        {"n_estimators": 50, "max_depth": 5, "random_state": 0},
+        tabular_regression_xy,
+    )
+
+
+def test_lightgbm_regressor_factory(tabular_regression_xy):
+    _check_regressor_fits_and_predicts(
+        "build_lightgbm_regressor",
+        {"n_estimators": 50, "learning_rate": 0.1, "num_leaves": 31, "random_state": 0, "verbosity": -1},
+        tabular_regression_xy,
+    )
+
+
+def test_xgboost_regressor_factory(tabular_regression_xy):
+    _check_regressor_fits_and_predicts(
+        "build_xgboost_regressor",
+        {"n_estimators": 50, "learning_rate": 0.1, "max_depth": 4, "random_state": 0,
+         "tree_method": "hist", "verbosity": 0},
+        tabular_regression_xy,
+    )
+
+
+def test_catboost_regressor_factory(tabular_regression_xy):
+    _check_regressor_fits_and_predicts(
+        "build_catboost_regressor",
+        {"iterations": 50, "learning_rate": 0.1, "depth": 4, "random_seed": 0, "verbose": False},
+        tabular_regression_xy,
+    )
