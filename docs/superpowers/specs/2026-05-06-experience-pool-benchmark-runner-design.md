@@ -124,7 +124,7 @@ Computed via skewness threshold (|skew| > 1) and kurtosis threshold (kurt > 3); 
 | QS (quarterly) | 1–2 | 3–4 | 5–8 | > 8 |
 | YS (yearly) | 1 | 2–3 | 4–5 | > 5 |
 
-So `30 daily steps` → `medium`; `30 monthly steps` → `long`. Difficulty is frequency-aware, capturing the user's intuition that long-period forecasting is harder.
+So `30 daily steps` → `short` (in [8, 30]); `30 monthly steps` → `long` (> 24). Difficulty is frequency-aware, capturing the intuition that long-period forecasting is harder.
 
 ### 1.6 Pydantic schema (`src/mlops_agents/contracts/profile.py`)
 
@@ -226,8 +226,9 @@ CREATE TABLE model_artifacts (
     task_id TEXT NOT NULL,
     model_key TEXT NOT NULL,
     mlflow_run_id TEXT,
-    artifact_path TEXT,
-    artifact_uri TEXT,
+    artifact_path TEXT,         -- relative path inside the MLflow run dir
+    artifact_uri TEXT,          -- mlflow-artifact://... or full URI of the artifact directory
+    model_uri TEXT,             -- e.g., "runs:/<run_id>/model" — direct mlflow.<flavor>.load_model() URI
     is_champion INTEGER NOT NULL,
     metric_name TEXT,
     metric_value REAL,
@@ -306,18 +307,51 @@ class MLRule(BaseModel):
     rule_id: str
     applies_when: dict[str, str | list[str] | bool]
     prefer: list[str] = Field(default_factory=list)
-    avoid: list[str] = Field(default_factory=list)
+    avoid_or_deprioritize: list[str] = Field(default_factory=list)
     requirements: list[str] = Field(default_factory=list)
     reason: str
     tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
+    def validate_applies_when_fields(self):
+        """applies_when keys must reference real DatasetProfile fields (catch typos)."""
+        from mlops_agents.contracts.profile import DatasetProfile
+        valid_fields = set(DatasetProfile.model_fields.keys())
+        for field in self.applies_when:
+            if field not in valid_fields:
+                raise ValueError(
+                    f"Rule {self.rule_id}: applies_when references unknown profile field '{field}'. "
+                    f"Valid fields: {sorted(valid_fields)}"
+                )
+        return self
+
+    @model_validator(mode="after")
     def validate_model_keys(self):
+        """Every prefer/avoid_or_deprioritize model_key must exist in the registry,
+        AND if applies_when.problem_type is set, every model_key must match that
+        problem_type (a forecasting rule cannot recommend a classification model)."""
         from mlops_agents.models.loader import load_registry
         registry = load_registry()
-        for k in self.prefer + self.avoid:
+        rule_pt = self.applies_when.get("problem_type")
+        # Normalize: applies_when.problem_type may be a single str or a list[str]
+        allowed_problem_types: set[str] | None
+        if isinstance(rule_pt, str):
+            allowed_problem_types = {rule_pt}
+        elif isinstance(rule_pt, list):
+            allowed_problem_types = set(rule_pt)
+        else:
+            allowed_problem_types = None  # rule applies to any problem_type
+
+        for k in self.prefer + self.avoid_or_deprioritize:
             if k not in registry:
                 raise ValueError(f"Rule {self.rule_id}: unknown model_key '{k}'")
+            if allowed_problem_types is not None:
+                model_pt = registry[k].problem_type
+                if model_pt not in allowed_problem_types:
+                    raise ValueError(
+                        f"Rule {self.rule_id}: model_key '{k}' (problem_type={model_pt!r}) "
+                        f"does not match the rule's allowed problem_type(s) {sorted(allowed_problem_types)}"
+                    )
         return self
 ```
 
@@ -338,28 +372,38 @@ If all entries match, the rule applies. Returned in YAML file order (curated ord
 Drafted ~13 rules covering the patterns from `plan_model_agent.md` plus broadly useful heuristics. Examples (truncated for brevity):
 
 ```yaml
-- rule_id: very_small_dataset_prefers_simple_models
+- rule_id: classification_very_small_prefers_simple_models
   applies_when:
+    problem_type: classification
     n_rows: very_small
-  prefer: [logistic_regression, ridge, naive, seasonal_naive]
-  avoid: [lightgbm_classifier, xgboost_classifier, catboost_classifier,
-          lightgbm_regressor, xgboost_regressor, catboost_regressor,
-          lightgbm_forecaster, xgboost_forecaster]
+  prefer: [logistic_regression, random_forest_classifier]
+  avoid_or_deprioritize: [lightgbm_classifier, xgboost_classifier, catboost_classifier]
   reason: |
-    With <500 rows, complex tree ensembles overfit and regularized linear
-    or simple statistical baselines generalize better.
-  tags: [sample_size]
+    With very small classification datasets (<500 rows), simple baselines and robust
+    classical models should be prioritized; complex boosting models overfit easily.
+  tags: [classification, sample_size]
+
+- rule_id: regression_very_small_prefers_simple_models
+  applies_when:
+    problem_type: regression
+    n_rows: very_small
+  prefer: [ridge, random_forest_regressor]
+  avoid_or_deprioritize: [lightgbm_regressor, xgboost_regressor, catboost_regressor]
+  reason: |
+    With very small regression datasets (<500 rows), regularized linear models and
+    simple tree baselines are safer than high-capacity boosting models.
+  tags: [regression, sample_size]
 
 - rule_id: forecasting_short_history_prefers_statistical
   applies_when:
     problem_type: forecasting
     history_length: [very_short, short]
   prefer: [seasonal_naive, ets, auto_arima, naive]
-  avoid: [svr_forecaster, lightgbm_forecaster, xgboost_forecaster,
-          random_forest_forecaster, extra_trees_forecaster, gbm_forecaster]
+  avoid_or_deprioritize: [svr_forecaster, lightgbm_forecaster, xgboost_forecaster,
+                          random_forest_forecaster, extra_trees_forecaster, gbm_forecaster]
   reason: |
     With short history (<200 obs/series), statistical models with strong
-    structural priors outperform feature-heavy supervised models.
+    structural priors outperform feature-heavy supervised forecasters.
   tags: [forecasting, sample_size]
 
 - rule_id: forecasting_long_history_with_exogenous_prefers_supervised
@@ -391,7 +435,7 @@ Drafted ~13 rules covering the patterns from `plan_model_agent.md` plus broadly 
     class_balance: severely_imbalanced
   prefer: [lightgbm_classifier, xgboost_classifier, catboost_classifier,
           random_forest_classifier]
-  avoid: [logistic_regression]
+  avoid_or_deprioritize: [logistic_regression]
   reason: |
     Severely imbalanced classes (>5x) benefit from tree ensembles which
     handle class weights and decision boundaries flexibly. Logistic
@@ -445,11 +489,18 @@ RETRIEVAL_WEIGHTS: dict[str, int] = {
 ### 4.2 Algorithm
 
 ```python
+MAX_SCORE_BY_PROBLEM_TYPE = {
+    "classification": 13,   # 3 + 2+2+2 + 1+1+1+1
+    "regression": 11,       # 3 + 2+2 + 1+1+1+1
+    "forecasting": 29,      # 3+3+3+3+3 + 2+2+2+2+2 + 1+1+1+1
+}
+
 def find_similar(profile, problem_type, k):
     rows = db.execute(
         "SELECT * FROM experiences WHERE problem_type = ?", (problem_type,)
     ).fetchall()
 
+    max_score = MAX_SCORE_BY_PROBLEM_TYPE[problem_type]
     scored = []
     for row in rows:
         candidate_profile = json.loads(row["dataset_profile_json"])
@@ -462,10 +513,20 @@ def find_similar(profile, problem_type, k):
         scored.append((score, row, matched_fields))
 
     scored.sort(key=lambda x: (-x[0], -isoparse(x[1]["created_at"]).timestamp()))
-    return [build_retrieval_view(row, score, matched) for score, row, matched in scored[:k]]
+    return [
+        build_retrieval_view(
+            row,
+            similarity_score=score,
+            similarity_ratio=round(score / max_score, 3),
+            matched_fields=matched,
+        )
+        for score, row, matched in scored[:k]
+    ]
 ```
 
-Total weight ceilings:
+`similarity_ratio = score / max_possible_score_for_this_problem_type` makes results comparable across problem types: a forecasting match with score 18 is 18/29 ≈ 0.62, whereas a classification match with score 8 is 8/13 ≈ 0.62 — the agent can interpret both as "moderately similar" without having to know per-type ceilings.
+
+Total weight ceilings (the `MAX_SCORE_BY_PROBLEM_TYPE` constants above):
 - classification: 13 (3 + 2+2+2 + 1+1+1+1)
 - regression: 11 (3 + 2+2 + 1+1+1+1)
 - forecasting: 29 (3+3+3+3+3 + 2+2+2+2+2 + 1+1+1+1)
@@ -535,7 +596,8 @@ class RetrievalView(BaseModel):
     selected_solution: SelectedSolutionView
     models_not_recommended: list[dict] = Field(default_factory=list)
     experience_summary: str | None
-    similarity_score: int
+    similarity_score: int       # raw weighted overlap (problem-type-dependent ceiling)
+    similarity_ratio: float     # similarity_score / max_possible_score_for_this_problem_type — 0.0–1.0
     matched_fields: list[str]
 ```
 
@@ -747,10 +809,13 @@ SP4 is complete when:
 
 1. `apply_pending_migrations(...)` creates the 3 tables on a fresh DB; idempotent on subsequent runs.
 2. `ExperiencePool.insert_from_record(record)` writes to all 3 tables atomically (one transaction); writes the JSON audit copy on success.
-3. `match_rules(profile)` loads `ml_rules.yaml`, validates every `prefer`/`avoid` model_key against the SP3 model registry, returns rules in YAML order whose `applies_when` is fully satisfied.
+3. `match_rules(profile)` loads `ml_rules.yaml` and returns rules in YAML order whose `applies_when` is fully satisfied. Rule loading rejects any rule that:
+    a. references an unknown `model_key` in `prefer` / `avoid_or_deprioritize` (registry-existence check), OR
+    b. references an unknown profile field name in `applies_when` (typo guard — catches `history_lenght: short` etc.), OR
+    c. has `applies_when.problem_type` set but recommends a `model_key` whose registry `problem_type` doesn't match (closed-catalog enforcement: a forecasting rule cannot recommend `logistic_regression`).
 4. `retrieve_similar_experiences` and `retrieve_ml_knowledge` are registered as LangChain `@tool` functions, return JSON strings, and pass round-trip Pydantic validation.
-5. `find_similar(profile, problem_type, k=5)` returns up to k matches sorted by weighted score (recency tie-break); empty list if no experiences match the problem_type.
+5. `find_similar(profile, problem_type, k=5)` returns up to k matches sorted by weighted `similarity_score` (recency tie-break); each `RetrievalView` carries both raw `similarity_score` and normalized `similarity_ratio` (= score / max-for-problem-type); empty list if no experiences match the problem_type.
 6. `scripts/run_benchmark.py` runs end-to-end against the manifest, populates the SQLite + JSON audit dir, logs per-dataset success/failure. Single-dataset failures do not abort the batch.
 7. After running the benchmark, the pool contains ≥ 12 experience records (≥ 4 per problem type).
-8. The starter `ml_rules.yaml` loads cleanly: every rule's `prefer`/`avoid` model_keys validate against the SP3 registry.
+8. The starter `ml_rules.yaml` loads cleanly: every rule passes all three validators in #3 (model-key existence, applies_when field-name typo guard, problem-type consistency between `applies_when.problem_type` and recommended models).
 9. Test suite passes; no test calls a real LLM.
