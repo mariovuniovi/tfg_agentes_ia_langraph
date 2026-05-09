@@ -18,7 +18,8 @@ def iris_csv(tmp_path):
     return p
 
 
-def test_one_failed_one_succeeds_run_completes(iris_csv, tmp_path):
+def test_one_failed_one_succeeds_run_completes(iris_csv, tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     """Force one factory to raise; other should still produce champion."""
     real = factories_module.FACTORY_REGISTRY["build_logistic_regression"]
     def boom(_params):

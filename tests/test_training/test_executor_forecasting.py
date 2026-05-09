@@ -21,7 +21,8 @@ def air_passengers_csv(tmp_path):
     return p
 
 
-def test_executor_forecasting_single_series_statistical(air_passengers_csv, tmp_path):
+def test_executor_forecasting_single_series_statistical(air_passengers_csv, tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     plan = TrainingPlan(
         problem_type="forecasting",
         candidates=[
@@ -48,7 +49,8 @@ def test_executor_forecasting_single_series_statistical(air_passengers_csv, tmp_
     assert record["selected_solution"]["model_key"] in {"seasonal_naive", "ets"}
 
 
-def test_executor_forecasting_multi_series_supervised(tmp_path):
+def test_executor_forecasting_multi_series_supervised(tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     rows = []
     rng = np.random.default_rng(0)
     for sid in ["a", "b", "c"]:

@@ -18,7 +18,8 @@ def iris_csv(tmp_path):
     return p
 
 
-def test_executor_iris_classification_endtoend(iris_csv, tmp_path):
+def test_executor_iris_classification_endtoend(iris_csv, tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     plan = TrainingPlan(
         problem_type="classification",
         candidates=[

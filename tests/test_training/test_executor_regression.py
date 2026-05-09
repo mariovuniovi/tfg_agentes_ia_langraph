@@ -17,7 +17,8 @@ def housing_csv(tmp_path):
     return p
 
 
-def test_executor_housing_regression_endtoend(housing_csv, tmp_path):
+def test_executor_housing_regression_endtoend(housing_csv, tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     plan = TrainingPlan(
         problem_type="regression",
         candidates=[
