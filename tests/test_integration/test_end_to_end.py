@@ -27,7 +27,7 @@ def test_full_pipeline_runs_on_sample_dataset(sample_csv):
     initial_state = {
         "messages": [HumanMessage(content=f"Validate dataset: {sample_csv}")],
         "next": "",
-        "dataset_path": str(sample_csv),
+        "processed_dataset_path": str(sample_csv),
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",

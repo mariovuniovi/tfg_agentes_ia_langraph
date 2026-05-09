@@ -10,7 +10,7 @@ def test_build_initial_state_sets_dataset_paths():
     paths = ["./data/samples/iris_measurements.csv", "./data/samples/iris_labels.csv"]
     state = build_initial_state(paths)
     assert state["dataset_paths"] == paths
-    assert state["dataset_path"] == ""
+    assert state["processed_dataset_path"] == ""
 
 
 def test_build_initial_state_has_human_message():

@@ -82,7 +82,7 @@ def _make_state() -> dict:
         "messages": [HumanMessage(content="Run pipeline on iris.csv")],
         "next": "",
         "dataset_paths": ["./data/samples/iris.csv"],
-        "dataset_path": "./data/samples/iris.csv",
+        "processed_dataset_path": "./data/samples/iris.csv",
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",
@@ -563,7 +563,7 @@ def test_build_trainer_context_includes_dataset_path_and_summary():
     from mlops_agents.graphs.mlops_graph import _build_trainer_context
 
     state = _make_state()
-    state["dataset_path"] = "data/processed/iris.csv"
+    state["processed_dataset_path"] = "data/processed/iris.csv"
     state["dataset_summary"] = {"row_count": 150, "column_names": ["a", "b"]}
     msg = _build_trainer_context(state)
     assert "data/processed/iris.csv" in msg.content

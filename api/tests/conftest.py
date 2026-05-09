@@ -27,7 +27,7 @@ def mock_graph():
     graph.astream = AsyncMock(return_value=aiter([]))
     graph.aget_state = AsyncMock()
     graph.aget_state.return_value.values = {
-        "dataset_path": "",
+        "processed_dataset_path": "",
         "training_metrics": {},
         "validation_report": {},
     }

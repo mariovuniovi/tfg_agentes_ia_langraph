@@ -25,7 +25,7 @@ def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict
         "messages": [HumanMessage(content=f"Run the full MLOps pipeline on these raw files: {paths_display}")],
         "next": "",
         "dataset_paths": dataset_paths,
-        "dataset_path": "",
+        "processed_dataset_path": "",
         "schema_json": schema_json,
         "dataset_summary": {},
         "problem_type": "",

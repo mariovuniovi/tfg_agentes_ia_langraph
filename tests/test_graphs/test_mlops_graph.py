@@ -39,7 +39,7 @@ def _make_validator_state(tmp_path=None):
         "messages": [HumanMessage(content="Run pipeline.")],
         "next": "",
         "dataset_paths": ["data/samples/iris_measurements.csv"],
-        "dataset_path": processed,
+        "processed_dataset_path": processed,
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",
@@ -79,7 +79,7 @@ def test_data_validator_node_approved_returns_to_supervisor(tmp_path):
     state = _make_validator_state(tmp_path)
     mock_agent = _make_mock_agent(
         tool_name="apply_column_mapping",
-        tool_content=f'{{"output_path": "{state["dataset_path"]}", "mapped_columns": 2}}',
+        tool_content=f'{{"output_path": "{state["processed_dataset_path"]}", "mapped_columns": 2}}',
     )
 
     with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \

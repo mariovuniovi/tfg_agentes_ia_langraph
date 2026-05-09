@@ -11,7 +11,7 @@ def make_state(messages=None, **kwargs):
     base = {
         "messages": messages or [HumanMessage(content="Run the pipeline.")],
         "next": "",
-        "dataset_path": "test.csv",
+        "processed_dataset_path": "test.csv",
         "validation_passed": False,
         "validation_report": {},
         "trained_model_path": "",

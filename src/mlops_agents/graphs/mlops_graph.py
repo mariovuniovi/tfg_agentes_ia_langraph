@@ -66,7 +66,7 @@ def _build_trainer_context(state: AgentState) -> HumanMessage:
     return HumanMessage(content=(
         f"Problem type: {state.get('problem_type', '')}\n"
         f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
-        f"Canonical dataset: {state.get('dataset_path', '')}\n"
+        f"Canonical dataset: {state.get('processed_dataset_path', '')}\n"
         f"Dataset summary: {json.dumps(state.get('dataset_summary') or {})}"
     ))
 
@@ -147,7 +147,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
                 "task_metadata": {},
                 "dataset_summary": {},
                 "validation_report": {},
-                "dataset_path": "",
+                "processed_dataset_path": "",
                 "schema_json": "",
             },
             goto="supervisor",
@@ -167,7 +167,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
                 "task_metadata": {},
                 "dataset_summary": {},
                 "validation_report": {},
-                "dataset_path": "",
+                "processed_dataset_path": "",
                 "schema_json": schema_json,
             },
             goto="supervisor",
@@ -224,7 +224,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
         "messages": [HumanMessage(content=final_message, name="data_validator")],
         "validation_report": quality_report,
         "validation_passed": validation_passed,
-        "dataset_path": processed_path,
+        "processed_dataset_path": processed_path,
         "dataset_summary": dataset_summary,
         "problem_type": problem_type,
         "task_metadata": task_metadata,
@@ -422,7 +422,7 @@ def main() -> None:
         ],
         "next": "",
         "dataset_paths": dataset_paths,
-        "dataset_path": "",
+        "processed_dataset_path": "",
         "dataset_summary": {},
         "problem_type": "",
         "task_metadata": {},
