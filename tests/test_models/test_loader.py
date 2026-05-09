@@ -83,3 +83,19 @@ def test_get_models_for_filters_by_problem_type(monkeypatch):
     )
     cls_models = get_models_for("classification")
     assert {m.model_key for m in cls_models} == {"a"}
+
+
+def test_load_actual_registry_has_20_entries():
+    """Smoke test: the shipped registry.yaml loads cleanly with all expected models."""
+    from mlops_agents.models.loader import load_registry, get_models_for
+    registry = load_registry(force_reload=True)
+    assert len(registry) == 20
+    assert len(get_models_for("classification")) == 5
+    assert len(get_models_for("regression")) == 5
+    assert len(get_models_for("forecasting")) == 10  # 4 statistical + 6 supervised
+
+
+def test_registry_complexity_ranks_set():
+    from mlops_agents.models.loader import load_registry
+    for model in load_registry(force_reload=True).values():
+        assert model.complexity_rank >= 1
