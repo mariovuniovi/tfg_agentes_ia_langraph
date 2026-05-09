@@ -165,3 +165,69 @@ def test_auto_arima_factory(panel_dataframe):
     _check_stat_forecaster_fits_and_predicts(
         "build_auto_arima", {"season_length": 12}, panel_dataframe,
     )
+
+
+def _check_supervised_forecaster_fits_and_predicts(factory_name: str, params: dict, panel):
+    """skforecast wants a wide series_dict from the long panel."""
+    import pandas as pd
+    factory = FACTORY_REGISTRY[factory_name]
+    forecaster = factory({"task_metadata": {"forecast_horizon": 6}, "params": params})
+    series_dict = {
+        sid: g.set_index("ds")["y"].asfreq("MS")
+        for sid, g in panel.groupby("unique_id")
+    }
+    forecaster.fit(series=series_dict)
+    preds = forecaster.predict(steps=6)
+    assert len(preds) == 6 * 2
+    # skforecast returns long format with columns ['level', 'pred']
+    assert "level" in preds.columns or "unique_id" in preds.columns
+
+
+def test_random_forest_forecaster_factory(panel_dataframe):
+    _check_supervised_forecaster_fits_and_predicts(
+        "build_random_forest_forecaster",
+        {"lags": 12, "n_estimators": 30, "max_depth": 5, "random_state": 0},
+        panel_dataframe,
+    )
+
+
+def test_extra_trees_forecaster_factory(panel_dataframe):
+    _check_supervised_forecaster_fits_and_predicts(
+        "build_extra_trees_forecaster",
+        {"lags": 12, "n_estimators": 30, "max_depth": 5, "random_state": 0},
+        panel_dataframe,
+    )
+
+
+def test_gbm_forecaster_factory(panel_dataframe):
+    _check_supervised_forecaster_fits_and_predicts(
+        "build_gbm_forecaster",
+        {"lags": 12, "n_estimators": 30, "max_depth": 3, "random_state": 0},
+        panel_dataframe,
+    )
+
+
+def test_lightgbm_forecaster_factory(panel_dataframe):
+    _check_supervised_forecaster_fits_and_predicts(
+        "build_lightgbm_forecaster",
+        {"lags": 12, "n_estimators": 30, "learning_rate": 0.1, "num_leaves": 15,
+         "random_state": 0, "verbosity": -1},
+        panel_dataframe,
+    )
+
+
+def test_xgboost_forecaster_factory(panel_dataframe):
+    _check_supervised_forecaster_fits_and_predicts(
+        "build_xgboost_forecaster",
+        {"lags": 12, "n_estimators": 30, "learning_rate": 0.1, "max_depth": 3,
+         "random_state": 0, "tree_method": "hist", "verbosity": 0},
+        panel_dataframe,
+    )
+
+
+def test_svr_forecaster_factory(panel_dataframe):
+    _check_supervised_forecaster_fits_and_predicts(
+        "build_svr_forecaster",
+        {"lags": 12, "C": 1.0, "epsilon": 0.1, "kernel": "rbf"},
+        panel_dataframe,
+    )

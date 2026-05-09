@@ -99,6 +99,56 @@ def build_auto_arima(spec: dict[str, Any]):
     return StatsForecast(models=[AutoARIMA(season_length=season_length)], freq=freq, n_jobs=1)
 
 
+def _split_lags_from_params(params: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Pull `lags` out of params; the rest goes to the regressor."""
+    p = dict(params)
+    lags = int(p.pop("lags", 12))
+    return lags, p
+
+
+def _wrap_with_skforecast(estimator: Any, lags: int) -> Any:
+    from skforecast.recursive import ForecasterRecursiveMultiSeries
+    return ForecasterRecursiveMultiSeries(estimator=estimator, lags=lags)
+
+
+def build_random_forest_forecaster(spec: dict[str, Any]):
+    lags, p = _split_lags_from_params(spec["params"])
+    return _wrap_with_skforecast(RandomForestRegressor(**p), lags)
+
+
+def build_extra_trees_forecaster(spec: dict[str, Any]):
+    from sklearn.ensemble import ExtraTreesRegressor
+    lags, p = _split_lags_from_params(spec["params"])
+    return _wrap_with_skforecast(ExtraTreesRegressor(**p), lags)
+
+
+def build_gbm_forecaster(spec: dict[str, Any]):
+    from sklearn.ensemble import GradientBoostingRegressor
+    lags, p = _split_lags_from_params(spec["params"])
+    return _wrap_with_skforecast(GradientBoostingRegressor(**p), lags)
+
+
+def build_lightgbm_forecaster(spec: dict[str, Any]):
+    from lightgbm import LGBMRegressor
+    lags, p = _split_lags_from_params(spec["params"])
+    return _wrap_with_skforecast(LGBMRegressor(**p), lags)
+
+
+def build_xgboost_forecaster(spec: dict[str, Any]):
+    from xgboost import XGBRegressor
+    lags, p = _split_lags_from_params(spec["params"])
+    return _wrap_with_skforecast(XGBRegressor(**p), lags)
+
+
+def build_svr_forecaster(spec: dict[str, Any]):
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVR
+    lags, p = _split_lags_from_params(spec["params"])
+    pipe = Pipeline([("scaler", StandardScaler()), ("svr", SVR(**p))])
+    return _wrap_with_skforecast(pipe, lags)
+
+
 FACTORY_REGISTRY: dict[str, Callable[..., Any]] = {
     "build_logistic_regression":      build_logistic_regression,
     "build_random_forest_classifier": build_random_forest_classifier,
@@ -114,4 +164,10 @@ FACTORY_REGISTRY: dict[str, Callable[..., Any]] = {
     "build_seasonal_naive":           build_seasonal_naive,
     "build_ets":                      build_ets,
     "build_auto_arima":               build_auto_arima,
+    "build_random_forest_forecaster": build_random_forest_forecaster,
+    "build_extra_trees_forecaster":   build_extra_trees_forecaster,
+    "build_gbm_forecaster":           build_gbm_forecaster,
+    "build_lightgbm_forecaster":      build_lightgbm_forecaster,
+    "build_xgboost_forecaster":       build_xgboost_forecaster,
+    "build_svr_forecaster":           build_svr_forecaster,
 }

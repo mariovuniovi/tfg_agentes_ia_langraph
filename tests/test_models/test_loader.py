@@ -58,6 +58,12 @@ def test_load_registry_empty_yaml(tmp_path):
 
 def test_get_models_for_filters_by_problem_type(monkeypatch):
     """get_models_for() returns only entries matching the requested problem_type."""
+    # Monkeypatch registries first so ModelSpec validation accepts 'build_x' / 'x_space'.
+    monkeypatch.setattr("mlops_agents.models.loader.FACTORY_REGISTRY", {"build_x": lambda p: None})
+    monkeypatch.setattr(
+        "mlops_agents.models.loader.SEARCH_SPACE_REGISTRY",
+        {"x_space": lambda *_: None},
+    )
     monkeypatch.setattr(
         "mlops_agents.models.loader._cached_registry",
         {
@@ -74,11 +80,6 @@ def test_get_models_for_filters_by_problem_type(monkeypatch):
                 default_params={},
             ),
         },
-    )
-    monkeypatch.setattr("mlops_agents.models.loader.FACTORY_REGISTRY", {"build_x": lambda p: None})
-    monkeypatch.setattr(
-        "mlops_agents.models.loader.SEARCH_SPACE_REGISTRY",
-        {"x_space": lambda *_: None},
     )
     cls_models = get_models_for("classification")
     assert {m.model_key for m in cls_models} == {"a"}
