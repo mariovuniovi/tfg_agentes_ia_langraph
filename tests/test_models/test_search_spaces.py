@@ -31,6 +31,7 @@ def test_build_suggest_fn_categorical():
         params={"k": SearchParamSpec(type="categorical", choices=["a", "b", "c"])},
     )
     suggest = build_suggest_fn(spec)
-    study = optuna.create_study()
-    study.optimize(lambda t: 0.0 if suggest(t)["k"] == "a" else 1.0, n_trials=5)
+    # Seed sampler + use enough trials to reliably visit every choice (3 choices, 12 trials)
+    study = optuna.create_study(sampler=optuna.samplers.TPESampler(seed=0))
+    study.optimize(lambda t: 0.0 if suggest(t)["k"] == "a" else 1.0, n_trials=12)
     assert study.best_params["k"] == "a"
