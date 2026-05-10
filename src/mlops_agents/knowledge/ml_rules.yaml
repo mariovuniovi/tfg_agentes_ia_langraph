@@ -1,0 +1,151 @@
+# Curated ML model-selection rules.
+# Each rule applies when ALL conditions in applies_when are satisfied.
+# prefer/avoid_or_deprioritize model_keys must exist in models/registry.yaml
+# and must match the rule's problem_type.
+
+- rule_id: classification_very_small_prefers_simple_models
+  applies_when:
+    problem_type: classification
+    n_rows: very_small
+  prefer: [logistic_regression, random_forest_classifier]
+  avoid_or_deprioritize: [lightgbm_classifier, xgboost_classifier, catboost_classifier]
+  reason: |
+    With <500 rows, complex boosting models overfit easily. Regularized linear
+    models and simple tree ensembles are safer baselines.
+  tags: [classification, sample_size]
+
+- rule_id: regression_very_small_prefers_simple_models
+  applies_when:
+    problem_type: regression
+    n_rows: very_small
+  prefer: [ridge, random_forest_regressor]
+  avoid_or_deprioritize: [lightgbm_regressor, xgboost_regressor, catboost_regressor]
+  reason: |
+    With <500 rows, regularized linear models and simple tree baselines
+    generalize better than high-capacity boosting models.
+  tags: [regression, sample_size]
+
+- rule_id: forecasting_short_history_prefers_statistical
+  applies_when:
+    problem_type: forecasting
+    history_length: [very_short, short]
+  prefer: [seasonal_naive, ets, auto_arima, naive]
+  avoid_or_deprioritize: [svr_forecaster, lightgbm_forecaster, xgboost_forecaster,
+                          random_forest_forecaster, extra_trees_forecaster, gbm_forecaster]
+  reason: |
+    With <200 obs/series, statistical models with strong structural priors
+    outperform feature-heavy supervised forecasters.
+  tags: [forecasting, sample_size]
+
+- rule_id: forecasting_long_history_with_exogenous_prefers_supervised
+  applies_when:
+    problem_type: forecasting
+    history_length: [medium, long]
+    exogenous_features_available: true
+  prefer: [lightgbm_forecaster, xgboost_forecaster, gbm_forecaster,
+          random_forest_forecaster, extra_trees_forecaster]
+  reason: |
+    Supervised lag-based models exploit nonlinear lagged effects and external
+    regressors when history is sufficient and exogenous variables are available.
+  tags: [forecasting, exogenous]
+
+- rule_id: forecasting_strong_seasonality_prefers_seasonal_models
+  applies_when:
+    problem_type: forecasting
+    seasonality_detected: true
+  prefer: [seasonal_naive, ets, auto_arima]
+  reason: |
+    Detected seasonality strongly favors models with explicit seasonal
+    decomposition (ETS, seasonal ARIMA) over non-seasonal alternatives.
+  tags: [forecasting, seasonality]
+
+- rule_id: classification_severe_imbalance_prefers_tree_ensembles
+  applies_when:
+    problem_type: classification
+    class_balance: severely_imbalanced
+  prefer: [lightgbm_classifier, xgboost_classifier, catboost_classifier,
+          random_forest_classifier]
+  avoid_or_deprioritize: [logistic_regression]
+  reason: |
+    Severely imbalanced classes (>5x ratio) benefit from tree ensembles that
+    handle class weights flexibly. Logistic regression often collapses to the
+    majority class.
+  tags: [classification, imbalance]
+
+- rule_id: regression_skewed_target_prefers_tree_ensembles
+  applies_when:
+    problem_type: regression
+    target_distribution: skewed
+  prefer: [lightgbm_regressor, xgboost_regressor, random_forest_regressor]
+  avoid_or_deprioritize: [ridge]
+  reason: |
+    Skewed target distributions violate the normality assumption behind ridge
+    regression. Tree ensembles are more robust to non-normal targets.
+  tags: [regression, target_distribution]
+
+- rule_id: forecasting_non_stationary_prefers_differencing_models
+  applies_when:
+    problem_type: forecasting
+    stationarity: false
+    trend_detected: true
+  prefer: [auto_arima, ets]
+  reason: |
+    Non-stationary series with trend are best handled by models that explicitly
+    model trend components (AutoARIMA with differencing, ETS with trend).
+  tags: [forecasting, stationarity]
+
+- rule_id: forecasting_many_series_prefers_global_ml
+  applies_when:
+    problem_type: forecasting
+    n_series: [moderate, many]
+    history_length: [medium, long]
+  prefer: [lightgbm_forecaster, xgboost_forecaster, gbm_forecaster]
+  reason: |
+    With many series, global ML models share signal across series and scale
+    better than fitting one statistical model per series.
+  tags: [forecasting, multi_series]
+
+- rule_id: classification_large_dataset_prefers_boosting
+  applies_when:
+    problem_type: classification
+    n_rows: large
+  prefer: [lightgbm_classifier, xgboost_classifier, catboost_classifier]
+  avoid_or_deprioritize: [logistic_regression]
+  reason: |
+    On large datasets (>50k rows), gradient boosting typically outperforms
+    linear models and is competitive with deep learning for tabular data.
+  tags: [classification, sample_size]
+
+- rule_id: regression_large_dataset_prefers_boosting
+  applies_when:
+    problem_type: regression
+    n_rows: large
+  prefer: [lightgbm_regressor, xgboost_regressor, catboost_regressor]
+  avoid_or_deprioritize: [ridge]
+  reason: |
+    On large regression datasets, gradient boosting handles nonlinear
+    interactions better than linear models.
+  tags: [regression, sample_size]
+
+- rule_id: forecasting_long_horizon_prefers_decomposition
+  applies_when:
+    problem_type: forecasting
+    horizon_difficulty: long
+  prefer: [ets, auto_arima]
+  avoid_or_deprioritize: [naive, svr_forecaster]
+  reason: |
+    Long forecast horizons amplify errors from simple extrapolation. Models with
+    structural decomposition (ETS, ARIMA) produce more reliable multi-step forecasts.
+  tags: [forecasting, horizon]
+
+- rule_id: forecasting_single_series_no_exogenous_prefers_statistical
+  applies_when:
+    problem_type: forecasting
+    n_series: single
+    exogenous_features_available: false
+  prefer: [ets, auto_arima, seasonal_naive, naive]
+  reason: |
+    Single univariate series without external regressors is the classic use case
+    for statistical time series models. Supervised lag-based models add complexity
+    without additional signal.
+  tags: [forecasting, univariate]
