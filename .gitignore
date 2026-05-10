@@ -76,6 +76,9 @@ models/
 experience_pool/
 storage/
 
+# SP4 — benchmark split outputs (CSVs commit, splits do not)
+data/benchmarks/_splits/
+
 # SP2 — temporal gap reports
 artifacts/
 

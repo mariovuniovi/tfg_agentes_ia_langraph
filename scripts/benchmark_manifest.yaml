@@ -1,0 +1,137 @@
+# Benchmark manifest — 18 datasets across classification, regression, and forecasting.
+# source: sklearn | openml | local
+
+# --- Classification (7) ---
+- dataset_id: iris
+  source: sklearn
+  source_id: load_iris
+  problem_type: classification
+  target_column: target
+
+- dataset_id: wine
+  source: sklearn
+  source_id: load_wine
+  problem_type: classification
+  target_column: target
+
+- dataset_id: breast_cancer
+  source: sklearn
+  source_id: load_breast_cancer
+  problem_type: classification
+  target_column: target
+
+- dataset_id: titanic
+  source: openml
+  source_id: 40945
+  problem_type: classification
+  target_column: survived
+
+- dataset_id: adult_income
+  source: openml
+  source_id: 1590
+  problem_type: classification
+  target_column: class
+
+- dataset_id: bank_marketing
+  source: openml
+  source_id: 1461
+  problem_type: classification
+  target_column: y
+
+- dataset_id: heart_disease
+  source: openml
+  source_id: 53
+  problem_type: classification
+  target_column: num
+
+# --- Regression (5) ---
+- dataset_id: california_housing
+  source: sklearn
+  source_id: fetch_california_housing
+  problem_type: regression
+  target_column: target
+
+- dataset_id: diabetes
+  source: sklearn
+  source_id: load_diabetes
+  problem_type: regression
+  target_column: target
+
+- dataset_id: bike_sharing
+  source: openml
+  source_id: 42712
+  problem_type: regression
+  target_column: cnt
+
+- dataset_id: concrete_strength
+  source: openml
+  source_id: 4353
+  problem_type: regression
+  target_column: class
+
+- dataset_id: energy_efficiency
+  source: openml
+  source_id: 41669
+  problem_type: regression
+  target_column: Y1
+
+# --- Forecasting (6) ---
+- dataset_id: air_passengers
+  source: local
+  source_id: data/benchmarks/air_passengers.csv
+  problem_type: forecasting
+  target_column: passengers
+  datetime_column: month
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 12
+
+- dataset_id: m4_monthly_sample
+  source: local
+  source_id: data/benchmarks/m4_monthly_sample.csv
+  problem_type: forecasting
+  target_column: value
+  datetime_column: date
+  series_id_columns: [series_id]
+  frequency: MS
+  forecast_horizon: 12
+
+- dataset_id: electricity_demand
+  source: local
+  source_id: data/benchmarks/electricity_demand_sample.csv
+  problem_type: forecasting
+  target_column: demand_gwh
+  datetime_column: date
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 30
+
+- dataset_id: sales_weekly
+  source: local
+  source_id: data/benchmarks/sales_sample.csv
+  problem_type: forecasting
+  target_column: sales
+  datetime_column: week
+  series_id_columns: [store_id]
+  frequency: W
+  forecast_horizon: 13
+
+- dataset_id: weather_daily
+  source: local
+  source_id: data/benchmarks/weather_sample.csv
+  problem_type: forecasting
+  target_column: temp_c
+  datetime_column: date
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 30
+
+- dataset_id: stock_daily
+  source: local
+  source_id: data/benchmarks/stock_sample.csv
+  problem_type: forecasting
+  target_column: close
+  datetime_column: date
+  series_id_columns: [ticker]
+  frequency: B
+  forecast_horizon: 21
