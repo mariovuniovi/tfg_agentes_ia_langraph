@@ -1,24 +1,32 @@
 # Benchmark manifest — 18 datasets across classification, regression, and forecasting.
-# source: sklearn | openml | local
+# source: sklearn | openml | local | yfinance
+# Forecasting datasets are designed to cover every rule in ml_rules.yaml.
 
-# --- Classification (7) ---
+# ---------------------------------------------------------------------------
+# Classification (7)
+# Rules covered: very_small→simple, large→boosting, severe_imbalance→ensembles
+# ---------------------------------------------------------------------------
+
 - dataset_id: iris
   source: sklearn
   source_id: load_iris
   problem_type: classification
   target_column: target
+  # 150 rows = very_small → logistic_regression preferred (rule 1)
 
 - dataset_id: wine
   source: sklearn
   source_id: load_wine
   problem_type: classification
   target_column: target
+  # 178 rows = very_small, 3 classes
 
 - dataset_id: breast_cancer
   source: sklearn
   source_id: load_breast_cancer
   problem_type: classification
   target_column: target
+  # 569 rows = small, binary, balanced
 
 - dataset_id: titanic
   source: openml
@@ -31,12 +39,14 @@
   source_id: 1590
   problem_type: classification
   target_column: class
+  # ~48k rows = large → boosting preferred (rule 10)
 
 - dataset_id: bank_marketing
   source: openml
   source_id: 1461
   problem_type: classification
   target_column: y
+  # ~45k rows, ~11% positive = severely_imbalanced → ensembles preferred (rule 6)
 
 - dataset_id: heart_disease
   source: openml
@@ -44,18 +54,24 @@
   problem_type: classification
   target_column: num
 
-# --- Regression (5) ---
+# ---------------------------------------------------------------------------
+# Regression (5)
+# Rules covered: very_small→ridge, large→boosting
+# ---------------------------------------------------------------------------
+
 - dataset_id: california_housing
   source: sklearn
   source_id: fetch_california_housing
   problem_type: regression
   target_column: target
+  # ~20k rows = large → boosting preferred (rule 11)
 
 - dataset_id: diabetes
   source: sklearn
   source_id: load_diabetes
   problem_type: regression
   target_column: target
+  # 442 rows = very_small → ridge preferred (rule 2)
 
 - dataset_id: bike_sharing
   source: openml
@@ -75,7 +91,12 @@
   problem_type: regression
   target_column: Y1
 
-# --- Forecasting (6) ---
+# ---------------------------------------------------------------------------
+# Forecasting (6) — designed to cover every forecasting rule in ml_rules.yaml
+# Run scripts/_generate_benchmarks.py to create the local CSVs first.
+# ---------------------------------------------------------------------------
+
+# Rules 5 + 13: strong seasonality + single series no exog → statistical models
 - dataset_id: air_passengers
   source: local
   source_id: data/benchmarks/air_passengers.csv
@@ -86,6 +107,7 @@
   frequency: MS
   forecast_horizon: 12
 
+# Rule 9: many series + medium history → global supervised ML
 - dataset_id: m4_monthly_sample
   source: local
   source_id: data/benchmarks/m4_monthly_sample.csv
@@ -96,42 +118,49 @@
   frequency: MS
   forecast_horizon: 12
 
-- dataset_id: electricity_demand
+# Rule 4: long history + exogenous variables → supervised ML wins
+# Gold price target + Oil, Silver, S&P500, USD as macro exogenous features
+- dataset_id: gold_macro_monthly
   source: local
-  source_id: data/benchmarks/electricity_demand_sample.csv
+  source_id: data/benchmarks/gold_macro_monthly.csv
   problem_type: forecasting
-  target_column: demand_gwh
+  target_column: gold_close
   datetime_column: date
   series_id_columns: []
-  frequency: D
-  forecast_horizon: 30
+  frequency: MS
+  forecast_horizon: 6
 
-- dataset_id: sales_weekly
+# Rule 9: moderate panel (5 commodities) + weekly history → global ML
+- dataset_id: commodity_panel_weekly
   source: local
-  source_id: data/benchmarks/sales_sample.csv
+  source_id: data/benchmarks/commodity_panel_weekly.csv
   problem_type: forecasting
-  target_column: sales
+  target_column: close_price
   datetime_column: week
-  series_id_columns: [store_id]
+  series_id_columns: [commodity]
   frequency: W
   forecast_horizon: 13
 
-- dataset_id: weather_daily
+# Rule 8: non-stationary + strong trend → AutoARIMA (differencing)
+# Bitcoin: highly non-stationary, strongly trending, high volatility
+- dataset_id: crypto_weekly
   source: local
-  source_id: data/benchmarks/weather_sample.csv
+  source_id: data/benchmarks/crypto_weekly.csv
   problem_type: forecasting
-  target_column: temp_c
-  datetime_column: date
+  target_column: btc_close
+  datetime_column: week
   series_id_columns: []
-  frequency: D
-  forecast_horizon: 30
+  frequency: W
+  forecast_horizon: 13
 
-- dataset_id: stock_daily
+# Rule 4 again: exogenous → supervised — FX domain (similar structure to user's dataset)
+# EUR/USD target + GBP/USD, JPY/USD, Gold as correlated exogenous signals
+- dataset_id: fx_exog_weekly
   source: local
-  source_id: data/benchmarks/stock_sample.csv
+  source_id: data/benchmarks/fx_exog_weekly.csv
   problem_type: forecasting
-  target_column: close
-  datetime_column: date
-  series_id_columns: [ticker]
-  frequency: B
-  forecast_horizon: 21
+  target_column: eurusd_close
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
