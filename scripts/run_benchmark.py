@@ -48,6 +48,22 @@ def _preprocess_benchmark_df(df: "pd.DataFrame", entry: dict) -> "pd.DataFrame":
 
     target = entry["target_column"]
     n = len(df)
+
+    # Drop columns that perfectly predict the target (OpenML often duplicates the target)
+    try:
+        target_numeric = pd.to_numeric(df[target], errors="coerce")
+        for col in list(df.columns):
+            if col == target:
+                continue
+            try:
+                col_numeric = pd.to_numeric(df[col], errors="coerce")
+                if col_numeric.equals(target_numeric) or abs(col_numeric.corr(target_numeric)) >= 1.0:
+                    df = df.drop(columns=[col])
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     for col in list(df.columns):
         if col == target:
             continue
