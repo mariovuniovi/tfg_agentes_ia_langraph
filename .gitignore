@@ -69,3 +69,15 @@ test_output.txt
 data/merged/
 data/processed/
 data/working/
+
+# SP3 — model training artifacts (generated at runtime)
+catboost_info/
+models/
+experience_pool/
+storage/
+
+# SP2 — temporal gap reports
+artifacts/
+
+# User planning notes
+plan_model_agent.md

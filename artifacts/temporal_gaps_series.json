@@ -1,1 +1,0 @@
-{"gaps": [{"series_id": {"store_id": "S01"}, "n_missing_periods": 1, "first_missing": "2024-01-03", "last_missing": "2024-01-03", "all_missing_dates": ["2024-01-03"], "sample_missing_dates": ["2024-01-03"]}], "total_missing_periods": 1}
