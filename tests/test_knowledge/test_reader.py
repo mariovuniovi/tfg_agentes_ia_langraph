@@ -67,3 +67,13 @@ def test_mlrule_rejects_wrong_problem_type_model():
             prefer=["logistic_regression"],  # classification model!
             reason="test",
         )
+
+
+def test_mlrule_rejects_unknown_model_key():
+    with pytest.raises(ValidationError, match="unknown model_key"):
+        MLRule(
+            rule_id="unknown_key",
+            applies_when={"problem_type": "classification"},
+            prefer=["nonexistent_model_xyz"],
+            reason="test",
+        )
