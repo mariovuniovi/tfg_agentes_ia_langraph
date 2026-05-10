@@ -8,10 +8,22 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import warnings
 from pathlib import Path
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*lbfgs failed to converge.*")
+warnings.filterwarnings("ignore", message=".*No further splits.*")
+try:
+    from skforecast.exceptions import IgnoredArgumentWarning
+    warnings.filterwarnings("ignore", category=IgnoredArgumentWarning)
+except Exception:
+    pass
+
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT / "src"))
+sys.path.insert(0, str(_ROOT))
 
 from mlops_agents.config.settings import settings
 from mlops_agents.experience.pool import ExperiencePool
@@ -24,6 +36,34 @@ from mlops_agents.utils.logging import get_logger
 from scripts._dataset_sources import fetch_dataset
 
 logger = get_logger(__name__)
+
+
+def _preprocess_benchmark_df(df: "pd.DataFrame", entry: dict) -> "pd.DataFrame":  # type: ignore[name-defined]
+    """Label-encode categoricals; drop high-cardinality string columns."""
+    import pandas as pd
+    from sklearn.preprocessing import LabelEncoder
+
+    if entry["problem_type"] == "forecasting":
+        return df
+
+    target = entry["target_column"]
+    n = len(df)
+    for col in list(df.columns):
+        if col == target:
+            continue
+        if df[col].dtype == object or str(df[col].dtype) == "category":
+            n_unique = df[col].nunique()
+            if n_unique > min(50, n * 0.5):
+                df = df.drop(columns=[col])
+            else:
+                df[col] = LabelEncoder().fit_transform(df[col].astype(str))
+        elif df[col].isna().any():
+            df[col] = df[col].fillna(df[col].median())
+
+    if df[target].dtype == object or str(df[target].dtype) == "category":
+        df[target] = LabelEncoder().fit_transform(df[target].astype(str))
+
+    return df
 
 
 def build_task_metadata(entry: dict) -> dict:
@@ -71,6 +111,7 @@ def run_benchmark(
         try:
             logger.info(f"[{dataset_id}] Fetching dataset...")
             df = fetch_dataset(entry)
+            df = _preprocess_benchmark_df(df, entry)
             csv_path = stage_dataset(df, entry, staged_dir)
 
             task_meta = build_task_metadata(entry)

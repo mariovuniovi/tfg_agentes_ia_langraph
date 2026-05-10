@@ -23,17 +23,17 @@ def build_random_forest_classifier(params: dict[str, Any]):
 
 def build_lightgbm_classifier(params: dict[str, Any]):
     from lightgbm import LGBMClassifier
-    return LGBMClassifier(**params)
+    return LGBMClassifier(**{**params, "verbosity": -1})
 
 
 def build_xgboost_classifier(params: dict[str, Any]):
     from xgboost import XGBClassifier
-    return XGBClassifier(**params)
+    return XGBClassifier(**{**params, "verbosity": 0})
 
 
 def build_catboost_classifier(params: dict[str, Any]):
     from catboost import CatBoostClassifier
-    return CatBoostClassifier(**params)
+    return CatBoostClassifier(**{**params, "verbose": 0})
 
 
 def build_ridge(params: dict[str, Any]):
@@ -46,17 +46,17 @@ def build_random_forest_regressor(params: dict[str, Any]):
 
 def build_lightgbm_regressor(params: dict[str, Any]):
     from lightgbm import LGBMRegressor
-    return LGBMRegressor(**params)
+    return LGBMRegressor(**{**params, "verbosity": -1})
 
 
 def build_xgboost_regressor(params: dict[str, Any]):
     from xgboost import XGBRegressor
-    return XGBRegressor(**params)
+    return XGBRegressor(**{**params, "verbosity": 0})
 
 
 def build_catboost_regressor(params: dict[str, Any]):
     from catboost import CatBoostRegressor
-    return CatBoostRegressor(**params)
+    return CatBoostRegressor(**{**params, "verbose": 0})
 
 
 _FREQ_TO_SEASON = {"H": 24, "D": 7, "W": 52, "MS": 12, "M": 12, "QS": 4, "YS": 1}
@@ -131,7 +131,7 @@ def build_gbm_forecaster(spec: dict[str, Any]):
 def build_lightgbm_forecaster(spec: dict[str, Any]):
     from lightgbm import LGBMRegressor
     lags, p = _split_lags_from_params(spec["params"])
-    return _wrap_with_skforecast(LGBMRegressor(**p), lags)
+    return _wrap_with_skforecast(LGBMRegressor(**{**p, "verbosity": -1}), lags)
 
 
 def build_xgboost_forecaster(spec: dict[str, Any]):

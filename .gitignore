@@ -72,7 +72,7 @@ data/working/
 
 # SP3 — model training artifacts (generated at runtime)
 catboost_info/
-models/
+/models/
 experience_pool/
 storage/
 

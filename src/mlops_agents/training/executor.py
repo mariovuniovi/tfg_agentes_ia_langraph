@@ -286,6 +286,31 @@ def _to_sf_format(
     return out[["unique_id", "ds", "y"]]
 
 
+def _build_series_dict(
+    df: pd.DataFrame, dt_col: str, target: str, sid_cols: list[str], freq_hint: str | None = None
+) -> dict[str, pd.Series]:
+    """Build series_dict for skforecast with explicit freq or RangeIndex fallback."""
+    def _prep(s: pd.Series) -> pd.Series:
+        s = s.sort_index()
+        for freq in ([freq_hint] if freq_hint else []) + ([pd.infer_freq(s.index)] if pd.infer_freq(s.index) else []):
+            if not freq:
+                continue
+            try:
+                candidate = s.asfreq(freq)
+                if candidate.notna().all():
+                    return candidate
+            except Exception:
+                pass
+        return s.reset_index(drop=True)
+
+    if sid_cols:
+        return {
+            sid: _prep(g.set_index(dt_col)[target])
+            for sid, g in df.groupby(sid_cols[0])
+        }
+    return {"__single__": _prep(df.set_index(dt_col)[target])}
+
+
 def _run_candidate_forecasting(
     candidate: TrainingPlanCandidate,
     train_pool: pd.DataFrame,
@@ -315,6 +340,8 @@ def _run_candidate_forecasting(
     is_stat = _is_statsforecast_model(candidate.model_key)
     factory = FACTORY_REGISTRY[spec.factory]
 
+    freq = task_metadata.get("frequency")
+
     def fit_score(params: dict) -> float:
         if is_stat:
             sf = factory({"task_metadata": task_metadata, "params": params})
@@ -324,18 +351,18 @@ def _run_candidate_forecasting(
             model_col = [c for c in fcst.columns if c not in ("unique_id", "ds")][0]
             val_sf = _to_sf_format(val, target, dt_col, sid_cols)
             merged = val_sf.merge(fcst, on=["unique_id", "ds"])
+            if merged.empty:
+                # Irregular dates (e.g. yfinance weekly): align predictions by position
+                val_s = val_sf.sort_values(["unique_id", "ds"]).reset_index(drop=True)
+                fct_s = fcst.sort_values(["unique_id", "ds"]).reset_index(drop=True)
+                n = min(len(val_s), len(fct_s))
+                if n == 0:
+                    raise ValueError("Statsforecast produced no predictions")
+                return _fc_metrics(val_s["y"].values[:n], fct_s[model_col].values[:n])[metric]
             return _fc_metrics(merged["y"].values, merged[model_col].values)[metric]
         else:
             forecaster = factory({"task_metadata": task_metadata, "params": params})
-            if sid_cols:
-                series_dict = {
-                    sid: g.set_index(dt_col)[target].sort_index()
-                    for sid, g in cand_train.groupby(sid_cols[0])
-                }
-            else:
-                series_dict = {
-                    "__single__": cand_train.set_index(dt_col)[target].sort_index()
-                }
+            series_dict = _build_series_dict(cand_train, dt_col, target, sid_cols, freq)
             forecaster.fit(series=series_dict)
             # skforecast 0.22: predict returns DataFrame with DatetimeIndex,
             # columns ['level', 'pred']
@@ -455,15 +482,8 @@ def _retrain_forecasting(
             pickle.dump(sf, f)
     else:
         forecaster = factory({"task_metadata": task_metadata, "params": champion["best_params"]})
-        if sid_cols:
-            series_dict = {
-                sid: g.set_index(dt_col)[target].sort_index()
-                for sid, g in train_pool.groupby(sid_cols[0])
-            }
-        else:
-            series_dict = {
-                "__single__": train_pool.set_index(dt_col)[target].sort_index()
-            }
+        freq = task_metadata.get("frequency")
+        series_dict = _build_series_dict(train_pool, dt_col, target, sid_cols, freq)
         forecaster.fit(series=series_dict)
         with path.open("wb") as f:
             pickle.dump(forecaster, f)

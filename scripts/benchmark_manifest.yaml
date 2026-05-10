@@ -80,14 +80,14 @@
   target_column: cnt
 
 - dataset_id: concrete_strength
-  source: openml
-  source_id: 4353
+  source: local
+  source_id: data/benchmarks/concrete_strength.csv
   problem_type: regression
-  target_column: class
+  target_column: compressive_strength
 
 - dataset_id: energy_efficiency
-  source: openml
-  source_id: 41669
+  source: local
+  source_id: data/benchmarks/energy_efficiency.csv
   problem_type: regression
   target_column: Y1
 

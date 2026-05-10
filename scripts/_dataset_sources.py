@@ -14,8 +14,15 @@ def fetch_dataset(entry: dict) -> pd.DataFrame:
         return df
     if src == "openml":
         from sklearn.datasets import fetch_openml
+        target_col = entry.get("target_column", "target")
         bunch = fetch_openml(data_id=int(entry["source_id"]), as_frame=True, parser="auto")
-        return bunch.frame
+        df = bunch.frame.copy() if bunch.frame is not None else pd.DataFrame(bunch.data)
+        if target_col not in df.columns:
+            if bunch.target is not None:
+                df[target_col] = bunch.target.values
+            elif len(df.columns) > 0:
+                df = df.rename(columns={df.columns[-1]: target_col})
+        return df
     if src == "local":
         return pd.read_csv(entry["source_id"])
     if src == "yfinance":

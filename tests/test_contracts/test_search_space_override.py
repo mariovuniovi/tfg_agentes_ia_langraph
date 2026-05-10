@@ -19,8 +19,8 @@ def test_override_within_range_accepted():
 
 
 def test_override_choices_subset_of_categorical_accepted():
-    overrides = {"penalty": SearchParamOverride(choices=["l2"])}
-    validate_override("logistic_regression", overrides)
+    overrides = {"kernel": SearchParamOverride(choices=["rbf"])}
+    validate_override("svr_forecaster", overrides)
 
 
 def test_override_unknown_param_rejected():
@@ -36,15 +36,15 @@ def test_override_out_of_range_rejected():
 
 
 def test_override_choices_outside_categorical_rejected():
-    overrides = {"penalty": SearchParamOverride(choices=["elasticnet"])}
+    overrides = {"kernel": SearchParamOverride(choices=["polynomial"])}  # not in [rbf, linear]
     with pytest.raises(ValueError, match="not in registry"):
-        validate_override("logistic_regression", overrides)
+        validate_override("svr_forecaster", overrides)
 
 
 def test_override_categorical_with_low_high_rejected():
-    overrides = {"penalty": SearchParamOverride(low=0, high=1)}
+    overrides = {"kernel": SearchParamOverride(low=0, high=1)}
     with pytest.raises(ValueError, match="categorical"):
-        validate_override("logistic_regression", overrides)
+        validate_override("svr_forecaster", overrides)
 
 
 def test_narrow_search_space_collapses_int_to_categorical_via_choices():
