@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,6 +57,14 @@ class Settings(BaseSettings):
     tie_tolerance_relative: float = 0.01
     forecasting_min_train_points: int = 30
     experience_pool_dir: Path = Path("experience_pool")
+
+    # Experience pool (SP4)
+    experience_db_path: Path = Path("storage/mlops_metadata.db")
+    experience_audit_dir: Path = Path("experience_pool")
+    data_benchmarks_dir: Path = Path("data/benchmarks")
+    ml_rules_path: Path = Path("src/mlops_agents/knowledge/ml_rules.yaml")
+    retrieval_default_k: int = 5
+    retrieval_weights_override: dict = Field(default_factory=dict)
 
 
 settings = Settings()
