@@ -16,8 +16,9 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message=".*lbfgs failed to converge.*")
 warnings.filterwarnings("ignore", message=".*No further splits.*")
 try:
-    from skforecast.exceptions import IgnoredArgumentWarning
+    from skforecast.exceptions import IgnoredArgumentWarning, MissingValuesWarning
     warnings.filterwarnings("ignore", category=IgnoredArgumentWarning)
+    warnings.filterwarnings("ignore", category=MissingValuesWarning)
 except Exception:
     pass
 

@@ -43,4 +43,39 @@ def fetch_dataset(entry: dict) -> pd.DataFrame:
         df.columns = [date_col, target_col]
         df[date_col] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
         return df
-    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance")
+    if src == "yfinance_multi":
+        import yfinance as yf
+        interval = entry.get("interval", "1wk")
+        start = entry.get("start", "2005-01-01")
+        end = entry.get("end", "2024-06-01")
+        target_ticker = entry["source_id"]
+        exog_tickers: list[str] = entry.get("exog_tickers", [])
+        all_tickers = [target_ticker] + exog_tickers
+        col_names: dict[str, str] = entry.get("col_names", {})
+
+        frames = {}
+        for ticker in all_tickers:
+            raw = yf.download(ticker, start=start, end=end, interval=interval,
+                              auto_adjust=True, progress=False)
+            if raw.empty:
+                raise RuntimeError(f"yfinance returned empty data for {ticker!r}")
+            s = raw["Close"].squeeze()
+            s.index = s.index.tz_localize(None).normalize()
+            s = s.ffill().dropna()
+            frames[ticker] = s
+
+        df = pd.DataFrame(frames).dropna()
+        df.index.name = entry.get("datetime_column", "date")
+        df = df.reset_index()
+
+        rename = {entry.get("datetime_column", "date"): entry.get("datetime_column", "date")}
+        rename[target_ticker] = col_names.get(target_ticker, entry["target_column"])
+        for t in exog_tickers:
+            rename[t] = col_names.get(t, t.replace("=", "_").replace("^", "").replace("-", "_").lower())
+        df = df.rename(columns=rename)
+
+        dt_col = entry.get("datetime_column", "date")
+        df[dt_col] = pd.to_datetime(df[dt_col]).dt.strftime("%Y-%m-%d")
+        return df
+
+    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi")

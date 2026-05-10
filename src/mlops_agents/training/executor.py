@@ -286,6 +286,38 @@ def _to_sf_format(
     return out[["unique_id", "ds", "y"]]
 
 
+def _build_exog_df(
+    df: pd.DataFrame,
+    dt_col: str,
+    target: str,
+    sid_cols: list[str],
+    series_dict: dict[str, pd.Series] | None = None,
+) -> pd.DataFrame | None:
+    """Extract exogenous columns as a DataFrame whose index matches series_dict.
+
+    skforecast requires exog and series to share the same index type
+    (DatetimeIndex or RangeIndex). Returns None when no exogenous columns exist.
+    """
+    exclude = {dt_col, target} | set(sid_cols)
+    exog_cols = [
+        c for c in df.columns
+        if c not in exclude and pd.api.types.is_numeric_dtype(df[c])
+    ]
+    if not exog_cols:
+        return None
+    # For panel data skip exog — multi-series exog alignment is complex
+    if sid_cols:
+        return None
+    exog = df.sort_values(dt_col).set_index(dt_col)[exog_cols].copy()
+    exog.index = pd.to_datetime(exog.index)
+    # If series_dict fell back to RangeIndex we must match it
+    if series_dict is not None:
+        sample = next(iter(series_dict.values()))
+        if isinstance(sample.index, pd.RangeIndex):
+            exog = exog.reset_index(drop=True)
+    return exog
+
+
 def _build_series_dict(
     df: pd.DataFrame, dt_col: str, target: str, sid_cols: list[str], freq_hint: str | None = None
 ) -> dict[str, pd.Series]:
@@ -363,10 +395,16 @@ def _run_candidate_forecasting(
         else:
             forecaster = factory({"task_metadata": task_metadata, "params": params})
             series_dict = _build_series_dict(cand_train, dt_col, target, sid_cols, freq)
-            forecaster.fit(series=series_dict)
+            train_exog = _build_exog_df(cand_train, dt_col, target, sid_cols, series_dict)
+            val_exog = _build_exog_df(val, dt_col, target, sid_cols, series_dict)
+            # When series uses RangeIndex, val_exog must continue from train_len
+            if val_exog is not None and isinstance(val_exog.index, pd.RangeIndex):
+                train_len = len(next(iter(series_dict.values())))
+                val_exog.index = pd.RangeIndex(train_len, train_len + len(val_exog))
+            forecaster.fit(series=series_dict, exog=train_exog)
             # skforecast 0.22: predict returns DataFrame with DatetimeIndex,
             # columns ['level', 'pred']
-            preds = forecaster.predict(steps=horizon)
+            preds = forecaster.predict(steps=horizon, exog=val_exog)
             preds = preds.reset_index().rename(columns={"index": "ds"})
             # preds now has columns ['ds', 'level', 'pred']
             if sid_cols:
@@ -484,7 +522,8 @@ def _retrain_forecasting(
         forecaster = factory({"task_metadata": task_metadata, "params": champion["best_params"]})
         freq = task_metadata.get("frequency")
         series_dict = _build_series_dict(train_pool, dt_col, target, sid_cols, freq)
-        forecaster.fit(series=series_dict)
+        train_exog = _build_exog_df(train_pool, dt_col, target, sid_cols, series_dict)
+        forecaster.fit(series=series_dict, exog=train_exog)
         with path.open("wb") as f:
             pickle.dump(forecaster, f)
     return path
