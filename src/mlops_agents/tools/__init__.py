@@ -12,6 +12,7 @@ from mlops_agents.tools.mlflow_tools import (
     register_model,
     set_model_alias,
 )
+from mlops_agents.tools.memory_tools import retrieve_similar_experiences, retrieve_ml_knowledge
 
 __all__ = [
     "load_dataset",
@@ -25,4 +26,6 @@ __all__ = [
     "get_best_run",
     "register_model",
     "set_model_alias",
+    "retrieve_similar_experiences",
+    "retrieve_ml_knowledge",
 ]
