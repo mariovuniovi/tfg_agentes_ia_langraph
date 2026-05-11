@@ -57,6 +57,8 @@ Adds two optional fields:
 Replaces the currently empty forecasting settings with three typed Pydantic models:
 
 ```python
+from pydantic import BaseModel, Field
+
 class ValidationStrategy(BaseModel):
     type: Literal["single_split", "rolling_window", "expanding_window"] = "single_split"
     n_folds: int = 1                  # ignored for single_split
@@ -67,7 +69,7 @@ class ValidationStrategy(BaseModel):
 ExogStrategy = Literal["known_future", "naive_carry", "ets", "auto_arima", "drop"]
 
 class ExogStrategySettings(BaseModel):
-    per_column: dict[str, ExogStrategy] = {}
+    per_column: dict[str, ExogStrategy] = Field(default_factory=dict)
     default_unknown_future: Literal["naive_carry", "ets", "auto_arima", "drop"] = "naive_carry"
 
 class ForecastingSettings(BaseModel):
@@ -455,7 +457,7 @@ Re-run the full benchmark (21 datasets) and confirm:
 | `src/mlops_agents/training/exog_extender.py` | **New module** |
 | `src/mlops_agents/training/executor.py` | Modify `_run_candidate_forecasting`; remove leakage-allowing `_build_exog_df(val, ...)` call; add cache; call validation_policy + iter_folds + extend_exog |
 | `src/mlops_agents/experience/schema.py` | Add five new optional fields to `ExperienceRecord` |
-| `src/mlops_agents/experience/pool.py` | SQL migration (idempotent `ADD COLUMN IF NOT EXISTS`-style); update insert |
+| `src/mlops_agents/experience/pool.py` | Add SQLite migration using `PRAGMA table_info(...)` + conditional `ALTER TABLE ADD COLUMN`; update insert |
 | `knowledge/ml_rules.yaml` (or wherever rules live) | Add 6 new rules |
 | `scripts/benchmark_manifest.yaml` | Add `exogenous_columns` blocks to forecasting entries; `expected_drift` for financial datasets |
 | `scripts/run_benchmark.py` | Pass `expected_drift` through to `task_metadata` |
