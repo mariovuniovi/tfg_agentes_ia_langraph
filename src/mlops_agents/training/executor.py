@@ -16,15 +16,34 @@ from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_
 from sklearn.model_selection import KFold, StratifiedKFold
 
 from mlops_agents.config.settings import settings
-from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrainingResult
+from mlops_agents.contracts.profile import DatasetProfile
+from mlops_agents.contracts.training import (
+    ExogStrategySettings,
+    ForecastingSettings,
+    TrainingPlan,
+    TrainingPlanCandidate,
+    TrainingResult,
+    TrialBudget,
+    ValidationStrategy,
+)
 from mlops_agents.models.factories import FACTORY_REGISTRY
 from mlops_agents.models.loader import get_model
 from mlops_agents.models.search_spaces import build_suggest_fn
 from mlops_agents.training.experience import build_task_id, write_experience_record
+from mlops_agents.training.exog_extender import align_val_exog_index, extend_exog
 from mlops_agents.training.override_validation import narrow_search_space
 from mlops_agents.training.profiler import build_dataset_profile
 from mlops_agents.training.splitter import split_dataset
 from mlops_agents.training.trial_budget import allocate_trials
+from mlops_agents.training.validation_folds import iter_folds
+from mlops_agents.training.validation_policy import (
+    resolve_rolling_window_size,
+    select_validation_strategy,
+    validate_forecasting_plan,
+)
+from mlops_agents.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -343,6 +362,24 @@ def _build_series_dict(
     return {"__single__": _prep(df.set_index(dt_col)[target])}
 
 
+def _resolve_exog_availability(df_columns: list[str], task_metadata: dict) -> dict[str, str]:
+    """Return {col: 'known_future' | 'unknown_future'} for every exog column.
+
+    If task_metadata['exogenous_columns'] is present, it is authoritative and
+    unlisted non-target/non-date/non-sid columns are dropped from the exog set.
+    If absent, all non-protected columns are treated as unknown_future.
+    """
+    target = task_metadata["target_column"]
+    dt = task_metadata["datetime_column"]
+    sids = set(task_metadata.get("series_id_columns") or [])
+    protected = {target, dt, *sids}
+
+    declared = task_metadata.get("exogenous_columns")
+    if declared is not None:
+        return {e["name"]: e["future_availability"] for e in declared}
+    return {c: "unknown_future" for c in df_columns if c not in protected}
+
+
 def _run_candidate_forecasting_panel(
     candidate: TrainingPlanCandidate,
     train_pool: pd.DataFrame,
@@ -493,133 +530,198 @@ def _run_candidate_forecasting(
     n_trials: int,
     metric: str,
     direction: str,
+    forecasting_settings: ForecastingSettings,
+    profile: DatasetProfile,
 ) -> dict:
     spec = get_model(candidate.model_key)
     target = task_metadata["target_column"]
     dt_col = task_metadata["datetime_column"]
     sid_cols = task_metadata.get("series_id_columns") or []
     horizon = int(task_metadata["forecast_horizon"])
+    freq = task_metadata.get("frequency")
     started = time.perf_counter()
 
     pool = train_pool.copy()
     pool[dt_col] = pd.to_datetime(pool[dt_col])
-    if sid_cols:
-        pool_sorted = pool.sort_values(sid_cols + [dt_col])
-        val = pool_sorted.groupby(sid_cols).tail(horizon)
-        cand_train = pool_sorted.drop(val.index)
-    else:
-        pool_sorted = pool.sort_values(dt_col)
-        val = pool_sorted.tail(horizon)
-        cand_train = pool_sorted.iloc[:-horizon]
 
     is_stat = _is_statsforecast_model(candidate.model_key)
     factory = FACTORY_REGISTRY[spec.factory]
 
-    freq = task_metadata.get("frequency")
+    train_pool_stats = {
+        "single_series": not sid_cols,
+        "series_lengths": (pool.groupby(sid_cols[0]).size().to_dict() if sid_cols else None),
+        "total_len": len(pool),
+    }
 
-    def fit_score(params: dict) -> float:
-        if is_stat:
-            sf = factory({"task_metadata": task_metadata, "params": params})
-            sf.fit(_to_sf_format(cand_train, target, dt_col, sid_cols))
-            fcst = sf.predict(h=horizon)
-            # statsforecast output: columns ['unique_id', 'ds', <ModelName>]
-            model_col = [c for c in fcst.columns if c not in ("unique_id", "ds")][0]
-            val_sf = _to_sf_format(val, target, dt_col, sid_cols)
-            merged = val_sf.merge(fcst, on=["unique_id", "ds"])
-            if merged.empty:
-                # Irregular dates (e.g. yfinance weekly): align predictions by position
-                val_s = val_sf.sort_values(["unique_id", "ds"]).reset_index(drop=True)
-                fct_s = fcst.sort_values(["unique_id", "ds"]).reset_index(drop=True)
-                n = min(len(val_s), len(fct_s))
-                if n == 0:
-                    raise ValueError("Statsforecast produced no predictions")
-                return _fc_metrics(val_s["y"].values[:n], fct_s[model_col].values[:n])[metric]
-            return _fc_metrics(merged["y"].values, merged[model_col].values)[metric]
-        else:
+    # Plan-level guardrail
+    throwaway = TrainingPlan(
+        problem_type="forecasting",
+        candidates=[candidate],
+        trial_budget=TrialBudget(total_trials=1, allocation_strategy="equal",
+                                 min_trials_per_candidate=1, max_trials_per_candidate=1),
+        forecasting_settings=forecasting_settings,
+    )
+
+    # Resolve auto window_size for rolling_window BEFORE validation
+    vs = forecasting_settings.validation_strategy
+    if vs.type == "rolling_window" and vs.window_size is None:
+        vs = vs.model_copy(update={
+            "window_size": resolve_rolling_window_size(
+                len(pool), horizon, vs.n_folds, season_length=None,
+            )
+        })
+        forecasting_settings = forecasting_settings.model_copy(update={"validation_strategy": vs})
+        throwaway = throwaway.model_copy(update={"forecasting_settings": forecasting_settings})
+
+    validate_forecasting_plan(throwaway, task_metadata, profile, train_pool_stats)
+
+    # Multi-target panel: delegate to preserved path (no exog support in v1)
+    if sid_cols:
+        return _run_candidate_forecasting_panel(
+            candidate, pool, task_metadata, n_trials, metric, direction,
+        )
+
+    # ─── Single-target leakage-safe path ────────────────────────────
+    availability = _resolve_exog_availability(list(pool.columns), task_metadata)
+    exog_columns = list(availability.keys())
+    strategies = forecasting_settings.exog_strategies
+
+    exog_cache: dict[tuple, pd.Series] = {}
+
+    def fit_score(params: dict) -> tuple[float, list[float], list[dict]]:
+        fold_scores: list[float] = []
+        fold_failures: list[dict] = []
+
+        for fold_id, (train_idx, val_idx) in enumerate(iter_folds(pool, vs, dt_col, sid_cols)):
+            cand_train = pool.loc[train_idx].reset_index(drop=True)
+            cand_val = pool.loc[val_idx].reset_index(drop=True)
+
+            if is_stat:
+                # statsforecast path: ignores exog (existing behavior)
+                sf = factory({"task_metadata": task_metadata, "params": params})
+                sf.fit(_to_sf_format(cand_train, target, dt_col, sid_cols))
+                fcst = sf.predict(h=horizon)
+                model_col = [c for c in fcst.columns if c not in ("unique_id", "ds")][0]
+                val_sf = _to_sf_format(cand_val, target, dt_col, sid_cols)
+                merged = val_sf.merge(fcst, on=["unique_id", "ds"])
+                if merged.empty:
+                    val_s = val_sf.sort_values(["unique_id", "ds"]).reset_index(drop=True)
+                    fct_s = fcst.sort_values(["unique_id", "ds"]).reset_index(drop=True)
+                    n = min(len(val_s), len(fct_s))
+                    if n == 0:
+                        raise ValueError("Statsforecast produced no predictions")
+                    score = _fc_metrics(val_s["y"].values[:n], fct_s[model_col].values[:n])[metric]
+                else:
+                    score = _fc_metrics(merged["y"].values, merged[model_col].values)[metric]
+                fold_scores.append(score)
+                continue
+
+            # ── Skforecast path with leakage-safe exog ────────────
             forecaster = factory({"task_metadata": task_metadata, "params": params})
             series_dict = _build_series_dict(cand_train, dt_col, target, sid_cols, freq)
-            train_exog = _build_exog_df(cand_train, dt_col, target, sid_cols, series_dict)
-            val_exog = _build_exog_df(val, dt_col, target, sid_cols, series_dict)
-            # When series uses RangeIndex, val_exog must continue from train_len
-            if val_exog is not None and isinstance(val_exog.index, pd.RangeIndex):
-                train_len = len(next(iter(series_dict.values())))
-                val_exog.index = pd.RangeIndex(train_len, train_len + len(val_exog))
+
+            future_values: dict[str, pd.Series] = {}
+            for col in exog_columns:
+                avail = availability[col]
+                if avail == "known_future":
+                    future_values[col] = cand_val[col].reset_index(drop=True)
+                    continue
+                strat = strategies.per_column.get(col, strategies.default_unknown_future)
+                if strat == "drop":
+                    continue
+                cache_key = (col, strat, fold_id, "default")
+                if cache_key in exog_cache:
+                    future_values[col] = exog_cache[cache_key]
+                else:
+                    preds, fail = extend_exog(cand_train[col], horizon, strat, freq)
+                    future_values[col] = preds
+                    exog_cache[cache_key] = preds
+                    if fail is not None:
+                        fold_failures.append(fail | {"fold_id": fold_id, "column": col})
+
+            used_cols = list(future_values.keys())
+            train_exog = cand_train[used_cols] if used_cols else None
+            val_exog = None
+            if used_cols:
+                val_exog_raw = pd.DataFrame(future_values)
+                val_exog = align_val_exog_index(
+                    val_exog_raw, series_dict, train_len=len(cand_train),
+                    dt_col=dt_col, freq=freq,
+                )
+                assert list(train_exog.columns) == list(val_exog.columns)
+
             forecaster.fit(series=series_dict, exog=train_exog)
-            # skforecast 0.22: predict returns DataFrame with DatetimeIndex,
-            # columns ['level', 'pred']
             preds = forecaster.predict(steps=horizon, exog=val_exog)
             preds = preds.reset_index().rename(columns={"index": "ds"})
-            # preds now has columns ['ds', 'level', 'pred']
-            if sid_cols:
-                val_long = val.rename(
-                    columns={sid_cols[0]: "level", target: "y_true", dt_col: "ds"}
-                )
-            else:
-                val_long = val.rename(columns={target: "y_true", dt_col: "ds"})
-                val_long = val_long.copy()
-                val_long["level"] = "__single__"
+            val_long = cand_val.rename(columns={target: "y_true", dt_col: "ds"}).copy()
+            val_long["level"] = "__single__"
             val_long["ds"] = pd.to_datetime(val_long["ds"])
             preds["ds"] = pd.to_datetime(preds["ds"])
             joined = val_long[["level", "ds", "y_true"]].merge(
                 preds[["level", "ds", "pred"]], on=["level", "ds"], how="inner"
             )
             if joined.empty:
-                # fallback: align by order
-                return _fc_metrics(
-                    val_long["y_true"].values,
-                    preds["pred"].values[: len(val_long)],
+                score = _fc_metrics(
+                    val_long["y_true"].values, preds["pred"].values[: len(val_long)],
                 )[metric]
-            return _fc_metrics(joined["y_true"].values, joined["pred"].values)[metric]
+            else:
+                score = _fc_metrics(joined["y_true"].values, joined["pred"].values)[metric]
+            fold_scores.append(score)
+
+        return float(np.mean(fold_scores)), fold_scores, fold_failures
 
     narrowed = (
         narrow_search_space(candidate.model_key, candidate.search_space_override)
-        if candidate.search_space_override
-        else spec.search_space
+        if candidate.search_space_override else spec.search_space
     )
     suggest_fn = build_suggest_fn(narrowed)
 
+    last_per_fold: list[float] = []
+    last_failures: list[dict] = []
+
     def objective(trial: optuna.Trial) -> float:
-        return fit_score(suggest_fn(trial))
+        nonlocal last_per_fold, last_failures
+        params = suggest_fn(trial)
+        score, per_fold, failures = fit_score(params)
+        last_per_fold = per_fold
+        last_failures = failures
+        return score
 
     try:
         if not narrowed.params:
-            best_score = fit_score(spec.default_params)
+            best_score, last_per_fold, last_failures = fit_score(spec.default_params)
             best_params, n_used = spec.default_params, 1
         else:
             study = optuna.create_study(
                 direction=direction, sampler=optuna.samplers.TPESampler(seed=42)
             )
-            study.optimize(objective, n_trials=n_trials)
-            if not study.best_trial:
-                raise RuntimeError("No successful trial")
+            study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
             best_params = study.best_params
             best_score = study.best_value
-            n_used = len(
-                [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-            )
-    except Exception:
-        try:
-            best_score = fit_score(spec.default_params)
-            best_params, n_used = spec.default_params, 1
-        except Exception as e2:
-            return {
-                "model_key": candidate.model_key,
-                "status": "failed",
-                "error_type": type(e2).__name__,
-                "error_message": str(e2),
-                "n_trials_used": 0,
-                "duration_s": time.perf_counter() - started,
-                "complexity_rank": spec.complexity_rank,
-            }
+            n_used = len(study.trials)
+        status = "successful"
+    except Exception as e:
+        logger.exception(f"[{candidate.model_key}] failed: {e}")
+        return {
+            "model_key": candidate.model_key, "status": "failed",
+            "best_params": {}, "best_score": float("inf"),
+            "best_score_std": 0.0, "n_trials_used": 0,
+            "duration_s": time.perf_counter() - started,
+            "complexity_rank": spec.complexity_rank,
+            "per_fold_scores": [], "exog_fit_failures": [],
+        }
+
     return {
         "model_key": candidate.model_key,
-        "status": "successful",
+        "status": status,
         "best_params": best_params,
         "best_score": float(best_score),
-        "best_score_std": 0.0,
+        "best_score_std": float(np.std(last_per_fold)) if last_per_fold else 0.0,
         "n_trials_used": n_used,
         "duration_s": time.perf_counter() - started,
         "complexity_rank": spec.complexity_rank,
+        "per_fold_scores": [float(x) for x in last_per_fold],
+        "exog_fit_failures": last_failures,
     }
 
 
@@ -661,14 +763,20 @@ def _retrain_forecasting(
         sf.fit(_to_sf_format(train_pool, target, dt_col, sid_cols))
         with path.open("wb") as f:
             pickle.dump(sf, f)
+        return path
+
+    forecaster = factory({"task_metadata": task_metadata, "params": champion["best_params"]})
+    freq = task_metadata.get("frequency")
+    series_dict = _build_series_dict(train_pool, dt_col, target, sid_cols, freq)
+    if not sid_cols:
+        availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
+        used_cols = [c for c in availability if c in train_pool.columns]
+        train_exog = train_pool[used_cols] if used_cols else None
     else:
-        forecaster = factory({"task_metadata": task_metadata, "params": champion["best_params"]})
-        freq = task_metadata.get("frequency")
-        series_dict = _build_series_dict(train_pool, dt_col, target, sid_cols, freq)
-        train_exog = _build_exog_df(train_pool, dt_col, target, sid_cols, series_dict)
-        forecaster.fit(series=series_dict, exog=train_exog)
-        with path.open("wb") as f:
-            pickle.dump(forecaster, f)
+        train_exog = None
+    forecaster.fit(series=series_dict, exog=train_exog)
+    with path.open("wb") as f:
+        pickle.dump(forecaster, f)
     return path
 
 
@@ -690,6 +798,16 @@ def run_training_plan(
     direction = METRIC_DIRECTION[metric]
 
     profile = build_dataset_profile(processed_dataset_path, task_metadata)
+
+    # Resolve forecasting_settings before any candidate runs
+    fs = plan.forecasting_settings
+    if fs is None and plan.problem_type == "forecasting":
+        fs = ForecastingSettings(
+            validation_strategy=select_validation_strategy(profile, task_metadata),
+            exog_strategies=ExogStrategySettings(),
+        )
+        plan = plan.model_copy(update={"forecasting_settings": fs})
+
     train_pool_path, test_path, split_meta_path = split_dataset(
         processed_dataset_path, task_metadata, output_dir, random_state=random_state
     )
@@ -719,6 +837,8 @@ def run_training_plan(
                     res = _run_candidate_forecasting(
                         cand, train_pool, task_metadata,
                         allocations[cand.model_key], metric, direction,
+                        forecasting_settings=fs,
+                        profile=profile,
                     )
                 res["mlflow_run_id"] = child.info.run_id
                 if res["status"] == "successful":
