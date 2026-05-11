@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 
 class DatasetProfile(BaseModel):
+    model_config = {"extra": "allow"}
+
     schema_version: int = 1
     problem_type: Literal["classification", "regression", "forecasting"]
     # Universal

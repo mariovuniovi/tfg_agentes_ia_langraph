@@ -21,32 +21,32 @@ def test_classification_profile_basic(tmp_path):
     })
     csv = _write_csv(tmp_path, df)
     p = build_dataset_profile(csv, {"problem_type": "classification", "target_column": "target"})
-    assert p["problem_type"] == "classification"
-    assert p["n_rows"] == "very_small"
-    assert p["n_classes"] == "binary"
-    assert p["class_balance"] == "balanced"
+    assert p.problem_type == "classification"
+    assert p.n_rows == "very_small"
+    assert p.n_classes == "binary"
+    assert p.class_balance == "balanced"
 
 
 def test_regression_profile_basic(tmp_path):
     df = pd.DataFrame({"x1": range(2000), "x2": [0.5] * 2000, "y": list(range(2000))})
     csv = _write_csv(tmp_path, df)
     p = build_dataset_profile(csv, {"problem_type": "regression", "target_column": "y"})
-    assert p["problem_type"] == "regression"
-    assert p["n_rows"] == "medium"
+    assert p.problem_type == "regression"
+    assert p.n_rows == "medium"
 
 
 def test_classification_imbalance_severely(tmp_path):
     df = pd.DataFrame({"f1": range(60), "target": [0] * 50 + [1] * 10})
     csv = _write_csv(tmp_path, df)
     p = build_dataset_profile(csv, {"problem_type": "classification", "target_column": "target"})
-    assert p["class_balance"] == "severely_imbalanced"
+    assert p.class_balance == "severely_imbalanced"
 
 
 def test_missing_rate_low(tmp_path):
     df = pd.DataFrame({"f1": [1.0, 2.0, None, 4.0, 5.0] * 12, "target": [0, 1] * 30})
     csv = _write_csv(tmp_path, df)
     p = build_dataset_profile(csv, {"problem_type": "classification", "target_column": "target"})
-    assert p["missing_rate"] in ("low", "medium")
+    assert p.missing_rate in ("low", "medium")
 
 
 def test_forecasting_profile_single_series(tmp_path):
@@ -64,11 +64,11 @@ def test_forecasting_profile_single_series(tmp_path):
             "forecast_horizon": 12,
         },
     )
-    assert p["problem_type"] == "forecasting"
-    assert p["n_series"] == "single"
-    assert p["history_length"] in ("short", "medium")
-    assert p["frequency"] == "MS"
-    assert p["horizon_difficulty"] in ("very_short", "short", "medium", "long")
-    assert isinstance(p["seasonality_detected"], bool)
-    assert isinstance(p["trend_detected"], bool)
-    assert isinstance(p["stationarity"], bool)
+    assert p.problem_type == "forecasting"
+    assert p.n_series == "single"
+    assert p.history_length in ("short", "medium")
+    assert p.frequency == "MS"
+    assert p.horizon_difficulty in ("very_short", "short", "medium", "long")
+    assert isinstance(p.seasonality_detected, bool)
+    assert isinstance(p.trend_detected, bool)
+    assert isinstance(p.stationarity, bool)

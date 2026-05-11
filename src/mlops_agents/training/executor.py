@@ -613,7 +613,7 @@ def run_training_plan(
             "task_id": task_id,
             "problem_type": plan.problem_type,
             "dataset_name": processed_dataset_path.stem,
-            "dataset_profile": profile,
+            "dataset_profile": profile.model_dump(),
             "training_plan_input": plan.model_dump(),
             "split_artifacts": {
                 "train_pool_path": str(train_pool_path),

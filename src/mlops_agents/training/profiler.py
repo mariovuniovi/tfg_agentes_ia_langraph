@@ -1,8 +1,4 @@
-"""Compute the bucketed dataset profile used as the retrieval join key.
-
-SP4 will define DatasetProfile as a Pydantic class; SP3 returns a plain dict
-with matching keys.
-"""
+"""Compute the bucketed dataset profile used as the retrieval join key."""
 
 from __future__ import annotations
 
@@ -11,6 +7,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from mlops_agents.contracts.profile import DatasetProfile
+
+__all__ = ["build_dataset_profile", "DatasetProfile"]
 
 # ---------------------------------------------------------------------------
 # Bucketers
@@ -75,10 +75,10 @@ def _bucket_n_series(n: int) -> str:
     return "many"
 
 
-def _bucket_history_length(n: float) -> str:
-    if n < 50: return "very_short"
-    if n <= 200: return "short"
-    if n <= 1000: return "medium"
+def _bucket_history_length(n: int) -> str:
+    if n < 60: return "very_short"
+    if n < 200: return "short"
+    if n < 2000: return "medium"
     return "long"
 
 
@@ -146,7 +146,7 @@ def _detect_per_series(series: pd.Series, freq: str) -> tuple[bool, bool, bool]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> dict[str, Any]:
+def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> DatasetProfile:
     """Compute the bucketed profile for the given canonical CSV."""
     df = pd.read_csv(dataset_path)
     problem_type = task_metadata["problem_type"]
@@ -185,10 +185,10 @@ def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> 
         if sid_cols:
             grouped = df.groupby(sid_cols)
             n_series = grouped.ngroups
-            avg_history = grouped.size().mean()
+            per_series_len = int(grouped.size().min())
         else:
             n_series = 1
-            avg_history = len(df)
+            per_series_len = len(df)
 
         # Per-series stats: take a sample if many series
         sample_groups = (
@@ -209,7 +209,7 @@ def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> 
 
         profile.update({
             "n_series": _bucket_n_series(n_series),
-            "history_length": _bucket_history_length(float(avg_history)),
+            "history_length": _bucket_history_length(per_series_len),
             "frequency": freq,
             "horizon_difficulty": _bucket_horizon_difficulty(freq, horizon),
             "forecast_horizon_raw": horizon,
@@ -219,4 +219,4 @@ def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> 
             "stationarity": (votes_stationary / n_voted) >= 0.5,
         })
 
-    return profile
+    return DatasetProfile(**profile)
