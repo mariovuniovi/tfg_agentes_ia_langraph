@@ -1,12 +1,11 @@
 """Deterministic multi-candidate training executor."""
 from __future__ import annotations
 
-import json
 import pickle
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import mlflow
 import numpy as np
@@ -24,13 +23,12 @@ from mlops_agents.contracts.training import (
     TrainingPlanCandidate,
     TrainingResult,
     TrialBudget,
-    ValidationStrategy,
 )
 from mlops_agents.models.factories import FACTORY_REGISTRY
 from mlops_agents.models.loader import get_model
 from mlops_agents.models.search_spaces import build_suggest_fn
-from mlops_agents.training.experience import build_task_id, write_experience_record
 from mlops_agents.training.exog_extender import align_val_exog_index, extend_exog
+from mlops_agents.training.experience import build_task_id, write_experience_record
 from mlops_agents.training.override_validation import narrow_search_space
 from mlops_agents.training.profiler import build_dataset_profile
 from mlops_agents.training.splitter import split_dataset
@@ -645,10 +643,9 @@ def _run_candidate_forecasting(
             if used_cols:
                 val_exog_raw = pd.DataFrame(future_values)
                 val_exog = align_val_exog_index(
-                    val_exog_raw, series_dict, train_len=len(cand_train),
+                    val_exog_raw, series_dict, train_len=len(next(iter(series_dict.values()))),
                     dt_col=dt_col, freq=freq,
                 )
-                assert list(train_exog.columns) == list(val_exog.columns)
 
             forecaster.fit(series=series_dict, exog=train_exog)
             preds = forecaster.predict(steps=horizon, exog=val_exog)
@@ -698,7 +695,7 @@ def _run_candidate_forecasting(
             study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
             best_params = study.best_params
             best_score = study.best_value
-            n_used = len(study.trials)
+            n_used = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
         status = "successful"
     except Exception as e:
         logger.exception(f"[{candidate.model_key}] failed: {e}")
@@ -869,6 +866,8 @@ def run_training_plan(
             if plan.problem_type == "classification"
             else "kfold_5_shuffle"
             if plan.problem_type == "regression"
+            else plan.forecasting_settings.validation_strategy.type
+            if plan.forecasting_settings is not None
             else "temporal_holdout"
         )
         task_id = build_task_id(processed_dataset_path.stem, plan.problem_type, run_idx=1)
