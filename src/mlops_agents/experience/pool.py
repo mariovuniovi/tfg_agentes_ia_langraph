@@ -11,10 +11,42 @@ from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+_NEW_EXPERIENCE_COLUMNS = [
+    "validation_strategy_json",
+    "exog_availability_json",
+    "exog_strategies_json",
+    "per_fold_metrics_json",
+    "exog_fit_failures_json",
+]
+
+
+def _migrate_experience_columns(conn: sqlite3.Connection) -> None:
+    """Add new TEXT columns idempotently using PRAGMA introspection.
+
+    SQLite does not universally support ADD COLUMN IF NOT EXISTS, so we check
+    the current schema with PRAGMA table_info first.
+    """
+    existing = {
+        row[1] for row in conn.execute("PRAGMA table_info(experiences)").fetchall()
+    }
+    for col in _NEW_EXPERIENCE_COLUMNS:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE experiences ADD COLUMN {col} TEXT")
+
+
+def _opt_json(v: Any) -> str | None:
+    return json.dumps(v) if v is not None else None
+
 
 class ExperiencePool:
     def __init__(self, db_path: Path, audit_dir: Path | None = None):
         apply_pending_migrations(db_path)
+        conn = sqlite3.connect(str(db_path))
+        try:
+            with conn:
+                _migrate_experience_columns(conn)
+        finally:
+            conn.close()
         self._db_path = db_path
         self._audit_dir = audit_dir
 
@@ -34,14 +66,21 @@ class ExperiencePool:
                 (task_id, problem_type, dataset_name, dataset_profile_json,
                  training_plan_json, selected_model_key, metric_to_optimize,
                  metric_direction, validation_score, validation_std,
-                 experience_summary, mlflow_parent_run_id, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 experience_summary, mlflow_parent_run_id, created_at,
+                 validation_strategy_json, exog_availability_json,
+                 exog_strategies_json, per_fold_metrics_json, exog_fit_failures_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (record.task_id, record.problem_type, record.dataset_name,
                  json.dumps(record.dataset_profile), json.dumps(record.training_plan_input),
                  sol.model_key if sol else None, record.metric_to_optimize,
                  record.metric_direction,
                  sol.validation_score if sol else None, sol.validation_std if sol else None,
-                 record.experience_summary, record.mlflow.get("parent_run_id"), created_at),
+                 record.experience_summary, record.mlflow.get("parent_run_id"), created_at,
+                 _opt_json(record.validation_strategy),
+                 _opt_json(record.exog_availability),
+                 _opt_json(record.exog_strategies),
+                 _opt_json(record.per_fold_metrics),
+                 _opt_json(record.exog_fit_failures)),
             )
             conn.execute("DELETE FROM candidate_results WHERE task_id = ?", (record.task_id,))
             for cand in record.models_tested:

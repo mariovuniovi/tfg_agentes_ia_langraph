@@ -42,6 +42,12 @@ class ExperienceRecord(BaseModel):
     models_tested: list[CandidateResult] = Field(default_factory=list)
     selected_solution: SelectedSolution | None = None
     experience_summary: str | None = None
+    # Added by exog/leakage-safe-validation feature
+    validation_strategy: dict | None = None
+    exog_availability:   dict | None = None
+    exog_strategies:     dict | None = None
+    per_fold_metrics:    list[dict] | None = None
+    exog_fit_failures:   list[dict] | None = None
 
 
 class CandidateResultView(BaseModel):
