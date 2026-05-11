@@ -87,6 +87,9 @@ class EvidenceReference(BaseModel):
     summary: str
 
 
+PlannerStatus = Literal["ok", "retry_ok", "failed"]
+
+
 class PlannerOutput(BaseModel):
     planning_analysis: str = Field(
         description=(
@@ -125,13 +128,21 @@ Called only from `planner_node`, after `_check_plan_integrity` and `_check_evide
 ### 3.3 `PlannerContext` — context assembled by deterministic code
 
 ```python
+class CandidateResultCompact(BaseModel):
+    model_key: str
+    rank: int                    # 1 = best
+    metric_value: float | None
+
 class ExperienceSummary(BaseModel):
     experience_id: str           # task_id from ExperienceRecord
     similarity_score: float
     dataset_summary: str         # from experience_summary field
-    models_trained: list[str]    # model_keys tried
+    models_trained: list[str]    # all model_keys tried
     best_model: str              # selected_solution.model_key
     validation_score: float
+    candidate_results: list[CandidateResultCompact] = Field(default_factory=list)
+    # compact ranking of all candidates; gives the LLM signal about runners-up and failures,
+    # not just the winner. Populated from CandidateResult rows ordered by best_score desc.
     notes: str                   # short rephrasing for LLM consumption
 
 class PlannerContext(BaseModel):
@@ -293,8 +304,9 @@ def _check_evidence_references(refs: list[EvidenceReference], ctx: PlannerContex
   state["planner_analysis"] = output.planning_analysis
   state["planner_evidence_used"] = [e.model_dump() for e in output.evidence_used]
   state["planner_warnings"] = output.risks_or_warnings
-  state["training_plan"] = output.plan.model_dump()
+  state["training_plan"] = output.plan.model_dump()   # executor reads via TrainingPlan.model_validate
   state["planner_status"] = "retry_ok" if retry_used else "ok"
+  state["planner_retry_used"] = retry_used
   ```
 
 ---
@@ -307,10 +319,13 @@ New fields in `state/agent_state.py`:
 planner_analysis: str           # LLM-generated planning explanation artifact
 planner_evidence_used: list     # list of EvidenceReference dicts
 planner_warnings: list          # list of warning strings
-planner_status: str             # "ok" | "retry_ok" | "failed"
+planner_status: str             # "ok" | "retry_ok" | "failed"  (PlannerStatus)
+planner_retry_used: bool        # True if second attempt was needed
 ```
 
-`planner_analysis` is surfaced via SSE — gives the UI a "why this plan?" moment before training begins.
+`planner_analysis` is surfaced via SSE — gives the UI a "why this plan?" moment before training begins. `planner_retry_used` is exposed in state (not only in `planner_output_json`) so UI and tests can read it without parsing JSON.
+
+**State serialization convention:** `planner_node` writes `state["training_plan"] = output.plan.model_dump()`. `executor_node` reads it back as `plan = TrainingPlan.model_validate(state["training_plan"])`. This keeps `AgentState` JSON-serializable throughout.
 
 ---
 
@@ -351,9 +366,9 @@ INSERT OR IGNORE INTO _schema_version(version) VALUES (4);
 | **New** | `agents/planner.py` — `planner_node`, `build_planner_context`, `_check_evidence_references`, `PlannerError` |
 | **New** | `prompts/planner.yaml` — system prompt |
 | **New** | `experience/migrations/004_add_planner_output.sql` |
-| **Modify** | `contracts/training.py` — exhaustiveness check in `_check_plan_integrity` |
+| **No change** | `contracts/training.py` — existing integrity checks remain unchanged; exhaustiveness is planner-specific |
 | **Modify** | `graphs/mlops_graph.py` — add `planner` node, rename `trainer_node` → `executor_node` |
-| **Modify** | `state/agent_state.py` — 4 new fields |
+| **Modify** | `state/agent_state.py` — 5 new fields (`planner_analysis`, `planner_evidence_used`, `planner_warnings`, `planner_status`, `planner_retry_used`) |
 | **Modify** | `experience/pool.py` — `planner_output_json` in INSERT + `get()` |
 | **Modify** | `experience/schema.py` — `planner_output: dict | None` field on `ExperienceRecord` |
 | **Modify** | `experience/migrations/_runner.py` — picks up migration 004 automatically (no change needed if runner is glob-based) |
@@ -410,7 +425,7 @@ INSERT OR IGNORE INTO _schema_version(version) VALUES (4);
 ```
 
 - Real LLM call with diabetes profile + seeded pool + real matched rules
-- `PlannerOutput` passes all 3 validation stages
+- `PlannerOutput` passes all 4 validation stages
 - Every `plan.candidates` model_key is in `available_models`
 - Every `models_not_recommended` entry has non-empty `reason`
 - Every `evidence_used` source_id exists in the context that was sent
