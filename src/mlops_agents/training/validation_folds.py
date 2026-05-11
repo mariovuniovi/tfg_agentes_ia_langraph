@@ -22,7 +22,8 @@ def iter_folds(
     """Yield (train_idx, val_idx) pairs in chronological order."""
     if sid_cols:
         raise NotImplementedError(
-            "Panel multi-target fold iteration deferred to v2"
+            "iter_folds does not support panel data (sid_cols non-empty). "
+            "Multi-target leakage-safe fold iteration is deferred to v2."
         )
 
     # Sort by date; keep original index so .loc[] works on the caller's DataFrame.
@@ -47,8 +48,12 @@ def iter_folds(
         if strategy.type == "expanding_window":
             train_start = 0
         elif strategy.type == "rolling_window":
-            window = strategy.window_size or 0
-            train_start = max(0, val_start - window)
+            if not strategy.window_size:
+                raise ValueError(
+                    "rolling_window strategy requires window_size to be set "
+                    "(call validation_policy.resolve_rolling_window_size first)"
+                )
+            train_start = max(0, val_start - strategy.window_size)
         else:
             raise ValueError(f"Unknown validation strategy type: {strategy.type}")
         yield sorted_index[train_start:val_start], sorted_index[val_start:val_end]

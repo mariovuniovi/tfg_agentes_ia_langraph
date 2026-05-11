@@ -1,6 +1,5 @@
 """Tests for iter_folds: correct count, chronological order, no future leakage."""
 import pandas as pd
-import pytest
 
 from mlops_agents.contracts.training import ValidationStrategy
 from mlops_agents.training.validation_folds import iter_folds
