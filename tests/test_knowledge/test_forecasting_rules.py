@@ -20,3 +20,22 @@ def test_recommend_field_present_on_new_rules():
     rules = {r.rule_id: r for r in load_rules()}
     r = rules["forecasting_short_history_single_split"]
     assert r.recommend == {"validation_strategy": "single_split"}
+
+
+from mlops_agents.knowledge.reader import match_rules
+
+
+def test_match_rules_short_history_recommends_single_split():
+    """At least one new recommend-only rule fires via match_rules()."""
+    profile = {
+        "problem_type": "forecasting",
+        "n_rows": "medium",
+        "n_features": "small",
+        "missing_rate": "none",
+        "n_categorical_features": "none",
+        "n_numerical_features": "few",
+        "history_length": "short",
+    }
+    rules = match_rules(profile)
+    ids = {r.rule_id for r in rules}
+    assert "forecasting_short_history_single_split" in ids
