@@ -1,151 +1,173 @@
-# Plan de Trabajo — Multi-Agent MLOps System (TFG)
+# Project plan — Multi-Agent MLOps System (TFG)
 
-> Cada historia de usuario representa una unidad funcional entregable.
-> Se marca con `[x]` cuando está completamente implementada y probada.
+> Status board organized around **sub-projects** (SP1–SP5). Each sub-project has a brainstormed design spec under `docs/superpowers/specs/` and an implementation plan under `docs/superpowers/plans/`. Tasks within a sub-project are tracked as TDD steps in the plan file.
 
----
-
-## Epic 1 — Scaffolding y configuración del proyecto
-
-| # | Historia | Estado |
-|---|----------|--------|
-| E1-1 | Como desarrollador, quiero una estructura de directorios organizada con UV src-layout para poder trabajar con imports limpios y builds reproducibles. | ✅ Done |
-| E1-2 | Como desarrollador, quiero un `pyproject.toml` completo con todas las dependencias, ruff, mypy y pytest configurados para poder ejecutar `uv sync` y tener el entorno listo. | ✅ Done |
-| E1-3 | Como desarrollador, quiero un `.env.example` con todas las variables necesarias documentadas para saber exactamente qué configurar antes de ejecutar el proyecto. | ✅ Done |
-| E1-4 | Como desarrollador, quiero un `CLAUDE.md` con las convenciones del proyecto para que Claude Code tenga contexto en cada sesión. | ✅ Done |
-| E1-5 | Como desarrollador, quiero `Dockerfile` y `docker-compose.yml` para poder levantar MLflow + Streamlit con un solo `docker compose up`. | ✅ Done |
+Last updated: 2026-05-11
 
 ---
 
-## Epic 2 — Estado compartido y esquemas
+## At a glance
 
-| # | Historia | Estado |
-|---|----------|--------|
-| E2-1 | Como desarrollador, quiero un `AgentState` TypedDict con todos los campos del pipeline para que los nodos puedan leer y escribir estado de forma tipada. | ✅ Done |
-| E2-2 | Como desarrollador, quiero esquemas Pydantic (`RouterOutput`, `ValidationResult`, `TrainingResult`, `EvaluationResult`) para que los outputs de LLM y herramientas sean estructurados y validados. | ✅ Done |
+| Sub-project | Description | State | Spec |
+|---|---|---|---|
+| **SP1** | Schema-driven data validation + HITL auto-fix | ✅ Complete | `2026-04-20-schema-driven-validation-design.md` |
+| **SP2** | Forecasting-aware data validator | ✅ Complete | `2026-05-05-forecasting-aware-data-validator-design.md` |
+| **SP3** | Model registry + training pipeline | ✅ Complete | `2026-05-06-model-registry-training-pipeline-design.md` |
+| **SP4** | Experience pool + benchmark runner (21 datasets) | ✅ Complete | `2026-05-06-experience-pool-benchmark-runner-design.md` |
+| **SP4.1** | Forecasting exog handling + leakage-safe validation | ✅ Complete | `2026-05-11-forecasting-exogenous-leakage-safe-validation-design.md` |
+| **API/UI** | FastAPI backend + Next.js frontend | 🔄 In progress | `2026-04-23-fastapi-backend-design.md`, `2026-04-24-nextjs-frontend-design.md` |
+| **SP5** | LLM model_agent (retrieves experiences, proposes plans) | ⬜ Next | (spec to be written) |
+| **Demo** | End-to-end demo + TFG report | ⬜ Pending | — |
 
----
-
-## Epic 3 — Herramientas deterministas (tools)
-
-| # | Historia | Estado |
-|---|----------|--------|
-| E3-1 | Como agente de validación, quiero herramientas `load_dataset`, `validate_schema` y `check_missing_values` para poder inspeccionar un CSV antes de entrenamiento. | ✅ Done |
-| E3-2 | Como agente de validación, quiero herramientas Evidently AI (`check_data_quality`, `check_data_drift`) para poder detectar problemas de calidad y drift estadístico. | ✅ Done |
-| E3-3 | Como agente de entrenamiento, quiero una herramienta `tune_hyperparameters` con Optuna para poder encontrar los mejores hiperparámetros automáticamente. | ✅ Done |
-| E3-4 | Como agente de entrenamiento, quiero una herramienta `train_model` que soporte `random_forest`, `gradient_boosting` y `logistic_regression` con sklearn para poder entrenar y guardar modelos. | ✅ Done |
-| E3-5 | Como agente de evaluación, quiero herramientas MLflow (`log_experiment`, `get_best_run`) para poder registrar métricas y comparar runs. | ✅ Done |
-| E3-6 | Como agente de despliegue, quiero herramientas `register_model` y `set_model_alias` para poder promover modelos al MLflow Model Registry. | ✅ Done |
-| **E3-7** | **Como desarrollador, quiero tests unitarios para todas las herramientas deterministas para verificar que funcionan correctamente sin llamadas a LLM.** | ✅ Hecho |
+Legend: ✅ Complete · 🔄 In progress · ⬜ Pending · ⚠️ Blocked
 
 ---
 
-## Epic 4 — Agentes especialistas
+## SP1 — Schema-driven data validation (✅ Complete)
 
-| # | Historia | Estado |
-|---|----------|--------|
-| E4-1 | Como pipeline, quiero un `data_agent` que valide un CSV usando sus herramientas y devuelva un informe de validación claro en linguaje natural. | ✅ Done (scaffold) |
-| E4-2 | Como pipeline, quiero un `training_agent` que seleccione modelo, afine hiperparámetros, entrene y loguee en MLflow, devolviendo el `run_id`. | ✅ Done (scaffold) |
-| E4-3 | Como pipeline, quiero un `evaluation_agent` que compare el modelo candidato con el baseline y emita una recomendación `promote/reject/retrain`. | ✅ Done (scaffold) |
-| E4-4 | Como pipeline, quiero un `deployment_agent` que registre el modelo en MLflow Registry y solicite aprobación humana antes de promover a champion. | ✅ Done (scaffold) |
-| **E4-5** | **Como desarrollador, quiero tests unitarios para cada agente mockeando el LLM para verificar que los builders funcionan y las herramientas están bien registradas.** | ⬜ Pendiente |
-| **E4-6** | **Como desarrollador, quiero probar manualmente cada agente de forma aislada (sin supervisor) con un dataset real para validar los prompts.** | ⬜ Pendiente |
+**Goal:** A user uploads a dataset; the `data_agent` validates it against a schema (column names, types, ranges, freshness) and either approves it or proposes auto-fixes via an HITL flow.
 
----
-
-## Epic 5 — Supervisor y grafo principal
-
-| # | Historia | Estado |
-|---|----------|--------|
-| E5-1 | Como pipeline, quiero un `supervisor_node` con structured output (`RouterOutput`) que enrute a los agentes correctos siguiendo las reglas del pipeline. | ✅ Done (scaffold) |
-| E5-2 | Como pipeline, quiero un `StateGraph` compilado con los 5 nodos (supervisor + 4 agentes) que fluya `START → supervisor → agentes → supervisor → END`. | ✅ Done (scaffold) |
-| E5-3 | Como pipeline, quiero un `deployer_node` con `interrupt()` que pause antes de la promoción a champion y espere aprobación humana. | ✅ Done (scaffold) |
-| **E5-4** | **Como desarrollador, quiero un test que verifique que el grafo tiene los nodos esperados y compila sin errores.** | ⬜ Pendiente |
-| **E5-5** | **Como desarrollador, quiero ejecutar el pipeline end-to-end con el dataset `iris.csv` y verificar que el supervisor enruta correctamente los 4 stages.** | ⬜ Pendiente |
-| **E5-6** | **Como desarrollador, quiero verificar el flujo HITL: el pipeline pausa en `deployer_node`, recibe `Command(resume={"approved": True})` y completa la promoción.** | ⬜ Pendiente |
+**Delivered:**
+- ✅ `data_agent` with `validate_schema`, `check_missing_values`, Evidently quality reports
+- ✅ Schema JSONs in `data/schemas/`
+- ✅ HITL auto-fix loop (user approves/rejects each proposed fix)
+- ✅ Streamlit + (later) FastAPI/Next.js endpoints to upload and validate
 
 ---
 
-## Epic 6 — Integración MLflow
+## SP2 — Forecasting-aware data validator (✅ Complete)
 
-| # | Historia | Estado |
-|---|----------|--------|
-| **E6-1** | **Como usuario, quiero ejecutar `uv run python scripts/seed_mlflow.py` y ver 3 runs en la UI de MLflow para tener datos de demo.** | ⬜ Pendiente |
-| **E6-2** | **Como agente de evaluación, quiero que `get_best_run` recupere el run champion actual y lo compare con el candidato correctamente.** | ⬜ Pendiente |
-| **E6-3** | **Como agente de despliegue, quiero que `register_model` y `set_model_alias` funcionen contra un MLflow real (local o Docker).** | ⬜ Pendiente |
+**Goal:** When the user declares the problem as forecasting, the validator captures the temporal structure: datetime column, frequency, gaps, series_id (if panel), exogenous columns. This produces a `task_metadata` dict that the training pipeline can rely on.
 
----
-
-## Epic 7 — Dashboard Streamlit
-
-| # | Historia | Estado |
-|---|----------|--------|
-| E7-1 | Como usuario, quiero una página "Pipeline" en Streamlit que me permita seleccionar un dataset y lanzar el pipeline desde la UI. | ✅ Done (scaffold) |
-| E7-2 | Como usuario, quiero una página "Experiments" que muestre los runs de MLflow en una tabla con métricas y parámetros. | ✅ Done (scaffold) |
-| E7-3 | Como usuario, quiero una página "Monitoring" donde pueda subir dos CSVs y ver el informe de drift de Evidently. | ✅ Done (scaffold) |
-| E7-4 | Como usuario, quiero una página "Chat" donde pueda hablar con los agentes en lenguaje natural. | ✅ Done (scaffold) |
-| **E7-5** | **Como usuario, quiero que la página Pipeline muestre el log en tiempo real (streaming) mientras los agentes trabajan.** | ✅ Done |
-| **E7-6** | **Como usuario, quiero que el dashboard detecte cuando hay un `interrupt()` pendiente y muestre un botón de "Aprobar / Rechazar" despliegue.** | ✅ Done |
-| **E7-7** | **Como usuario, quiero lanzar `uv run streamlit run dashboard/app.py` y que las 4 páginas carguen sin errores de import.** | ⬜ Pendiente |
+**Delivered:**
+- ✅ Frequency detection (H/D/W/MS/M/QS/YS) + irregular-spacing report
+- ✅ Gap analysis (missing dates within the inferred frequency)
+- ✅ Multi-series detection (panel vs single-target)
+- ✅ Exogenous column detection (non-target/non-date/non-series-id numeric cols)
+- ✅ `task_metadata` schema documented for downstream consumers
 
 ---
 
-## Epic 8 — Logging y observabilidad
+## SP3 — Model registry + training pipeline (✅ Complete)
 
-> **Contexto:** El logging actual está valorado en 3/10. Solo escribe a stderr, tiene un bug de re-registro de handler, no persiste a fichero y el dashboard solo muestra "nodo completado". Estas historias lo llevan a un 8/10.
+**Goal:** A deterministic training executor that, given a `TrainingPlan` and a dataset, runs Optuna-tuned model selection for classification / regression / forecasting and produces a `TrainingResult` + an `ExperienceRecord`.
 
-| # | Historia | Estado |
-|---|----------|--------|
-| **E8-1** | **Como desarrollador, quiero corregir el bug en `get_logger()` que llama `logger.remove()` en cada import para que el handler de loguru no se registre múltiples veces.** | ✅ Done |
-| **E8-2** | **Como desarrollador, quiero que los logs se escriban a `logs/pipeline.log` con rotación diaria (máx. 7 días) además de a stderr, para poder revisar ejecuciones pasadas.** | ⬜ Pendiente |
-| **E8-3** | **Como desarrollador, quiero un sink en memoria (`queue.Queue`) en `utils/logging.py` que acumule los log entries del run actual para que Streamlit los pueda leer en tiempo real.** | ⬜ Pendiente |
-| **E8-4** | **Como usuario del dashboard, quiero que la página "Pipeline" muestre el contenido real de los mensajes de cada agente (no solo "nodo completado") mientras el grafo hace streaming.** | ⬜ Pendiente |
-| **E8-5** | **Como usuario del dashboard, quiero una nueva página "Logs" (`05_logs.py`) que muestre los logs del run actual filtrables por nivel (DEBUG/INFO/WARNING/ERROR) y por agente.** | ⬜ Pendiente |
-| **E8-6** | **Como desarrollador, quiero que el supervisor loguee cada decisión de enrutamiento (agente elegido + razonamiento) en INFO para poder auditar el comportamiento del pipeline.** | ⬜ Pendiente |
-| **E8-7** | **Como desarrollador, quiero que los logs de herramientas deterministas incluyan duración de ejecución (ms) para poder identificar cuellos de botella.** | ⬜ Pendiente |
-
----
-
-## Epic 9 — Servidores MCP
-
-| # | Historia | Estado |
-|---|----------|--------|
-| E9-1 | Como desarrollador, quiero servidores MCP para MLflow y datos implementados con FastMCP. | ✅ Done (scaffold) |
-| **E9-2** | **Como desarrollador, quiero levantar los servidores MCP y verificar que las herramientas aparecen en Claude Code (`/mcp`).** | ⬜ Pendiente |
+**Delivered:**
+- ✅ `src/mlops_agents/models/registry.yaml` — all models with factory, default_params, search_space, complexity_rank, requirements
+- ✅ Factory functions per model (`factories.py`): sklearn, LightGBM, XGBoost, CatBoost, statsforecast (AutoETS, AutoARIMA, Naive, SeasonalNaive), skforecast (ForecasterRecursiveMultiSeries wrapping each tabular regressor + SVR)
+- ✅ `executor.py` with `_run_candidate_classification` / `_run_candidate_regression` / `_run_candidate_forecasting`
+- ✅ Optuna integration with `build_suggest_fn(search_space)`
+- ✅ MLflow parent + nested runs; champion selection (`_pick_champion`) with complexity tie-breaker
+- ✅ `_retrain_forecasting` / `_retrain_tabular` to refit champion on full train pool
+- ✅ Search-space override validation (`override_validation.py`)
 
 ---
 
-## Epic 10 — Calidad y pruebas
+## SP4 — Experience pool + benchmark runner (✅ Complete)
 
-| # | Historia | Estado |
-|---|----------|--------|
-| **E10-1** | **Como desarrollador, quiero ejecutar `uv run pytest -m "not integration"` y que todos los tests unitarios pasen (0 fallos).** | ⬜ Pendiente |
-| **E10-2** | **Como desarrollador, quiero ejecutar `uv run ruff check .` sin errores de linting.** | ⬜ Pendiente |
-| **E10-3** | **Como desarrollador, quiero ejecutar `uv run mypy src/` con 0 errores de tipo.** | ⬜ Pendiente |
-| **E10-4** | **Como desarrollador, quiero ejecutar el test de integración end-to-end con `GITHUB_TOKEN` real y verificar que el pipeline completo funciona.** | ⬜ Pendiente |
+**Goal:** Every training run writes an `ExperienceRecord` to a SQLite-backed pool. The pool is seeded offline from a manifest of 21 public benchmark datasets so SP5 has a non-empty retrieval source from day one.
 
----
-
-## Epic 11 — Demo y entrega TFG
-
-| # | Historia | Estado |
-|---|----------|--------|
-| **E11-1** | **Como evaluador del TFG, quiero ver una demo del pipeline completo: dataset → validación → entrenamiento → evaluación → aprobación humana → registro en MLflow.** | ⬜ Pendiente |
-| **E11-2** | **Como evaluador, quiero ver el dashboard Streamlit con datos reales de MLflow mostrando experimentos, métricas y comparación de modelos.** | ⬜ Pendiente |
-| **E11-3** | **Como evaluador, quiero ver el flujo HITL en acción: el pipeline pausado esperando aprobación y reanudándose tras la decisión humana.** | ⬜ Pendiente |
-| **E11-4** | **Como desarrollador, quiero que `docker compose up` arranque todo el stack (MLflow + app) y la demo funcione sin configuración manual.** | ⬜ Pendiente |
+**Delivered:**
+- ✅ `ExperiencePool` with `INSERT OR REPLACE` upsert + PRAGMA-introspecting idempotent migrations
+- ✅ SQL migrations (`001_init.sql`, `002_add_forecasting_columns.sql`)
+- ✅ `ExperienceRecord` Pydantic model (schema.py) + JSON audit copies
+- ✅ `scripts/run_benchmark.py` with `--trials N` override, label-encoding of categoricals, OpenML-leakage-column dropping, NaN imputation
+- ✅ `scripts/_dataset_sources.py` with sklearn / openml / local / yfinance / yfinance_multi fetchers
+- ✅ 21-entry manifest covering: 7 classification, 5 regression, 9 forecasting (including 3 large multi-exog yfinance datasets)
+- ✅ All 21 datasets seeded successfully
 
 ---
 
-## Leyenda
+## SP4.1 — Forecasting exog handling + leakage-safe validation (✅ Complete)
 
-| Símbolo | Significado |
-|---------|-------------|
-| ✅ Done | Implementado y verificado |
-| ⬜ Pendiente | Por implementar |
-| 🔄 En curso | Actualmente en desarrollo |
-| ⚠️ Bloqueado | Bloqueado por dependencia |
+**Goal:** Fix the temporal leakage bug where realized future exog values were silently fed into `forecaster.predict(exog=val_exog)`. Add typed contracts so the executor enforces leakage protection deterministically.
+
+Spec: [`2026-05-11-forecasting-exogenous-leakage-safe-validation-design.md`](docs/superpowers/specs/2026-05-11-forecasting-exogenous-leakage-safe-validation-design.md)
+Plan: [`2026-05-11-forecasting-exogenous-leakage-safe-validation.md`](docs/superpowers/plans/2026-05-11-forecasting-exogenous-leakage-safe-validation.md)
+
+**Tasks (all done):**
+
+| # | Task | State |
+|---|---|---|
+| 1 | Typed Pydantic models (`ValidationStrategy`, `ExogStrategySettings`, `ForecastingSettings`) | ✅ |
+| 2 | Pydantic-ified `DatasetProfile` + `history_length` field | ✅ |
+| 3 | `validation_folds.iter_folds` (single_split / rolling / expanding) | ✅ |
+| 4 | `exog_extender` (naive_carry / ets / auto_arima + fallback + index align) | ✅ |
+| 5 | `validation_policy` (selection + plan guardrails) | ✅ |
+| 6 | `ExperienceRecord` + PRAGMA migration (5 new fields) | ✅ |
+| 7 | Rewritten `_run_candidate_forecasting` with leakage-safe loop | ✅ |
+| 8 | Experience record assembly + MLflow per-fold logging | ✅ |
+| 9 | 6 new forecasting rules + `MLRule.recommend` field | ✅ |
+| 10 | Benchmark manifest `exogenous_columns` + `expected_drift` annotations | ✅ |
+| 11 | End-to-end regression: re-seed 21 datasets, verify no leakage | ✅ |
+| + | `TrainingPlan._check_plan_integrity` boundary validator | ✅ |
+
+**Result:** 326 unit tests pass; 21/21 benchmarks re-seeded; `sp500_macro_weekly` verified — all 7 exog declared `unknown_future` and extended via `naive_carry` (no leakage).
 
 ---
 
-*Última actualización: 2026-04-19*
+## API + UI (🔄 In progress)
+
+| Component | State |
+|---|---|
+| FastAPI backend with SSE for run streaming | ✅ |
+| Next.js pages: pipeline, experiments, monitoring | ✅ |
+| HITL approval flow via REST endpoint | ✅ |
+| Streamlit dashboard (alternative UI) | ✅ |
+| Frontend tests (Vitest) | 🔄 Partial |
+| Experiment chart panel polish | 🔄 |
+
+---
+
+## SP5 — LLM model_agent (⬜ Next)
+
+**Goal:** Replace `default_training_plan` (rule-based, registry-driven) with an LLM that:
+1. Reads the `DatasetProfile`, `task_metadata`, registered models, ML rules, and retrieved similar past `ExperienceRecord`s
+2. Produces a `TrainingPlan` with:
+   - Ranked `candidates` with `reason` per candidate
+   - `models_not_recommended` with reasons (the LLM's judgment, not just hard-rule rejection)
+   - `forecasting_settings` (validation strategy + exog strategies) for forecasting tasks
+3. Hands the plan to the deterministic executor, which validates and runs it
+
+**Why now:** the experience pool is populated (21 records), the contracts are LLM-safe (`_check_plan_integrity` enforces structure), the rules YAML has the planner-guidance entries.
+
+**Open questions for the design spec:**
+- Retrieval: vector similarity on profile dict, or keyword filtering, or both?
+- Prompt structure: how to present 5–10 retrieved records concisely?
+- Fallback: if the LLM proposes a structurally-invalid plan, retry once with the validation error in the prompt, then fall back to the deterministic planner?
+- Token budget: gpt-4.1-mini context window per call
+
+To start: invoke the `superpowers:brainstorming` skill on this.
+
+---
+
+## Demo + TFG report (⬜ Pending)
+
+| Item | State |
+|---|---|
+| End-to-end demo recording (upload → validate → train → deploy with HITL) | ⬜ |
+| TFG written report (architecture, design decisions, results) | ⬜ |
+| Architecture diagrams (graph topology, data flow, contracts) | 🔄 In progress (ARCHITECTURE.md has Mermaid-ish ASCII) |
+| Defense slides | ⬜ |
+| `docker compose up` smoke test | ⬜ |
+
+---
+
+## Cross-cutting hygiene (always-on)
+
+| Item | State |
+|---|---|
+| `uv run pytest -m "not integration"` passes | ✅ (326/326) |
+| `uv run ruff check .` clean | 🔄 Partial (a few pre-existing warnings) |
+| `uv run mypy src/` clean | 🔄 Partial |
+| Integration test (`@pytest.mark.integration`) with real GITHUB_TOKEN | ⬜ |
+
+---
+
+## What's intentionally out of scope (v1)
+
+- Multi-target panel forecasting with leakage-safe exog (deferred to v2 — single-target with many exog is the primary use case)
+- `scenario_based` / `market_implied` / `forecasted` covariate types from the original brief (the binary `known_future` / `unknown_future` covers ≥95% of real cases)
+- Auto-detection of `expected_drift` from the data itself (user-provided business hint in v1)
+- Season-length-aware `min_train_len` (MVP uses `max(3 × horizon, 30)`)
+- Optuna-tuning of validation `n_folds` / `window_size` (these are evaluation protocol, not model hyperparameters)

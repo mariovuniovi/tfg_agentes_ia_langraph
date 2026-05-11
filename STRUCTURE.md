@@ -1,186 +1,255 @@
-# Estructura del proyecto — descripción de carpetas y ficheros
+# Project structure — file reference
 
-> Referencia rápida de para qué sirve cada fichero del proyecto.
-
----
-
-## Raíz del proyecto
-
-| Fichero | Propósito |
-|---------|-----------|
-| `pyproject.toml` | Configuración central de UV: dependencias, versión de Python, y configuración de ruff, mypy y pytest. Todo en un solo fichero. |
-| `uv.lock` | Lockfile generado por UV (se crea con `uv sync`). Fija las versiones exactas de todos los paquetes. Se commitea a git. |
-| `.python-version` | Fija la versión de Python a `3.12` para UV y pyenv. |
-| `.env` | Variables de entorno reales (ignorado por git). Copia de `.env.example` con valores reales. |
-| `.env.example` | Plantilla documentada de las variables de entorno necesarias. Se commitea a git. |
-| `.gitignore` | Excluye `.venv/`, `.env`, artefactos de MLflow, cachés, etc. |
-| `CLAUDE.md` | Instrucciones del proyecto para Claude Code — se carga automáticamente en cada sesión. Incluye comandos, arquitectura y convenciones. |
-| `PLAN.md` | Plan de trabajo con historias de usuario. Marca el progreso del TFG. |
-| `STRUCTURE.md` | Este fichero — descripción de la estructura del proyecto. |
-| `langgraph.json` | Config para el servidor de LangGraph Cloud/local. Apunta al grafo compilado. |
-| `Dockerfile` | Build multi-stage con UV: instala dependencias en una capa separada del código fuente para cache eficiente. |
-| `docker-compose.yml` | Levanta dos servicios: MLflow Tracking Server (puerto 5000) y la app Streamlit (puerto 8501). |
+Quick reference for what each file does. Use this when navigating the repo. For the *why*, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
-## `src/mlops_agents/` — paquete principal
+## Root
 
-### `state/` — Estado compartido del grafo
-
-| Fichero | Propósito |
-|---------|-----------|
-| `agent_state.py` | Define `AgentState` (TypedDict): el estado compartido que se pasa entre todos los nodos del grafo. **Leer antes de tocar cualquier agente.** |
-| `schemas.py` | Esquemas Pydantic para outputs estructurados: `RouterOutput` (decisión del supervisor), `ValidationResult`, `TrainingResult`, `EvaluationResult`. |
-
-### `config/` — Configuración de la aplicación
-
-| Fichero | Propósito |
-|---------|-----------|
-| `settings.py` | `Settings` (Pydantic BaseSettings): lee todas las variables de entorno desde `.env`. Nunca hardcodear tokens — usar siempre `settings.github_token`, etc. |
-| `constants.py` | Constantes globales: umbrales de calidad (`MIN_ACCURACY_TO_DEPLOY`), nombres de agentes, aliases de MLflow. |
-
-### `utils/` — Utilidades compartidas
-
-| Fichero | Propósito |
-|---------|-----------|
-| `llm.py` | Factoría de LLMs: `get_llm()` devuelve el modelo principal (worker agents), `get_router_llm()` devuelve el modelo más barato para el supervisor (nano en lugar de mini). |
-| `logging.py` | Setup de loguru: devuelve un logger con el nombre del módulo. Usar `get_logger(__name__)` — nunca `print()`. |
-| `runners.py` | Entry point del script `mlops-dashboard` (registrado en `pyproject.toml`). |
-
-### `tools/` — Herramientas deterministas `@tool`
-
-Las herramientas son **funciones Python puras** decoradas con `@tool`. No llaman a LLMs. Los agentes las llaman y luego interpretan los resultados.
-
-| Fichero | Propósito |
-|---------|-----------|
-| `data_tools.py` | `load_dataset` (resumen CSV), `validate_schema` (columnas esperadas), `check_missing_values` (% de nulos por columna). |
-| `evidently_tools.py` | `check_data_quality` (reporte de calidad con Evidently AI), `check_data_drift` (detección de drift PSI entre dataset actual y referencia). |
-| `training_tools.py` | `tune_hyperparameters` (búsqueda con Optuna, N trials), `train_model` (entrena sklearn, guarda `.pkl`, devuelve métricas). |
-| `mlflow_tools.py` | `log_experiment` (loguea modelo+métricas a MLflow), `get_best_run` (consulta los mejores runs), `register_model` (registra en Model Registry), `set_model_alias` (asigna champion/challenger). |
-
-### `prompts/` — Plantillas de prompts en YAML
-
-Separar prompts del código permite editarlos sin tocar Python y ver diffs limpios en git.
-
-| Fichero | Propósito |
-|---------|-----------|
-| `loader.py` | `get_prompt(name)` — carga el YAML y devuelve un `PromptTemplate` de LangChain. |
-| `supervisor.yaml` | System prompt del supervisor: roles de los 4 agentes + reglas de enrutamiento del pipeline. |
-| `data_agent.yaml` | System prompt del agente de validación: proceso de validación en 5 pasos. |
-| `training_agent.yaml` | System prompt del agente de entrenamiento: selección de modelo, tuning, entrenamiento, logging. |
-| `evaluation_agent.yaml` | System prompt del agente de evaluación: criterios de promoción (accuracy ≥ 0.80, F1 ≥ 0.75). |
-| `deployment_agent.yaml` | System prompt del agente de despliegue: registro, alias challenger, espera aprobación humana. |
-
-### `agents/` — Definición de los agentes especialistas
-
-Cada agente es un `create_react_agent` de LangGraph: bucle ReAct (razona → llama herramienta → observa → repite).
-
-| Fichero | Propósito |
-|---------|-----------|
-| `data_agent.py` | `build_data_agent()` — agente con herramientas de data_tools + evidently_tools. |
-| `training_agent.py` | `build_training_agent()` — agente con herramientas de training_tools + mlflow_tools. |
-| `evaluation_agent.py` | `build_evaluation_agent()` — agente con herramientas de mlflow_tools (consulta y compara runs). |
-| `deployment_agent.py` | `build_deployment_agent()` — agente con herramientas de registro y alias de MLflow. |
-| `supervisor.py` | `supervisor_node(state)` — nodo del supervisor: usa LLM con structured output (`RouterOutput`) para decidir el siguiente agente. Cada decisión se loguea con su razonamiento. |
-| `registry.py` | `get_agent(name)` — factoría con `@lru_cache`: construye y cachea los agentes la primera vez. Evita reconstruirlos en cada llamada. |
-
-### `graphs/` — Topología del grafo LangGraph
-
-| Fichero | Propósito |
-|---------|-----------|
-| `mlops_graph.py` | **Fichero principal** — construye el `StateGraph` con los 5 nodos, los nodos wrapper de cada agente (que devuelven `Command(goto="supervisor")`), el `deployer_node` con `interrupt()` para HITL, y el grafo compilado `graph`. También contiene `main()` para ejecución por CLI. |
-| `subgraphs/training_flow.py` | Reservado para un sub-workflow de reentrenamiento iterativo (si el modelo no pasa evaluación en el primer intento). No conectado al grafo principal por ahora. |
-
-### `mcp_servers/` — Servidores MCP (Model Context Protocol)
-
-Permiten a Claude Code acceder a MLflow y a los datasets directamente desde el IDE vía `/mcp`.
-
-| Fichero | Propósito |
-|---------|-----------|
-| `mlflow_server.py` | Servidor FastMCP que expone: `list_experiments`, `get_experiment_runs`, `list_registered_models`. |
-| `data_server.py` | Servidor FastMCP que expone: `list_datasets`, `preview_dataset`. |
+| File | Purpose |
+|---|---|
+| `pyproject.toml` | UV configuration: deps, Python 3.12, ruff + mypy + pytest config |
+| `uv.lock` | UV lockfile (committed) |
+| `.python-version` | Pins Python 3.12 |
+| `.env.example` | Documented env-var template |
+| `.gitignore` | Excludes `.venv/`, `.env`, `mlruns/`, `storage/`, `experience_pool/`, `CLAUDE.md`, `models/`, etc. |
+| `README.md` | Project intro, setup, status |
+| `ARCHITECTURE.md` | System shape, agent graph, contracts, data flow |
+| `PLAN.md` | Sub-project status board (SP1–SP5) |
+| `STRUCTURE.md` | This file |
+| `Dockerfile`, `docker-compose.yml` | Multi-stage UV build + MLflow + app services |
+| `langgraph.json` | LangGraph CLI config pointing at the compiled graph |
 
 ---
 
-## `dashboard/` — Interfaz Streamlit
+## `src/mlops_agents/` — main package
 
-| Fichero | Propósito |
-|---------|-----------|
-| `app.py` | Entry point de Streamlit. Configura la página y muestra el menú de navegación. |
-| `pages/01_pipeline.py` | Lanza el pipeline desde la UI: selecciona dataset, ejecuta el grafo y muestra el log en tiempo real. |
-| `pages/02_experiments.py` | Browser de experimentos MLflow: tabla de runs con métricas y parámetros. |
-| `pages/03_monitoring.py` | Detección de drift: sube dos CSVs y muestra el reporte de Evidently AI. |
-| `pages/04_chat.py` | Interfaz de chat para interactuar con los agentes en lenguaje natural. |
-| `components/metrics_display.py` | Componente reutilizable: muestra un dict de métricas como tarjetas Streamlit. |
-| `components/chat_interface.py` | Componente reutilizable: renderiza el historial de mensajes LangChain como hilo de chat. |
+### `state/` — shared graph state
+| File | Purpose |
+|---|---|
+| `agent_state.py` | `AgentState` TypedDict — the shared state every node reads/writes. Read this before editing any agent. |
+| `schemas.py` | Pydantic schemas for structured LLM outputs: `RouterOutput`, `ValidationResult`, `TrainingResult`, `EvaluationResult` |
+
+### `config/` — environment + constants
+| File | Purpose |
+|---|---|
+| `settings.py` | `Settings` (pydantic-settings) — reads `.env`. Never hardcode tokens; use `settings.github_token` |
+| `constants.py` | Global constants: `MIN_ACCURACY_TO_DEPLOY`, agent names, MLflow aliases |
+
+### `contracts/` — cross-cutting Pydantic contracts
+| File | Purpose |
+|---|---|
+| `training.py` | `TrainingPlan`, `TrainingPlanCandidate`, `RejectedModel`, `ValidationStrategy`, `ExogStrategySettings`, `ForecastingSettings`, `TrialBudget`, `SearchParamOverride`. Includes `_check_plan_integrity` boundary validator. |
+| `profile.py` | `DatasetProfile` (Pydantic v2) — the retrieval join key. Includes `history_length` bucket for forecasting. |
+
+### `utils/` — shared utilities
+| File | Purpose |
+|---|---|
+| `llm.py` | LLM factory: `get_llm()` returns the worker model, `get_router_llm()` returns the cheaper supervisor model |
+| `logging.py` | loguru setup — `get_logger(__name__)`. Never `print()`. |
+| `runners.py` | Entry point for the `mlops-dashboard` console script |
+
+### `tools/` — deterministic `@tool` functions
+Pure Python; no LLM calls. Agents call these and interpret results.
+
+| File | Purpose |
+|---|---|
+| `data_tools.py` | `load_dataset`, `validate_schema`, `check_missing_values` |
+| `evidently_tools.py` | `check_data_quality`, `check_data_drift` (Evidently 0.7 API) |
+| `mlflow_tools.py` | `log_experiment`, `get_best_run`, `register_model`, `set_model_alias` |
+| `memory_tools.py` | `retrieve_ml_knowledge`, `retrieve_similar_experiences` — entry points for SP5 retrieval |
+
+### `prompts/` — YAML system prompts
+| File | Purpose |
+|---|---|
+| `loader.py` | `get_prompt(name)` — loads YAML and returns a `PromptTemplate` |
+| `supervisor.yaml` | Supervisor system prompt + routing rules |
+| `data_agent.yaml`, `evaluation_agent.yaml`, `deployment_agent.yaml` | Specialist agent prompts |
+
+(Note: `training_agent.yaml` not present yet — training currently runs via the deterministic executor without an LLM in the loop. SP5 will introduce a model_agent prompt.)
+
+### `agents/` — specialist agents
+Each agent is `langchain.agents.create_agent(...)` (ReAct loop). The supervisor is a structured-output LLM call (not ReAct).
+
+| File | Purpose |
+|---|---|
+| `supervisor.py` | `supervisor_node(state)` — structured LLM call returning `RouterOutput`. Logs every routing decision. Force-exits when `remaining_steps <= 2`. |
+| `data_agent.py` | `build_data_agent()` — tools: data_tools + evidently_tools |
+| `evaluation_agent.py` | `build_evaluation_agent()` — tools: mlflow_tools |
+| `deployment_agent.py` | `build_deployment_agent()` — tools: register + set alias |
+| `registry.py` | `get_agent(name)` — `@lru_cache` factory; builds agents lazily |
+
+### `graphs/` — LangGraph topology
+| File | Purpose |
+|---|---|
+| `mlops_graph.py` | The main `StateGraph`. Builds nodes (supervisor + 4 specialists), the `deployer_node` with `interrupt()` for HITL, and the compiled `graph`. Also has `main()` for CLI execution. |
+| `subgraphs/training_flow.py` | Reserved for an iterative retrain sub-workflow (not wired into the main graph yet) |
+
+### `models/` — model registry
+| File | Purpose |
+|---|---|
+| `registry.yaml` | All available models per problem_type: factory, default_params, search_space, complexity_rank, requirements |
+| `loader.py` | `get_model(key)`, `get_models_for(problem_type)` — registry accessors |
+| `factories.py` | One factory function per model key. Wraps sklearn / LightGBM / XGBoost / CatBoost / statsforecast / skforecast |
+| `search_spaces.py` | `build_suggest_fn(search_space)` — converts YAML search space to an Optuna `suggest_*` callable |
+
+### `training/` — deterministic training spine
+| File | Purpose |
+|---|---|
+| `executor.py` | `run_training_plan(plan, csv, target, task_metadata, output_dir, mlflow_experiment) -> TrainingResult` — the top-level entry. Dispatches to `_run_candidate_classification` / `_run_candidate_regression` / `_run_candidate_forecasting`. Owns the leakage-safe per-fold loop and the MLflow logging. |
+| `profiler.py` | `build_dataset_profile(csv, task_metadata) -> DatasetProfile` — computes the bucketed profile |
+| `splitter.py` | Train/test split (single-shot; the K-fold backtest is inside the executor) |
+| `default_plans.py` | `default_training_plan(problem_type, profile) -> TrainingPlan` — registry-driven fallback when no LLM produces the plan |
+| `validation_policy.py` | `select_validation_strategy`, `resolve_rolling_window_size`, `validate_forecasting_plan` — the policy + guardrails for forecasting validation |
+| `validation_folds.py` | `iter_folds(train_pool, strategy, dt_col, sid_cols)` — yields (train_idx, val_idx) pairs for single_split / rolling / expanding |
+| `exog_extender.py` | `extend_exog`, `align_val_exog_index` — the **leakage firewall** for unknown_future exog columns (naive_carry / ets / auto_arima) |
+| `override_validation.py` | Validates user-provided search-space overrides against the registry |
+| `trial_budget.py` | `allocate_trials(...)` — distributes Optuna trials across candidates |
+| `experience.py` | `build_task_id`, `write_experience_record` — record assembly + filesystem write |
+
+### `experience/` — pool persistence
+| File | Purpose |
+|---|---|
+| `pool.py` | `ExperiencePool(db_path, audit_dir)` — SQLite store with `insert_from_record` and `get(task_id)`. Idempotent migration runner. |
+| `schema.py` | `ExperienceRecord`, `SelectedSolution`, `CandidateResult` Pydantic models |
+| `retrieval.py` | (placeholder) future SP5 retrieval helpers |
+| `migrations/001_init.sql` | Initial schema: `experiences`, `candidate_results`, `model_artifacts` tables |
+| `migrations/002_add_forecasting_columns.sql` | SP4.1 additions: `validation_strategy_json`, `exog_availability_json`, `exog_strategies_json`, `per_fold_metrics_json`, `exog_fit_failures_json` |
+| `migrations/_runner.py` | PRAGMA-introspecting migration applier (idempotent) |
+
+### `knowledge/` — ML rules
+| File | Purpose |
+|---|---|
+| `ml_rules.yaml` | Domain rules: hard preferences (`prefer`/`avoid`) and forecasting recipe recommendations (`recommend`). Consumed by the deterministic planner today and by SP5 LLM tomorrow. |
+| `reader.py` | `MLRule` Pydantic model + `load_rules()` + `match_rules(context)` — matches rules against a merged profile+task_metadata context |
+
+### `mcp_servers/` — Model Context Protocol servers
+| File | Purpose |
+|---|---|
+| `mlflow_server.py` | FastMCP server: `list_experiments`, `get_experiment_runs`, `list_registered_models` |
+| `data_server.py` | FastMCP server: `list_datasets`, `preview_dataset` |
 
 ---
 
-## `tests/` — Suite de pruebas
+## `api/` — FastAPI backend
 
-Espeja la estructura de `src/`. Cada módulo tiene su fichero de tests correspondiente.
-
-| Fichero | Propósito |
-|---------|-----------|
-| `conftest.py` | Fixtures compartidas: `sample_csv` (CSV temporal con columna `target`), `mock_llm` (LLM mockeado). Comprobar aquí antes de crear fixtures nuevas. |
-| `test_agents/test_supervisor.py` | Tests unitarios del supervisor: verifica el enrutamiento correcto sin llamadas reales al LLM. |
-| `test_agents/test_data_agent.py` | Tests del builder del agente de validación. |
-| `test_tools/test_data_tools.py` | Tests de las herramientas deterministas (no necesitan mock de LLM). |
-| `test_tools/test_mlflow_tools.py` | Tests de las herramientas de MLflow con MLflow mockeado. |
-| `test_graphs/test_mlops_graph.py` | Tests de estructura del grafo: verifica que compila y tiene los nodos esperados. |
-| `test_integration/test_end_to_end.py` | Test end-to-end completo. Requiere `GITHUB_TOKEN` real y MLflow activo. Marcado `@pytest.mark.integration`. |
-
----
-
-## `data/` — Datasets y esquemas
-
-| Fichero | Propósito |
-|---------|-----------|
-| `samples/iris.csv` | Dataset Iris con 30 filas y columna `target` — listo para usar en demos y tests. |
-| `schemas/dataset_schema.json` | Esquema esperado del dataset de entrada (columnas requeridas, tipos). |
+| Path | Purpose |
+|---|---|
+| `main.py` | FastAPI app + CORS + router includes |
+| `routers/uploads.py` | `POST /uploads` — receive user CSVs |
+| `routers/runs.py` | `POST /runs`, `GET /runs/{id}/stream` (SSE), `POST /runs/{id}/approve` |
+| `routers/experiments.py` | MLflow experiment browsing |
+| `routers/monitoring.py` | Drift report generation |
+| `services/pipeline.py` | Invokes the LangGraph compiled graph |
+| `services/pipeline_helpers.py` | SSE event formatting + state translation |
+| `services/run_store.py` | Active-run registry (in-memory) |
+| `services/mlflow_client.py` | Wrapped MLflow client |
+| `models/` | API-side Pydantic request/response models (`run.py`, `experiment.py`, `monitoring.py`) |
+| `tests/` | API tests (FastAPI TestClient) |
 
 ---
 
-## `scripts/` — Scripts de utilidad
+## `frontend/` — Next.js UI
 
-| Fichero | Propósito |
-|---------|-----------|
-| `run_pipeline.py` | Ejecuta el pipeline completo desde CLI: `uv run python scripts/run_pipeline.py [path/dataset.csv]` |
-| `seed_mlflow.py` | Crea 3 runs de ejemplo en MLflow (RandomForest baseline, RandomForest tuned, GradientBoosting) para tener datos de demo en la UI. |
-
----
-
-## `.claude/` — Configuración de Claude Code
-
-| Fichero | Propósito |
-|---------|-----------|
-| `settings.json` | Permisos: qué comandos Bash puede ejecutar Claude automáticamente (UV, git) y qué está denegado (rm -rf, pip, leer .env). |
-| `.mcp.json` | Configura los servidores MCP para la sesión de Claude Code: mlflow-server, data-server y github. |
-| `rules/langgraph-agents.md` | Reglas que se aplican automáticamente cuando Claude edita ficheros de `agents/` o `graphs/`. |
-| `rules/testing.md` | Reglas que se aplican cuando Claude edita ficheros de `tests/`. |
-| `commands/test-agent.md` | Slash command `/test-agent <nombre>` — ejecuta pytest filtrado por nombre de módulo. |
-| `commands/run-pipeline.md` | Slash command `/run-pipeline [dataset]` — ejecuta el pipeline por CLI. |
-| `skills/create-agent/SKILL.md` | Skill auto-invocable cuando se pide crear un nuevo agente — lista los 10 pasos a seguir. |
+| Path | Purpose |
+|---|---|
+| `app/page.tsx` | Landing |
+| `app/pipeline/page.tsx` | Trigger a run, watch SSE log, approve at HITL gate |
+| `app/experiments/page.tsx` | MLflow run browser with chart panel |
+| `app/monitoring/page.tsx` | Drift detection on uploaded reference + current CSVs |
+| `components/pipeline/*` | `TriggerPanel`, `EventLog`, `RunStatusBadge`, `HITLGate`, `ResultsDashboard` |
+| `components/experiments/*` | `RunSidebar`, `ChartPanel`, `charts/` |
+| `components/monitoring/*` | `AdHocForm`, `DriftTable`, `LatestReport` |
+| `hooks/use-run-stream.ts` | SSE subscription hook |
+| `hooks/use-approve.ts` | HITL approve/reject mutation |
+| `stores/run-store.ts` | Zustand store for active-run state |
+| `lib/api.ts`, `lib/format.ts`, `lib/query-client.ts` | API client + helpers |
+| `__tests__/` | Vitest unit tests for hooks, components, stores |
 
 ---
 
-## Flujo de ejecución resumido
+## `dashboard/` — Streamlit UI (alternative)
 
-```
-.env (GITHUB_TOKEN, GITHUB_MODEL)
-    │
-    ▼
-config/settings.py          ← lee variables de entorno
-    │
-    ▼
-utils/llm.py                ← crea ChatOpenAI apuntando a GitHub Models
-    │
-    ▼
-agents/registry.py          ← construye los 4 agentes con sus tools y prompts
-    │
-    ▼
-graphs/mlops_graph.py       ← StateGraph: supervisor → agentes → supervisor → END
-    │
-    ├── dashboard/app.py    ← UI Streamlit (invoca el grafo)
-    └── scripts/run_pipeline.py  ← CLI (invoca el grafo)
-```
+| File | Purpose |
+|---|---|
+| `app.py` | Streamlit entry + navigation |
+| `pages/01_pipeline.py` | Run launcher with real-time log streaming |
+| `pages/02_experiments.py` | MLflow run table |
+| `pages/03_monitoring.py` | Drift report uploader |
+| `pages/04_chat.py` | Chat interface (calls agents directly) |
+| `components/metrics_display.py`, `components/chat_interface.py` | Reusable widgets |
+
+---
+
+## `scripts/` — utility scripts
+
+| File | Purpose |
+|---|---|
+| `run_pipeline.py` | CLI: `uv run python scripts/run_pipeline.py [csv]` — runs the full graph |
+| `run_benchmark.py` | Seeds the experience pool from `benchmark_manifest.yaml`. Has `_preprocess_benchmark_df` (label-encode categoricals, drop high-cardinality strings, impute NaNs) and `build_task_metadata` (propagates `exogenous_columns`, `expected_drift`). |
+| `_dataset_sources.py` | Fetchers: `sklearn`, `openml`, `local`, `yfinance`, `yfinance_multi` |
+| `_generate_benchmarks.py` | Builds local benchmark CSVs (air_passengers, m4_monthly_sample, gold_macro_monthly, etc.) |
+| `benchmark_manifest.yaml` | 21 dataset entries: 7 classification + 5 regression + 9 forecasting (including 3 with multi-exog yfinance) |
+| `seed_mlflow.py` | Creates demo MLflow runs |
+
+---
+
+## `data/`
+
+| Path | Purpose |
+|---|---|
+| `samples/` | Toy datasets for development (iris.csv, iris_measurements.csv, iris_labels.csv) |
+| `schemas/` | Dataset schema JSONs (column types, expected names) |
+| `benchmarks/` | Benchmark CSVs (one per manifest entry) |
+| `benchmarks/_splits/<dataset>/` | Train/test split + champion `.pkl` per benchmark run |
+| `uploads/` | User-uploaded CSVs (timestamped) |
+| `processed/` | Processed-canonical CSVs (post-merge, post-encoding) |
+| `merged/` | Merged-but-not-yet-processed CSVs |
+| `working/` | Intermediate artifacts |
+
+---
+
+## `tests/` — unit + integration
+
+Mirrors `src/` layout. ~326 tests, ~50s to run (excluding integration).
+
+| Path | Purpose |
+|---|---|
+| `conftest.py` | Shared fixtures: `sample_csv`, `mock_llm`, `iris_schema_file`, `minimal_experience_record` (factory), etc. **Check here before adding new fixtures.** |
+| `test_contracts/` | `TrainingPlan`, `ForecastingSettings`, `SearchParamOverride`, `_check_plan_integrity` |
+| `test_training/` | `executor`, `profiler`, `splitter`, `validation_folds`, `validation_policy`, `exog_extender`, `executor_forecasting_leakage` |
+| `test_experience/` | Pool migration, round-trip |
+| `test_models/` | Factory + loader + search_spaces |
+| `test_knowledge/` | YAML rules load + match (`forecasting_rules`, `starter_rules`) |
+| `test_tools/` | Deterministic tools (no LLM mocks needed for data_tools) |
+| `test_agents/` | Agent builders (with `mock_llm`) |
+| `test_graphs/` | Graph structure (compile, expected nodes) |
+| `test_integration/` | End-to-end; requires real `GITHUB_TOKEN`; `@pytest.mark.integration` |
+
+---
+
+## `docs/`
+
+| Path | Purpose |
+|---|---|
+| `superpowers/specs/` | Design specs (one per feature, brainstormed before coding) |
+| `superpowers/plans/` | Implementation plans (one per feature, bite-sized TDD tasks) |
+
+Most recent (SP4.1 forecasting work):
+- `specs/2026-05-11-forecasting-exogenous-leakage-safe-validation-design.md`
+- `plans/2026-05-11-forecasting-exogenous-leakage-safe-validation.md`
+
+---
+
+## Generated / gitignored
+
+| Path | Created by | Status |
+|---|---|---|
+| `.venv/` | `uv sync` | gitignored |
+| `mlruns/`, `mlartifacts/` | MLflow tracking | gitignored |
+| `storage/mlops_metadata.db` | `ExperiencePool` | gitignored |
+| `experience_pool/*.json` | Audit copies | gitignored |
+| `models/` (top-level) | SP3 training artifacts | gitignored (note: `src/mlops_agents/models/` is NOT gitignored — only top-level `/models/`) |
+| `catboost_info/` | CatBoost training logs | gitignored |
+| `data/uploads/`, `data/merged/`, `data/processed/`, `data/working/` | Pipeline-generated | gitignored |
+| `CLAUDE.md`, `CLAUDE_backup.md` | Local Claude Code guidance | gitignored |
