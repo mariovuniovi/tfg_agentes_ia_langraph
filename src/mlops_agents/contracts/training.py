@@ -14,6 +14,28 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 
+ExogStrategy = Literal["known_future", "naive_carry", "ets", "auto_arima", "drop"]
+UnknownFutureStrategy = Literal["naive_carry", "ets", "auto_arima", "drop"]
+
+
+class ValidationStrategy(BaseModel):
+    type: Literal["single_split", "rolling_window", "expanding_window"] = "single_split"
+    n_folds: int = 1
+    horizon: int
+    step_size: int | None = None
+    window_size: int | None = None
+
+
+class ExogStrategySettings(BaseModel):
+    per_column: dict[str, ExogStrategy] = Field(default_factory=dict)
+    default_unknown_future: UnknownFutureStrategy = "naive_carry"
+
+
+class ForecastingSettings(BaseModel):
+    validation_strategy: ValidationStrategy
+    exog_strategies: ExogStrategySettings = Field(default_factory=ExogStrategySettings)
+
+
 class SearchParamOverride(BaseModel):
     """Explicit override entry — no JSON tuple/list ambiguity.
 
@@ -64,8 +86,7 @@ class TrainingPlan(BaseModel):
     candidates: list[TrainingPlanCandidate]
     models_not_recommended: list[RejectedModel] = Field(default_factory=list)
     trial_budget: TrialBudget = Field(default_factory=TrialBudget)
-    validation_strategy: dict[str, Any] | None = None
-    forecasting_settings: dict[str, Any] | None = None
+    forecasting_settings: ForecastingSettings | None = None
 
     @model_validator(mode="after")
     def priorities_unique(self):
