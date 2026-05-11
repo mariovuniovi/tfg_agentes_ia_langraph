@@ -22,6 +22,7 @@ def get_llm(agent: str = "", temperature: float = 0, max_tokens: int = 4000) -> 
     model_map = {
         "data_validator": settings.openai_model_data_validator,
         "trainer":        settings.openai_model_trainer,
+        "planner":        settings.openai_model_planner,
         "evaluator":      settings.openai_model_evaluator,
         "deployer":       settings.openai_model_deployer,
     }

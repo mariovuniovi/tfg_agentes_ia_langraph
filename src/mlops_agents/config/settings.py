@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     openai_model_supervisor: str = "gpt-5-mini"
     openai_model_data_validator: str = "gpt-5-mini"
     openai_model_trainer: str = "gpt-5-mini"
+    openai_model_planner: str = "gpt-5-mini"
     openai_model_evaluator: str = "gpt-5-mini"
     openai_model_deployer: str = "gpt-5.4-nano"
 

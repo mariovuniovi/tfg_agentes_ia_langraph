@@ -66,3 +66,11 @@ class AgentState(TypedDict):
     #   "forecast_horizon": int,
     #   "frequency": str,
     # }
+
+    # SP5 planner outputs
+    planner_analysis: str                   # LLM-generated planning explanation artifact
+    planner_evidence_used: list             # list of EvidenceReference dicts
+    planner_warnings: list                  # list of warning strings
+    planner_status: str                     # "ok" | "retry_ok" | "failed"
+    planner_retry_used: bool                # True if second attempt was needed
+    _planner_output_record: dict | None     # private state key used by executor to get planner's output record
