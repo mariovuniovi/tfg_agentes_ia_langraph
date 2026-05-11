@@ -119,13 +119,16 @@ def select_validation_strategy(
     history = profile.history_length
     drift   = task_metadata.get("expected_drift", "low")
 
+    # Short history always wins over drift hints: K-fold backtesting with too
+    # little data is worse than a single clean split.
+    if history in ("very_short", "short"):
+        return ValidationStrategy(type="single_split", n_folds=1, horizon=horizon)
+
     if drift == "high":
         return ValidationStrategy(
             type="rolling_window", n_folds=3, horizon=horizon,
             step_size=horizon, window_size=None,  # auto
         )
-    if history in ("very_short", "short"):
-        return ValidationStrategy(type="single_split", n_folds=1, horizon=horizon)
     return ValidationStrategy(
         type="expanding_window", n_folds=3, horizon=horizon, step_size=horizon,
     )
@@ -291,11 +294,13 @@ return trial_score
 
 **For 7 exog × 3 folds × 8 trials**, the cache reduces 168 exog fits to 21 per candidate.
 
-### 6.4 Multi-target (panel) datasets
+### 6.4 Scope: single-target with many exogenous series
 
-Out of scope for v1. When `sid_cols` is non-empty:
-- `validate_forecasting_plan` accepts the plan as long as `per_column` is empty and `default_unknown_future == "naive_carry"`. Anything else raises `NotImplementedError("Multi-target exog support deferred to v2").`
-- `_run_candidate_forecasting` continues to call `_build_exog_df(...)` which returns `None` for `sid_cols` (current behavior). No regression to existing panel benchmarks.
+V1 focuses on **single-target forecasting with many exogenous time-series columns** — one target column, an arbitrary number of exogenous predictor columns, each extended independently. This is the spec's primary use case (financial/commodity forecasting with macro exog).
+
+**Multi-target panel forecasting** (one model predicting many target series like store_A / store_B / store_C, i.e. `sid_cols` non-empty) is **not extended** in v1. Existing panel benchmark behavior is preserved unchanged:
+- `validate_forecasting_plan` accepts panel plans only if `per_column` is empty and `default_unknown_future == "naive_carry"`. Any other configuration raises `NotImplementedError("Leakage-safe exogenous extension for multi-target panel data deferred to v2")`.
+- `_run_candidate_forecasting` continues to call the existing helper that returns `None` for `sid_cols`, so panel models train with no exog (current behavior). No regression to existing panel benchmarks.
 
 ### 6.5 Failure modes
 
@@ -331,7 +336,7 @@ forecasting_rules:
   - rule_id: exog_calendar_known_future
     applies_when: { problem_type: forecasting, exog_column_kind: calendar_derived }
     recommend:    { future_availability: known_future }
-    reason: "Calendar features (year, month, dayofweek, is_holiday) are deterministic and known ahead."
+    reason: "Calendar-derived features (year, month, dayofweek, deterministic holiday-calendar flags) are known for future timestamps."
 
   - rule_id: exog_unknown_default_naive_carry
     applies_when: { problem_type: forecasting, exog_future_availability: unknown_future }
@@ -341,23 +346,38 @@ forecasting_rules:
   - rule_id: exog_slow_macro_auto_arima
     applies_when: { problem_type: forecasting, exog_kind: macro_indicator, history_length: [medium, long] }
     recommend:    { exog_strategy: auto_arima }
-    reason: "Slow-moving macro variables (rates, FX) have ARIMA-friendly dynamics; outperform naive over longer horizons."
+    reason: "Slow-moving macro variables (rates, FX) may have ARIMA-friendly dynamics and can sometimes outperform naive carry over longer horizons."
 ```
 
 The rule matcher receives a merged context: `{**profile.model_dump(), "expected_drift": task_metadata.get("expected_drift", "low")}`. Rules can match on profile fields plus selected task_metadata fields.
+
+**MLRule schema accommodation.** The existing `MLRule` Pydantic schema must allow:
+- `recommend: dict[str, Any]` (so new keys like `validation_strategy`, `exog_strategy`, `future_availability` flow through without per-key model changes).
+- `applies_when` keys including `expected_drift`, `exog_column_kind`, `exog_future_availability`, and `exog_kind` — none of which are `DatasetProfile` fields. The rule engine treats them as allowed context fields, matched against the merged context above.
 
 `exog_column_kind` and `exog_kind` are optional hints attached to columns by the LLM data-agent in SP5; not required in v1 — the deterministic defaults work without them.
 
 ## 8. Experience pool migration
 
-`storage/mlops_metadata.db` migration adds five nullable TEXT columns to `experiences`:
+`storage/mlops_metadata.db` migration adds five nullable TEXT columns to `experiences`. SQLite does not universally support `ADD COLUMN IF NOT EXISTS`, so the migration runner introspects the table first:
 
-```sql
-ALTER TABLE experiences ADD COLUMN validation_strategy_json TEXT;
-ALTER TABLE experiences ADD COLUMN exog_availability_json   TEXT;
-ALTER TABLE experiences ADD COLUMN exog_strategies_json     TEXT;
-ALTER TABLE experiences ADD COLUMN per_fold_metrics_json    TEXT;
-ALTER TABLE experiences ADD COLUMN exog_fit_failures_json   TEXT;
+```python
+existing_cols = {
+    row["name"]
+    for row in conn.execute("PRAGMA table_info(experiences)").fetchall()
+}
+
+NEW_COLUMNS = [
+    "validation_strategy_json",
+    "exog_availability_json",
+    "exog_strategies_json",
+    "per_fold_metrics_json",
+    "exog_fit_failures_json",
+]
+
+for col in NEW_COLUMNS:
+    if col not in existing_cols:
+        conn.execute(f"ALTER TABLE experiences ADD COLUMN {col} TEXT")
 ```
 
 Existing rows (pre-migration) remain valid with NULL in these columns. The pool's `insert_from_record` uses `INSERT OR REPLACE`, so re-seeding the benchmark after migration produces clean records.
@@ -407,7 +427,7 @@ Re-run the full benchmark (21 datasets) and confirm:
 
 1. ✅ All 21 benchmark datasets complete via `scripts/run_benchmark.py --trials 8` without errors.
 2. ✅ Experience pool records contain the five new fields populated for forecasting tasks.
-3. ✅ Re-running the benchmark twice produces identical records (deterministic).
+3. ✅ Re-running the benchmark twice with fixed seeds produces identical selected models and validation metrics within tolerance; runtime metadata (timestamps, durations, MLflow run IDs, AutoARIMA internals) may differ.
 4. ✅ A regression test confirms no realized future exog value reaches the main forecaster's `predict()` call for any `unknown_future` column.
 5. ✅ All existing 274 tests still pass.
 6. ✅ MLflow runs show the new parent-run params and per-fold metrics.
