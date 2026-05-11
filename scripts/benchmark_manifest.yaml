@@ -129,6 +129,12 @@
   series_id_columns: []
   frequency: MS
   forecast_horizon: 6
+  expected_drift: high
+  exogenous_columns:
+    - { name: oil_close,    future_availability: unknown_future }
+    - { name: silver_close, future_availability: unknown_future }
+    - { name: sp500_close,  future_availability: unknown_future }
+    - { name: usd_close,    future_availability: unknown_future }
 
 # Rule 9: moderate panel (5 commodities) + weekly history → global ML
 - dataset_id: commodity_panel_weekly
@@ -164,6 +170,11 @@
   series_id_columns: []
   frequency: W
   forecast_horizon: 13
+  expected_drift: high
+  exogenous_columns:
+    - { name: gbpusd_close, future_availability: unknown_future }
+    - { name: jpyusd_close, future_availability: unknown_future }
+    - { name: gold_close,   future_availability: unknown_future }
 
 # ---------------------------------------------------------------------------
 # Large exogenous forecasting (3) — ~1000 weekly rows each, 7+ exogenous
@@ -194,6 +205,15 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
+  expected_drift: high
+  exogenous_columns:
+    - { name: vix,          future_availability: unknown_future }
+    - { name: treasury_10y, future_availability: unknown_future }
+    - { name: oil_wti,      future_availability: unknown_future }
+    - { name: gold,         future_availability: unknown_future }
+    - { name: usd_index,    future_availability: unknown_future }
+    - { name: eurusd,       future_availability: unknown_future }
+    - { name: nasdaq,       future_availability: unknown_future }
 
 # WTI crude oil weekly with 7 energy/macro exogenous (2005-2024, ~1000 rows)
 # Exog: Natural Gas, Gasoline, Copper, S&P500, USD, Gold, VIX
@@ -219,6 +239,15 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
+  expected_drift: high
+  exogenous_columns:
+    - { name: nat_gas,   future_availability: unknown_future }
+    - { name: gasoline,  future_availability: unknown_future }
+    - { name: copper,    future_availability: unknown_future }
+    - { name: sp500,     future_availability: unknown_future }
+    - { name: usd_index, future_availability: unknown_future }
+    - { name: gold,      future_availability: unknown_future }
+    - { name: vix,       future_availability: unknown_future }
 
 # Gold weekly with 7 precious-metals/macro exogenous (2005-2024, ~1000 rows)
 # Exog: Silver, Copper, Oil, USD, 10Y Treasury, S&P500, VIX
@@ -244,3 +273,12 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
+  expected_drift: high
+  exogenous_columns:
+    - { name: silver,       future_availability: unknown_future }
+    - { name: copper,       future_availability: unknown_future }
+    - { name: oil_wti,      future_availability: unknown_future }
+    - { name: usd_index,    future_availability: unknown_future }
+    - { name: treasury_10y, future_availability: unknown_future }
+    - { name: sp500,        future_availability: unknown_future }
+    - { name: vix,          future_availability: unknown_future }

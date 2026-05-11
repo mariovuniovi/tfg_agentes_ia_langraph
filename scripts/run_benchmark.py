@@ -92,6 +92,10 @@ def build_task_metadata(entry: dict) -> dict:
             "frequency": entry["frequency"],
             "forecast_horizon": entry["forecast_horizon"],
         })
+        if "exogenous_columns" in entry:
+            meta["exogenous_columns"] = entry["exogenous_columns"]
+        if "expected_drift" in entry:
+            meta["expected_drift"] = entry["expected_drift"]
     return meta
 
 
