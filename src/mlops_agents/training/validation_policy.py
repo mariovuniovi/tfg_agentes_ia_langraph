@@ -112,15 +112,15 @@ def validate_forecasting_plan(
                 f"Cannot override known_future column {col!r} with strategy {strat!r}"
             )
 
-    # (4) panel guardrail
+    # (4) panel guardrail — V1 is single-target only
     single_series = bool(train_pool_stats.get("single_series", True))
     if not single_series:
-        if fs.exog_strategies.per_column or fs.exog_strategies.default_unknown_future != "naive_carry":
-            raise NotImplementedError(
-                "Leakage-safe exogenous extension for multi-target panel data deferred to v2"
-            )
+        raise NotImplementedError(
+            "Multi-target panel forecasting is out of scope for V1. "
+            "Use a single-target dataset with optional exogenous predictor columns."
+        )
 
-    # (5) capacity check (single-series only here; panel handled above)
+    # (5) capacity check
     if single_series:
         total_len = int(train_pool_stats["total_len"])
         min_train_len = max(_HORIZON_MULTIPLIER * horizon_meta, _MIN_TRAIN_ROWS)

@@ -326,7 +326,7 @@ def _build_exog_df(
     ]
     if not exog_cols:
         return None
-    # For panel data skip exog — multi-series exog alignment is complex
+    # sid_cols is always empty in V1 (panel is out of scope)
     if sid_cols:
         return None
     exog = df.sort_values(dt_col).set_index(dt_col)[exog_cols].copy()
@@ -400,149 +400,6 @@ def _resolve_exog_availability(df_columns: list[str], task_metadata: dict) -> di
     return {c: "unknown_future" for c in df_columns if c not in protected}
 
 
-def _run_candidate_forecasting_panel(
-    candidate: TrainingPlanCandidate,
-    train_pool: pd.DataFrame,
-    task_metadata: dict[str, Any],
-    n_trials: int,
-    metric: str,
-    direction: str,
-) -> dict:
-    """Preserved original forecasting path — single-split, no leakage-safe exog.
-
-    Used by the rewritten _run_candidate_forecasting for panel data (sid_cols
-    non-empty) where the multi-target leakage-safe fold iteration is deferred
-    to v2.
-    """
-    spec = get_model(candidate.model_key)
-    target = task_metadata["target_column"]
-    dt_col = task_metadata["datetime_column"]
-    sid_cols = task_metadata.get("series_id_columns") or []
-    horizon = int(task_metadata["forecast_horizon"])
-    started = time.perf_counter()
-
-    pool = train_pool.copy()
-    pool[dt_col] = pd.to_datetime(pool[dt_col])
-    if sid_cols:
-        pool_sorted = pool.sort_values(sid_cols + [dt_col])
-        val = pool_sorted.groupby(sid_cols).tail(horizon)
-        cand_train = pool_sorted.drop(val.index)
-    else:
-        pool_sorted = pool.sort_values(dt_col)
-        val = pool_sorted.tail(horizon)
-        cand_train = pool_sorted.iloc[:-horizon]
-
-    is_stat = _is_statsforecast_model(candidate.model_key)
-    factory = FACTORY_REGISTRY[spec.factory]
-
-    freq = task_metadata.get("frequency")
-
-    def fit_score(params: dict) -> float:
-        if is_stat:
-            sf = factory({"task_metadata": task_metadata, "params": params})
-            sf.fit(_to_sf_format(cand_train, target, dt_col, sid_cols))
-            fcst = sf.predict(h=horizon)
-            # statsforecast output: columns ['unique_id', 'ds', <ModelName>]
-            model_col = [c for c in fcst.columns if c not in ("unique_id", "ds")][0]
-            val_sf = _to_sf_format(val, target, dt_col, sid_cols)
-            merged = val_sf.merge(fcst, on=["unique_id", "ds"])
-            if merged.empty:
-                # Irregular dates (e.g. yfinance weekly): align predictions by position
-                val_s = val_sf.sort_values(["unique_id", "ds"]).reset_index(drop=True)
-                fct_s = fcst.sort_values(["unique_id", "ds"]).reset_index(drop=True)
-                n = min(len(val_s), len(fct_s))
-                if n == 0:
-                    raise ValueError("Statsforecast produced no predictions")
-                return _fc_metrics(val_s["y"].values[:n], fct_s[model_col].values[:n])[metric]
-            return _fc_metrics(merged["y"].values, merged[model_col].values)[metric]
-        else:
-            forecaster = factory({"task_metadata": task_metadata, "params": params})
-            series_dict = _build_series_dict(cand_train, dt_col, target, sid_cols, freq)
-            train_exog = _build_exog_df(cand_train, dt_col, target, sid_cols, series_dict)
-            val_exog = _build_exog_df(val, dt_col, target, sid_cols, series_dict)
-            # When series uses RangeIndex, val_exog must continue from train_len
-            if val_exog is not None and isinstance(val_exog.index, pd.RangeIndex):
-                train_len = len(next(iter(series_dict.values())))
-                val_exog.index = pd.RangeIndex(train_len, train_len + len(val_exog))
-            forecaster.fit(series=series_dict, exog=train_exog)
-            # skforecast 0.22: predict returns DataFrame with DatetimeIndex,
-            # columns ['level', 'pred']
-            preds = forecaster.predict(steps=horizon, exog=val_exog)
-            preds = preds.reset_index().rename(columns={"index": "ds"})
-            # preds now has columns ['ds', 'level', 'pred']
-            if sid_cols:
-                val_long = val.rename(
-                    columns={sid_cols[0]: "level", target: "y_true", dt_col: "ds"}
-                )
-            else:
-                val_long = val.rename(columns={target: "y_true", dt_col: "ds"})
-                val_long = val_long.copy()
-                val_long["level"] = "__single__"
-            val_long["ds"] = pd.to_datetime(val_long["ds"])
-            preds["ds"] = pd.to_datetime(preds["ds"])
-            joined = val_long[["level", "ds", "y_true"]].merge(
-                preds[["level", "ds", "pred"]], on=["level", "ds"], how="inner"
-            )
-            if joined.empty:
-                # fallback: align by order
-                return _fc_metrics(
-                    val_long["y_true"].values,
-                    preds["pred"].values[: len(val_long)],
-                )[metric]
-            return _fc_metrics(joined["y_true"].values, joined["pred"].values)[metric]
-
-    narrowed = (
-        narrow_search_space(candidate.model_key, candidate.search_space_override)
-        if candidate.search_space_override
-        else spec.search_space
-    )
-    suggest_fn = build_suggest_fn(narrowed)
-
-    def objective(trial: optuna.Trial) -> float:
-        return fit_score(suggest_fn(trial))
-
-    try:
-        if not narrowed.params:
-            best_score = fit_score(spec.default_params)
-            best_params, n_used = spec.default_params, 1
-        else:
-            study = optuna.create_study(
-                direction=direction, sampler=optuna.samplers.TPESampler(seed=42)
-            )
-            study.optimize(objective, n_trials=n_trials)
-            if not study.best_trial:
-                raise RuntimeError("No successful trial")
-            best_params = study.best_params
-            best_score = study.best_value
-            n_used = len(
-                [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-            )
-    except Exception:
-        try:
-            best_score = fit_score(spec.default_params)
-            best_params, n_used = spec.default_params, 1
-        except Exception as e2:
-            return {
-                "model_key": candidate.model_key,
-                "status": "failed",
-                "error_type": type(e2).__name__,
-                "error_message": str(e2),
-                "n_trials_used": 0,
-                "duration_s": time.perf_counter() - started,
-                "complexity_rank": spec.complexity_rank,
-            }
-    return {
-        "model_key": candidate.model_key,
-        "status": "successful",
-        "best_params": best_params,
-        "best_score": float(best_score),
-        "best_score_std": 0.0,
-        "n_trials_used": n_used,
-        "duration_s": time.perf_counter() - started,
-        "complexity_rank": spec.complexity_rank,
-    }
-
-
 def _run_candidate_forecasting(
     candidate: TrainingPlanCandidate,
     train_pool: pd.DataFrame,
@@ -595,10 +452,13 @@ def _run_candidate_forecasting(
 
     validate_forecasting_plan(throwaway, task_metadata, profile, train_pool_stats)
 
-    # Multi-target panel: delegate to preserved path (no exog support in v1)
+    # Defensive guard — should never be reached if top-level guard in run_training_plan works
     if sid_cols:
-        return _run_candidate_forecasting_panel(
-            candidate, pool, task_metadata, n_trials, metric, direction,
+        raise NotImplementedError(
+            "Multi-target panel forecasting (series_id_columns non-empty) is out of "
+            "scope for V1. V1 supports single-target forecasting with multiple "
+            "exogenous predictor columns. Got series_id_columns="
+            f"{sid_cols}"
         )
 
     # ─── Single-target leakage-safe path ────────────────────────────
@@ -820,6 +680,16 @@ def run_training_plan(
 ) -> TrainingResult:
     metric = plan.metric_to_optimize or DEFAULT_METRIC[plan.problem_type]
     direction = METRIC_DIRECTION[metric]
+
+    if plan.problem_type == "forecasting":
+        sid_cols = task_metadata.get("series_id_columns") or []
+        if sid_cols:
+            raise NotImplementedError(
+                "Multi-target panel forecasting (series_id_columns non-empty) is out of "
+                "scope for V1. V1 supports single-target forecasting with multiple "
+                "exogenous predictor columns. Got series_id_columns="
+                f"{sid_cols}"
+            )
 
     profile = build_dataset_profile(processed_dataset_path, task_metadata)
 

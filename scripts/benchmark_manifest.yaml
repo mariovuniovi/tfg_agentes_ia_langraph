@@ -1,6 +1,6 @@
-# Benchmark manifest — 18 datasets across classification, regression, and forecasting.
+# Benchmark manifest — 19 datasets across classification, regression, and forecasting.
 # source: sklearn | openml | local | yfinance
-# Forecasting datasets are designed to cover every rule in ml_rules.yaml.
+# Forecasting datasets cover single-target rules in ml_rules.yaml (V1: single-target only).
 
 # ---------------------------------------------------------------------------
 # Classification (7)
@@ -92,7 +92,8 @@
   target_column: Y1
 
 # ---------------------------------------------------------------------------
-# Forecasting (6) — designed to cover every forecasting rule in ml_rules.yaml
+# Forecasting (4) — single-target datasets covering forecasting rules in ml_rules.yaml
+# V1 is single-target only; panel datasets (series_id_columns non-empty) are out of scope.
 # Run scripts/_generate_benchmarks.py to create the local CSVs first.
 # ---------------------------------------------------------------------------
 
@@ -104,17 +105,6 @@
   target_column: passengers
   datetime_column: month
   series_id_columns: []
-  frequency: MS
-  forecast_horizon: 12
-
-# Rule 9: many series + medium history → global supervised ML
-- dataset_id: m4_monthly_sample
-  source: local
-  source_id: data/benchmarks/m4_monthly_sample.csv
-  problem_type: forecasting
-  target_column: value
-  datetime_column: date
-  series_id_columns: [series_id]
   frequency: MS
   forecast_horizon: 12
 
@@ -135,17 +125,6 @@
     - { name: silver_close, future_availability: unknown_future }
     - { name: sp500_close,  future_availability: unknown_future }
     - { name: usd_close,    future_availability: unknown_future }
-
-# Rule 9: moderate panel (5 commodities) + weekly history → global ML
-- dataset_id: commodity_panel_weekly
-  source: local
-  source_id: data/benchmarks/commodity_panel_weekly.csv
-  problem_type: forecasting
-  target_column: close_price
-  datetime_column: week
-  series_id_columns: [commodity]
-  frequency: W
-  forecast_horizon: 13
 
 # Rule 8: non-stationary + strong trend → AutoARIMA (differencing)
 # Bitcoin: highly non-stationary, strongly trending, high volatility

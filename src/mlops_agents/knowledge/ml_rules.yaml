@@ -94,17 +94,6 @@
     model trend components (AutoARIMA with differencing, ETS with trend).
   tags: [forecasting, stationarity]
 
-- rule_id: forecasting_many_series_prefers_global_ml
-  applies_when:
-    problem_type: forecasting
-    n_series: [moderate, many]
-    history_length: [medium, long]
-  prefer: [lightgbm_forecaster, xgboost_forecaster, gbm_forecaster]
-  reason: |
-    With many series, global ML models share signal across series and scale
-    better than fitting one statistical model per series.
-  tags: [forecasting, multi_series]
-
 - rule_id: classification_large_dataset_prefers_boosting
   applies_when:
     problem_type: classification

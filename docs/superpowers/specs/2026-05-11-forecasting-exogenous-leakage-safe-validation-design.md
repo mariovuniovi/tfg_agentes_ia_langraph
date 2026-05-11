@@ -296,13 +296,13 @@ return trial_score
 
 **For 7 exog × 3 folds × 8 trials**, the cache reduces 168 exog fits to 21 per candidate.
 
-### 6.4 Scope: single-target with many exogenous series
+### 6.4 Scope: single-target forecasting only
 
-V1 focuses on **single-target forecasting with many exogenous time-series columns** — one target column, an arbitrary number of exogenous predictor columns, each extended independently. This is the spec's primary use case (financial/commodity forecasting with macro exog).
+V1 supports **single-target forecasting with many exogenous time-series columns** — one target column, an arbitrary number of exogenous predictor columns, each extended independently. This is the project's primary use case (financial / commodity forecasting with macro exog).
 
-**Multi-target panel forecasting** (one model predicting many target series like store_A / store_B / store_C, i.e. `sid_cols` non-empty) is **not extended** in v1. Existing panel benchmark behavior is preserved unchanged:
-- `validate_forecasting_plan` accepts panel plans only if `per_column` is empty and `default_unknown_future == "naive_carry"`. Any other configuration raises `NotImplementedError("Leakage-safe exogenous extension for multi-target panel data deferred to v2")`.
-- `_run_candidate_forecasting` continues to call the existing helper that returns `None` for `sid_cols`, so panel models train with no exog (current behavior). No regression to existing panel benchmarks.
+**Multi-target panel forecasting** (one model predicting many target series, i.e. `series_id_columns` non-empty) is **out of scope for V1, permanently**. The executor raises `NotImplementedError` at entry when `series_id_columns` is non-empty. This is a deliberate scope lock — single-target with rich exog is the project's actual use case, not a stepping stone to panel.
+
+If panel support is ever needed, it would require a new sub-project (SP-panel) with its own design: leakage-safe per-series exog extension, fold partitioning across series, hierarchical reconciliation, etc. None of that work is loaded as a "future" obligation; the project is structurally complete without it.
 
 ### 6.5 Failure modes
 
@@ -435,9 +435,9 @@ Re-run the full benchmark (21 datasets) and confirm:
 6. ✅ MLflow runs show the new parent-run params and per-fold metrics.
 7. ✅ Documentation (`CLAUDE.md` if applicable) updated to describe `exogenous_columns` and `forecasting_settings` schema.
 
-## 12. Explicitly out of scope (v1)
+## 12. Explicitly out of scope (V1, permanently)
 
-- Per-column ETS/AutoARIMA for **multi-target (panel) datasets**. Multi-target exog uses `naive_carry` only or raises `NotImplementedError`. v2.
+- **Multi-target panel forecasting** (`series_id_columns` non-empty). The executor raises `NotImplementedError` at entry — this is a permanent scope lock, not a v2 deferral. Single-target with rich exog is the project's actual use case.
 - `scenario_based`, `market_implied`, `forecasted` covariate types from the original brief. The `known_future` / `unknown_future` binary covers ≥95% of real cases; richer types deferred.
 - Static covariates (series-level metadata for hierarchical forecasting).
 - Auto-detection of `expected_drift` from the time series itself. v1 = user-provided business hint.
