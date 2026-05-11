@@ -95,6 +95,34 @@ class TrainingPlan(BaseModel):
             raise ValueError(f"Candidate priorities must be unique. Got: {priorities}")
         return self
 
+    @model_validator(mode="after")
+    def _check_plan_integrity(self):
+        cand = {c.model_key for c in self.candidates}
+        rej = {r.model_key for r in self.models_not_recommended}
+
+        overlap = cand & rej
+        if overlap:
+            raise ValueError(
+                f"models appear in both candidates and models_not_recommended: {sorted(overlap)}"
+            )
+
+        for r in self.models_not_recommended:
+            if not r.reason or not r.reason.strip():
+                raise ValueError(
+                    f"models_not_recommended[{r.model_key}].reason is empty"
+                )
+
+        from mlops_agents.models.loader import get_models_for
+
+        valid_keys = {m.model_key for m in get_models_for(self.problem_type)}
+        invalid = (cand | rej) - valid_keys
+        if invalid:
+            raise ValueError(
+                f"unknown or wrong-problem-type model_keys: {sorted(invalid)}"
+            )
+
+        return self
+
 
 class TrainingResult(BaseModel):
     """Returned by run_training_plan(...). Embedded in graph state via agent_state."""

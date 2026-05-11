@@ -48,8 +48,8 @@ def test_training_plan_candidate_minimal():
 
 def test_training_plan_unique_priorities_required():
     candidates = [
-        TrainingPlanCandidate(priority=1, model_key="a"),
-        TrainingPlanCandidate(priority=1, model_key="b"),  # duplicate
+        TrainingPlanCandidate(priority=1, model_key="logistic_regression"),
+        TrainingPlanCandidate(priority=1, model_key="lightgbm_classifier"),  # duplicate priority
     ]
     with pytest.raises(ValidationError, match="unique"):
         TrainingPlan(problem_type="classification", candidates=candidates)
@@ -58,7 +58,7 @@ def test_training_plan_unique_priorities_required():
 def test_training_plan_default_trial_budget():
     plan = TrainingPlan(
         problem_type="classification",
-        candidates=[TrainingPlanCandidate(priority=1, model_key="x")],
+        candidates=[TrainingPlanCandidate(priority=1, model_key="logistic_regression")],
     )
     assert plan.trial_budget.total_trials == 60
     assert plan.trial_budget.allocation_strategy == "priority_weighted"
