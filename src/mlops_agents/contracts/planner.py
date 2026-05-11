@@ -53,7 +53,7 @@ class PlannerContext(BaseModel):
     task_metadata: dict[str, str | int | float | bool]
     available_models: list[str]
     similar_experiences: list[ExperienceSummary]
-    matched_rules: list[dict[str, str | int | float | bool]]
+    matched_rules: list[dict[str, str | int | float | bool | list[str] | dict]]
 
 
 class PlannerOutput(BaseModel):

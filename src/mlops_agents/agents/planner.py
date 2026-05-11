@@ -66,6 +66,9 @@ def build_planner_context(
     matched_rules_dicts = [
         {
             "rule_id": r.rule_id,
+            "prefer": r.prefer,
+            "avoid_or_deprioritize": r.avoid_or_deprioritize,
+            "recommend": r.recommend,
             "summary": r.reason,
         }
         for r in matched
