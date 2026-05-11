@@ -20,8 +20,8 @@ UnknownFutureStrategy = Literal["naive_carry", "ets", "auto_arima", "drop"]
 
 class ValidationStrategy(BaseModel):
     type: Literal["single_split", "rolling_window", "expanding_window"] = "single_split"
-    n_folds: int = 1
-    horizon: int
+    n_folds: int = Field(default=1, ge=1)
+    horizon: int = Field(ge=1)
     step_size: int | None = None
     window_size: int | None = None
 

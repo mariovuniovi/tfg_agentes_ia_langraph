@@ -47,3 +47,12 @@ def test_forecasting_settings_compose():
     )
     assert fs.validation_strategy.n_folds == 1
     assert fs.exog_strategies.per_column["oil"] == "auto_arima"
+
+
+def test_validation_strategy_rejects_non_positive_horizon_and_folds():
+    with pytest.raises(ValidationError):
+        ValidationStrategy(horizon=0)
+    with pytest.raises(ValidationError):
+        ValidationStrategy(horizon=-1)
+    with pytest.raises(ValidationError):
+        ValidationStrategy(n_folds=0, horizon=10)
