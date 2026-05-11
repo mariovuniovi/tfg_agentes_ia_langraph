@@ -360,6 +360,24 @@ def _build_series_dict(
     return {"__single__": _prep(df.set_index(dt_col)[target])}
 
 
+def _align_train_exog_index(
+    exog: pd.DataFrame, series_dict: dict[str, pd.Series]
+) -> pd.DataFrame:
+    """Match exog's index type to a sample series in series_dict.
+
+    skforecast requires exog and series to share the same index type
+    (DatetimeIndex or RangeIndex). The training DataFrame may carry a
+    RangeIndex (from CSV loading) while series_dict produces a
+    DatetimeIndex when frequency can be inferred.
+    """
+    sample = next(iter(series_dict.values()))
+    exog = exog.copy()
+    if isinstance(sample.index, pd.DatetimeIndex):
+        exog.index = sample.index
+        return exog
+    return exog.reset_index(drop=True)
+
+
 def _resolve_exog_availability(df_columns: list[str], task_metadata: dict) -> dict[str, str]:
     """Return {col: 'known_future' | 'unknown_future'} for every exog column.
 
@@ -639,13 +657,7 @@ def _run_candidate_forecasting(
 
             used_cols = list(future_values.keys())
             if used_cols:
-                train_exog = cand_train[used_cols].copy()
-                # Align train_exog index to match series_dict index type
-                sample_series = next(iter(series_dict.values()))
-                if isinstance(sample_series.index, pd.DatetimeIndex):
-                    train_exog.index = sample_series.index
-                else:
-                    train_exog = train_exog.reset_index(drop=True)
+                train_exog = _align_train_exog_index(cand_train[used_cols], series_dict)
             else:
                 train_exog = None
             val_exog = None
@@ -778,13 +790,7 @@ def _retrain_forecasting(
         availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
         used_cols = [c for c in availability if c in train_pool.columns]
         if used_cols:
-            train_exog = train_pool[used_cols].copy()
-            # Align train_exog index to match series_dict index type
-            sample_series = next(iter(series_dict.values()))
-            if isinstance(sample_series.index, pd.DatetimeIndex):
-                train_exog.index = sample_series.index
-            else:
-                train_exog = train_exog.reset_index(drop=True)
+            train_exog = _align_train_exog_index(train_pool[used_cols], series_dict)
         else:
             train_exog = None
     else:
@@ -889,7 +895,8 @@ def run_training_plan(
             else "temporal_holdout"
         )
 
-        # Forecasting-specific MLflow params and per-fold metrics
+        # Forecasting-specific MLflow params, per-fold metrics, and experience extras
+        forecasting_extras: dict[str, Any] = {}
         if plan.problem_type == "forecasting" and fs is not None:
             mlflow.log_param("validation_strategy_type", fs.validation_strategy.type)
             mlflow.log_param("validation_n_folds", fs.validation_strategy.n_folds)
@@ -903,9 +910,6 @@ def run_training_plan(
                 mlflow.log_metric(f"fold_mean_{metric}", float(np.mean(per_fold)))
                 mlflow.log_metric(f"fold_std_{metric}", float(np.std(per_fold)))
 
-        # Assemble forecasting extras for the experience record
-        forecasting_extras: dict[str, Any] = {}
-        if plan.problem_type == "forecasting" and fs is not None:
             availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
             used_strategies: dict[str, str] = {}
             for col, avail in availability.items():
@@ -920,7 +924,7 @@ def run_training_plan(
                 "exog_availability": availability,
                 "exog_strategies": used_strategies,
                 "per_fold_metrics": [
-                    {"fold_id": i, "score": s}
+                    {"fold_id": i, metric: s}
                     for i, s in enumerate(champion.get("per_fold_scores", []))
                 ],
                 "exog_fit_failures": champion.get("exog_fit_failures", []),
