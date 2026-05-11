@@ -52,7 +52,8 @@ def _task_meta(horizon=10):
     }
 
 
-def test_unknown_future_exog_is_extended_not_leaked(tmp_path):
+def test_unknown_future_exog_is_extended_not_leaked(tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     csv = _synthetic_csv(tmp_path, 200)
     plan = _plan(horizon=10)
     result = run_training_plan(
@@ -66,7 +67,8 @@ def test_unknown_future_exog_is_extended_not_leaked(tmp_path):
     assert rec.get("exog_availability", {}).get("holiday_flag") == "known_future"
 
 
-def test_k_fold_runs_three_folds(tmp_path):
+def test_k_fold_runs_three_folds(tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     csv = _synthetic_csv(tmp_path, 400)
     plan = _plan(horizon=10)
     plan.forecasting_settings.validation_strategy = ValidationStrategy(
@@ -82,7 +84,8 @@ def test_k_fold_runs_three_folds(tmp_path):
     assert len(pfm) == 3
 
 
-def test_plan_with_unknown_column_raises(tmp_path):
+def test_plan_with_unknown_column_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     csv = _synthetic_csv(tmp_path, 200)
     plan = _plan(horizon=10)
     plan.forecasting_settings.exog_strategies.per_column = {"nonexistent": "ets"}
@@ -94,7 +97,8 @@ def test_plan_with_unknown_column_raises(tmp_path):
         )
 
 
-def test_plan_without_exog_columns_treats_all_as_unknown(tmp_path):
+def test_plan_without_exog_columns_treats_all_as_unknown(tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
     csv = _synthetic_csv(tmp_path, 200)
     plan = _plan(horizon=10)
     plan.forecasting_settings.exog_strategies.per_column = {}

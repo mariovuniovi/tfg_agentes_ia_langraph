@@ -18,6 +18,7 @@ def test_migration_adds_five_columns(tmp_path):
         "exog_strategies_json",
         "per_fold_metrics_json",
         "exog_fit_failures_json",
+        "expected_drift",
     ]:
         assert c in cols
 

@@ -20,7 +20,7 @@ def test_migrations_are_idempotent(tmp_path):
     apply_pending_migrations(db)  # second call must not raise
     conn = sqlite3.connect(db)
     version = conn.execute("SELECT MAX(version) FROM _schema_version").fetchone()[0]
-    assert version == 2
+    assert version == 3
     conn.close()
 
 
@@ -29,5 +29,5 @@ def test_migration_sets_schema_version(tmp_path):
     apply_pending_migrations(db)
     conn = sqlite3.connect(db)
     row = conn.execute("SELECT MAX(version) FROM _schema_version").fetchone()
-    assert row[0] == 2
+    assert row[0] == 3
     conn.close()

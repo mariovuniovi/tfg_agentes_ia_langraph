@@ -150,6 +150,7 @@ def _run_candidate_classification(
             )[metric]
             for ti, vi in skf.split(X, y)
         ]
+        trial.set_user_attr("fold_scores", scores)
         return float(np.mean(scores))
 
     try:
@@ -161,6 +162,7 @@ def _run_candidate_classification(
             raise RuntimeError("No successful trial")
         best_params = study.best_params
         best_score = study.best_value
+        best_fold_scores = study.best_trial.user_attrs.get("fold_scores", [])
         n_used = len(
             [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
         )
@@ -174,7 +176,7 @@ def _run_candidate_classification(
                 )[metric]
                 for ti, vi in skf.split(X, y)
             ]
-            best_params, best_score, n_used = spec.default_params, float(np.mean(scores)), 1
+            best_params, best_score, best_fold_scores, n_used = spec.default_params, float(np.mean(scores)), scores, 1
         except Exception as e2:
             return {
                 "model_key": candidate.model_key,
@@ -190,7 +192,7 @@ def _run_candidate_classification(
         "status": "successful",
         "best_params": best_params,
         "best_score": float(best_score),
-        "best_score_std": 0.0,
+        "best_score_std": float(np.std(best_fold_scores)) if best_fold_scores else 0.0,
         "n_trials_used": n_used,
         "duration_s": time.perf_counter() - started,
         "complexity_rank": spec.complexity_rank,
@@ -232,6 +234,7 @@ def _run_candidate_regression(
             )[metric]
             for ti, vi in kf.split(X)
         ]
+        trial.set_user_attr("fold_scores", scores)
         return float(np.mean(scores))
 
     try:
@@ -243,6 +246,7 @@ def _run_candidate_regression(
             raise RuntimeError("No successful trial")
         best_params = study.best_params
         best_score = study.best_value
+        best_fold_scores = study.best_trial.user_attrs.get("fold_scores", [])
         n_used = len(
             [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
         )
@@ -256,7 +260,7 @@ def _run_candidate_regression(
                 )[metric]
                 for ti, vi in kf.split(X)
             ]
-            best_params, best_score, n_used = spec.default_params, float(np.mean(scores)), 1
+            best_params, best_score, best_fold_scores, n_used = spec.default_params, float(np.mean(scores)), scores, 1
         except Exception as e2:
             return {
                 "model_key": candidate.model_key,
@@ -272,7 +276,7 @@ def _run_candidate_regression(
         "status": "successful",
         "best_params": best_params,
         "best_score": float(best_score),
-        "best_score_std": 0.0,
+        "best_score_std": float(np.std(best_fold_scores)) if best_fold_scores else 0.0,
         "n_trials_used": n_used,
         "duration_s": time.perf_counter() - started,
         "complexity_rank": spec.complexity_rank,
@@ -694,15 +698,11 @@ def _run_candidate_forecasting(
     )
     suggest_fn = build_suggest_fn(narrowed)
 
-    last_per_fold: list[float] = []
-    last_failures: list[dict] = []
-
     def objective(trial: optuna.Trial) -> float:
-        nonlocal last_per_fold, last_failures
         params = suggest_fn(trial)
         score, per_fold, failures = fit_score(params)
-        last_per_fold = per_fold
-        last_failures = failures
+        trial.set_user_attr("per_fold_scores", per_fold)
+        trial.set_user_attr("exog_fit_failures", failures)
         return score
 
     try:
@@ -714,6 +714,9 @@ def _run_candidate_forecasting(
                 direction=direction, sampler=optuna.samplers.TPESampler(seed=42)
             )
             study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+            best_trial = study.best_trial
+            last_per_fold = best_trial.user_attrs.get("per_fold_scores", [])
+            last_failures = best_trial.user_attrs.get("exog_fit_failures", [])
             best_params = study.best_params
             best_score = study.best_value
             n_used = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
@@ -928,6 +931,7 @@ def run_training_plan(
                     for i, s in enumerate(champion.get("per_fold_scores", []))
                 ],
                 "exog_fit_failures": champion.get("exog_fit_failures", []),
+                "expected_drift": task_metadata.get("expected_drift", "low"),
             }
 
         task_id = build_task_id(processed_dataset_path.stem, plan.problem_type, run_idx=1)
@@ -950,7 +954,7 @@ def run_training_plan(
             "metric_direction": direction,
             "candidate_selection_policy": {
                 "primary": "best_validation_score",
-                "tie_breaker": "complexity_rank",
+                "tie_breaker_chain": ["complexity_rank", "priority"],
                 "tie_tolerance_relative": settings.tie_tolerance_relative,
             },
             "models_tested": [
