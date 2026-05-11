@@ -31,7 +31,7 @@ def test_history_length_short_for_50_rows(tmp_path):
               "datetime_column": "date", "frequency": "W", "forecast_horizon": 4,
               "series_id_columns": []},
     )
-    assert profile.history_length in ("very_short", "short")
+    assert profile.history_length == "very_short"
 
 
 def test_history_length_medium_for_500_rows(tmp_path):
@@ -41,7 +41,7 @@ def test_history_length_medium_for_500_rows(tmp_path):
               "datetime_column": "date", "frequency": "W", "forecast_horizon": 4,
               "series_id_columns": []},
     )
-    assert profile.history_length in ("medium", "long")
+    assert profile.history_length == "medium"
 
 
 def test_history_length_none_for_tabular(tmp_path):

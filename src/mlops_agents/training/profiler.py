@@ -75,6 +75,8 @@ def _bucket_n_series(n: int) -> str:
     return "many"
 
 
+# Thresholds in row count, not time units. Calibrated for daily/weekly series:
+# <60 ~= one quarter of weekly data; <2000 ~= ~5y of daily data.
 def _bucket_history_length(n: int) -> str:
     if n < 60: return "very_short"
     if n < 200: return "short"
