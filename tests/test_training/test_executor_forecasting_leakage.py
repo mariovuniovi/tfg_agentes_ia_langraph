@@ -52,7 +52,6 @@ def _task_meta(horizon=10):
     }
 
 
-@pytest.mark.skip(reason="Awaits Task 8 wiring of experience record fields")
 def test_unknown_future_exog_is_extended_not_leaked(tmp_path):
     csv = _synthetic_csv(tmp_path, 200)
     plan = _plan(horizon=10)
@@ -67,7 +66,6 @@ def test_unknown_future_exog_is_extended_not_leaked(tmp_path):
     assert rec.get("exog_availability", {}).get("holiday_flag") == "known_future"
 
 
-@pytest.mark.skip(reason="Awaits Task 8 wiring of experience record fields")
 def test_k_fold_runs_three_folds(tmp_path):
     csv = _synthetic_csv(tmp_path, 400)
     plan = _plan(horizon=10)
@@ -96,7 +94,6 @@ def test_plan_with_unknown_column_raises(tmp_path):
         )
 
 
-@pytest.mark.skip(reason="Awaits Task 8 wiring of experience record fields")
 def test_plan_without_exog_columns_treats_all_as_unknown(tmp_path):
     csv = _synthetic_csv(tmp_path, 200)
     plan = _plan(horizon=10)

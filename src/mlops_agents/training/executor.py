@@ -638,7 +638,16 @@ def _run_candidate_forecasting(
                         fold_failures.append(fail | {"fold_id": fold_id, "column": col})
 
             used_cols = list(future_values.keys())
-            train_exog = cand_train[used_cols] if used_cols else None
+            if used_cols:
+                train_exog = cand_train[used_cols].copy()
+                # Align train_exog index to match series_dict index type
+                sample_series = next(iter(series_dict.values()))
+                if isinstance(sample_series.index, pd.DatetimeIndex):
+                    train_exog.index = sample_series.index
+                else:
+                    train_exog = train_exog.reset_index(drop=True)
+            else:
+                train_exog = None
             val_exog = None
             if used_cols:
                 val_exog_raw = pd.DataFrame(future_values)
@@ -768,7 +777,16 @@ def _retrain_forecasting(
     if not sid_cols:
         availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
         used_cols = [c for c in availability if c in train_pool.columns]
-        train_exog = train_pool[used_cols] if used_cols else None
+        if used_cols:
+            train_exog = train_pool[used_cols].copy()
+            # Align train_exog index to match series_dict index type
+            sample_series = next(iter(series_dict.values()))
+            if isinstance(sample_series.index, pd.DatetimeIndex):
+                train_exog.index = sample_series.index
+            else:
+                train_exog = train_exog.reset_index(drop=True)
+        else:
+            train_exog = None
     else:
         train_exog = None
     forecaster.fit(series=series_dict, exog=train_exog)
@@ -870,6 +888,44 @@ def run_training_plan(
             if plan.forecasting_settings is not None
             else "temporal_holdout"
         )
+
+        # Forecasting-specific MLflow params and per-fold metrics
+        if plan.problem_type == "forecasting" and fs is not None:
+            mlflow.log_param("validation_strategy_type", fs.validation_strategy.type)
+            mlflow.log_param("validation_n_folds", fs.validation_strategy.n_folds)
+            mlflow.log_param("exog_default_strategy", fs.exog_strategies.default_unknown_future)
+            mlflow.log_param("expected_drift", task_metadata.get("expected_drift", "low"))
+
+            per_fold = champion.get("per_fold_scores", [])
+            for i, s in enumerate(per_fold):
+                mlflow.log_metric(f"fold_{i}_{metric}", s)
+            if per_fold:
+                mlflow.log_metric(f"fold_mean_{metric}", float(np.mean(per_fold)))
+                mlflow.log_metric(f"fold_std_{metric}", float(np.std(per_fold)))
+
+        # Assemble forecasting extras for the experience record
+        forecasting_extras: dict[str, Any] = {}
+        if plan.problem_type == "forecasting" and fs is not None:
+            availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
+            used_strategies: dict[str, str] = {}
+            for col, avail in availability.items():
+                if avail == "known_future":
+                    used_strategies[col] = "known_future"
+                else:
+                    used_strategies[col] = fs.exog_strategies.per_column.get(
+                        col, fs.exog_strategies.default_unknown_future,
+                    )
+            forecasting_extras = {
+                "validation_strategy": fs.validation_strategy.model_dump(),
+                "exog_availability": availability,
+                "exog_strategies": used_strategies,
+                "per_fold_metrics": [
+                    {"fold_id": i, "score": s}
+                    for i, s in enumerate(champion.get("per_fold_scores", []))
+                ],
+                "exog_fit_failures": champion.get("exog_fit_failures", []),
+            }
+
         task_id = build_task_id(processed_dataset_path.stem, plan.problem_type, run_idx=1)
         record: dict[str, Any] = {
             "task_id": task_id,
@@ -907,6 +963,7 @@ def run_training_plan(
                 "complexity_rank": champion["complexity_rank"],
             },
             "experience_summary": "",
+            **forecasting_extras,
         }
         record_path = write_experience_record(record, settings.experience_pool_dir)
 
