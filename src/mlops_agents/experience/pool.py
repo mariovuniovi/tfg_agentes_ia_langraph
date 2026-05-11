@@ -44,8 +44,8 @@ class ExperiencePool:
                  experience_summary, mlflow_parent_run_id, created_at,
                  validation_strategy_json, exog_availability_json,
                  exog_strategies_json, per_fold_metrics_json, exog_fit_failures_json,
-                 expected_drift)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 expected_drift, planner_output_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (record.task_id, record.problem_type, record.dataset_name,
                  json.dumps(record.dataset_profile), json.dumps(record.training_plan_input),
                  sol.model_key if sol else None, record.metric_to_optimize,
@@ -57,7 +57,8 @@ class ExperiencePool:
                  _opt_json(record.exog_strategies),
                  _opt_json(record.per_fold_metrics),
                  _opt_json(record.exog_fit_failures),
-                 record.expected_drift),
+                 record.expected_drift,
+                 _opt_json(record.planner_output)),
             )
             conn.execute("DELETE FROM candidate_results WHERE task_id = ?", (record.task_id,))
             for cand in record.models_tested:
@@ -129,6 +130,7 @@ class ExperiencePool:
             per_fold_metrics=_opt_load(row["per_fold_metrics_json"]),
             exog_fit_failures=_opt_load(row["exog_fit_failures_json"]),
             expected_drift=row["expected_drift"],
+            planner_output=_opt_load(row["planner_output_json"]),
         )
 
     def count(self, problem_type: str | None = None) -> int:

@@ -20,7 +20,7 @@ def test_migrations_are_idempotent(tmp_path):
     apply_pending_migrations(db)  # second call must not raise
     conn = sqlite3.connect(db)
     version = conn.execute("SELECT MAX(version) FROM _schema_version").fetchone()[0]
-    assert version == 3
+    assert version == 4
     conn.close()
 
 
@@ -29,5 +29,14 @@ def test_migration_sets_schema_version(tmp_path):
     apply_pending_migrations(db)
     conn = sqlite3.connect(db)
     row = conn.execute("SELECT MAX(version) FROM _schema_version").fetchone()
-    assert row[0] == 3
+    assert row[0] == 4
+    conn.close()
+
+
+def test_migration_004_adds_planner_output_column(tmp_path):
+    db = tmp_path / "test.db"
+    apply_pending_migrations(db)
+    conn = sqlite3.connect(db)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(experiences)").fetchall()}
+    assert "planner_output_json" in cols
     conn.close()

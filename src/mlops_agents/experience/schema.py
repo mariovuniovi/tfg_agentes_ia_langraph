@@ -48,6 +48,7 @@ class ExperienceRecord(BaseModel):
     per_fold_metrics: list[dict] | None = None
     exog_fit_failures: list[dict] | None = None
     expected_drift: str | None = None
+    planner_output: dict | None = None
 
 
 class CandidateResultView(BaseModel):
