@@ -1,12 +1,13 @@
 """Model Planning Agent — context builder, validators, and planner node (SP5)."""
 from __future__ import annotations
+
 from typing import Any
+
 from mlops_agents.contracts.planner import (
     CandidateResultCompact,
     EvidenceReference,
     ExperienceSummary,
     PlannerContext,
-    PlannerOutput,
 )
 from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.experience.pool import ExperiencePool
@@ -63,7 +64,7 @@ def build_planner_context(
     similar_experiences = [_to_experience_summary(v) for v in views]
     rule_input = {**profile, **task_metadata, "problem_type": problem_type}
     matched = match_rules(rule_input)
-    matched_rules_dicts = [
+    matched_rules_dicts: list[dict[str, Any]] = [
         {
             "rule_id": r.rule_id,
             "prefer": r.prefer,
@@ -106,11 +107,10 @@ def _check_evidence_references(
                 raise PlannerError(
                     f"rule source_id {ref.source_id!r} not in context"
                 )
-        elif ref.source == "registry":
-            if ref.source_id is not None and ref.source_id not in model_keys:
-                raise PlannerError(
-                    f"registry source_id {ref.source_id!r} not in available_models"
-                )
+        elif ref.source == "registry" and ref.source_id is not None and ref.source_id not in model_keys:
+            raise PlannerError(
+                f"registry source_id {ref.source_id!r} not in available_models"
+            )
 
 
 def _check_plan_exhaustiveness(
