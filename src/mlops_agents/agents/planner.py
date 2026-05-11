@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import Command
@@ -148,11 +148,11 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
     """Model Planning Agent node — assembles context, calls LLM, validates plan."""
     processed_path = Path(state["processed_dataset_path"])
     problem_type: str = state.get("problem_type", "")
-    task_meta: dict = state.get("task_metadata") or {}
+    task_meta: dict[str, Any] = state.get("task_metadata") or {}
 
     # Reuse dataset_profile from state (produced by data_validator) to avoid recomputing.
     # Fall back to building it from the CSV only if the validator didn't store it.
-    profile_raw = state.get("dataset_profile") or state.get("schema_json")
+    profile_raw = state.get("schema_json")
     if profile_raw:
         raw_dict = (
             profile_raw if isinstance(profile_raw, dict) else json.loads(profile_raw)
@@ -170,11 +170,11 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
     llm = get_llm("planner").with_structured_output(PlannerOutput)
     last_error = ""
-    output: PlannerOutput | None = None
+    output: PlannerOutput
 
     for attempt in range(2):
         try:
-            messages: list = [
+            messages: list[SystemMessage | HumanMessage] = [
                 SystemMessage(content=_planner_prompt),
                 HumanMessage(content=ctx.model_dump_json(indent=2)),
             ]
@@ -183,7 +183,7 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
                     content=f"Your previous plan was rejected: {last_error}. "
                             "Please produce a corrected PlannerOutput."
                 ))
-            output = llm.invoke(messages)
+            output = cast(PlannerOutput, llm.invoke(messages))
             # Stage 3: evidence references
             _check_evidence_references(output.evidence_used, ctx)
             # Stage 4: exhaustiveness
@@ -196,7 +196,6 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
                 raise PlannerError(f"Planner failed after retry: {last_error}") from exc
 
     retry_used = attempt == 1
-    assert output is not None
 
     planner_output_record = {
         "planner_status": "retry_ok" if retry_used else "ok",
