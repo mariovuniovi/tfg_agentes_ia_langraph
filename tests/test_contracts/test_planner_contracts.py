@@ -4,17 +4,15 @@ import pytest
 from pydantic import ValidationError
 
 from mlops_agents.contracts.planner import (
-    EvidenceReference,
-    PlannerOutput,
-    PlannerContext,
-    ExperienceSummary,
     CandidateResultCompact,
+    EvidenceReference,
+    ExperienceSummary,
+    PlannerContext,
+    PlannerOutput,
 )
 from mlops_agents.contracts.training import (
     TrainingPlan,
     TrainingPlanCandidate,
-    RejectedModel,
-    TrialBudget,
 )
 
 
