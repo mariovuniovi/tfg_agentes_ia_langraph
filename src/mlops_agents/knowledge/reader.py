@@ -14,6 +14,7 @@ class MLRule(BaseModel):
     prefer: list[str] = Field(default_factory=list)
     avoid_or_deprioritize: list[str] = Field(default_factory=list)
     requirements: list[str] = Field(default_factory=list)
+    recommend: dict[str, Any] = Field(default_factory=dict)
     reason: str
     tags: list[str] = Field(default_factory=list)
 

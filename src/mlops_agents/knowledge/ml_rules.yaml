@@ -149,3 +149,53 @@
     for statistical time series models. Supervised lag-based models add complexity
     without additional signal.
   tags: [forecasting, univariate]
+
+# ─── forecasting_rules — exog & validation strategy guidance (SP5 planner) ─
+- rule_id: forecasting_short_history_single_split
+  applies_when:
+    problem_type: forecasting
+    history_length: [very_short, short]
+  recommend:
+    validation_strategy: single_split
+  reason: "Multiple folds leave too little data per fold with short history."
+
+- rule_id: forecasting_medium_long_expanding_window
+  applies_when:
+    problem_type: forecasting
+    history_length: [medium, long]
+  recommend:
+    validation_strategy: expanding_window
+  reason: "Sufficient history makes expanding-window backtesting more robust."
+
+- rule_id: forecasting_high_drift_rolling_window
+  applies_when:
+    problem_type: forecasting
+    expected_drift: high
+  recommend:
+    validation_strategy: rolling_window
+  reason: "Non-stationary processes benefit from a fixed-size recent training window."
+
+- rule_id: exog_calendar_known_future
+  applies_when:
+    problem_type: forecasting
+    exog_column_kind: calendar_derived
+  recommend:
+    future_availability: known_future
+  reason: "Calendar-derived features (year, month, dayofweek, deterministic holiday-calendar flags) are known for future timestamps."
+
+- rule_id: exog_unknown_default_naive_carry
+  applies_when:
+    problem_type: forecasting
+    exog_future_availability: unknown_future
+  recommend:
+    exog_strategy: naive_carry
+  reason: "Safest default; cheap; competitive for short horizons."
+
+- rule_id: exog_slow_macro_auto_arima
+  applies_when:
+    problem_type: forecasting
+    exog_kind: macro_indicator
+    history_length: [medium, long]
+  recommend:
+    exog_strategy: auto_arima
+  reason: "Slow-moving macro variables (rates, FX) may have ARIMA-friendly dynamics and can sometimes outperform naive carry over longer horizons."

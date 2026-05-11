@@ -12,7 +12,7 @@ def test_starter_rules_all_have_reason():
         assert rule.reason.strip(), f"Rule {rule.rule_id} has empty reason"
 
 
-def test_starter_rules_all_have_prefer_or_avoid():
+def test_starter_rules_all_have_prefer_or_avoid_or_recommend():
     for rule in load_rules():
-        assert rule.prefer or rule.avoid_or_deprioritize, \
-            f"Rule {rule.rule_id} has neither prefer nor avoid_or_deprioritize"
+        assert rule.prefer or rule.avoid_or_deprioritize or rule.recommend, \
+            f"Rule {rule.rule_id} has neither prefer, avoid_or_deprioritize, nor recommend"

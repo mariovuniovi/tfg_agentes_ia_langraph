@@ -30,3 +30,7 @@ class DatasetProfile(BaseModel):
     seasonality_detected: bool | None = None
     trend_detected: bool | None = None
     stationarity: bool | None = None
+    expected_drift: Literal["low", "medium", "high"] | None = None
+    exog_column_kind: str | None = None
+    exog_future_availability: Literal["known_future", "unknown_future"] | None = None
+    exog_kind: str | None = None
