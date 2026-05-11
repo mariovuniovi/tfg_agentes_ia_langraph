@@ -5,7 +5,7 @@ import pandas as pd
 
 from mlops_agents.training.exog_extender import (
     extend_exog,
-    _align_val_exog_index,
+    align_val_exog_index,
 )
 
 
@@ -37,22 +37,27 @@ def test_auto_arima_returns_horizon_values():
     assert len(out) == 5
 
 
-def test_ets_failure_falls_back_to_naive_carry():
-    # A constant series can cause some ETS configurations to fail
+def test_ets_failure_falls_back_to_naive_carry(monkeypatch):
+    """Force a fit failure to deterministically verify the fallback path."""
+    def boom(history, horizon, freq):
+        raise RuntimeError("forced fit failure")
+
+    monkeypatch.setattr(
+        "mlops_agents.training.exog_extender._fit_ets", boom
+    )
     s = _series([5.0] * 10)
     out, fail = extend_exog(s, horizon=3, strategy="ets", freq="W")
-    # Either ETS succeeded or it fell back to naive_carry
-    assert len(out) == 3
-    if fail is not None:
-        # fallback was used; last value repeated
-        assert list(out) == [5.0, 5.0, 5.0]
-        assert fail["fallback"] == "naive_carry"
+    assert list(out) == [5.0, 5.0, 5.0]
+    assert fail is not None
+    assert fail["fallback"] == "naive_carry"
+    assert fail["error_class"] == "RuntimeError"
+    assert fail["strategy"] == "ets"
 
 
 def test_align_index_matches_rangeindex_series_dict():
     val_exog = pd.DataFrame({"oil": [1.0, 2.0, 3.0]})
     series_dict = {"__single__": pd.Series([0.0] * 50, index=pd.RangeIndex(50))}
-    aligned = _align_val_exog_index(
+    aligned = align_val_exog_index(
         val_exog, series_dict, train_len=50, dt_col="date", freq="W"
     )
     assert isinstance(aligned.index, pd.RangeIndex)
@@ -64,7 +69,7 @@ def test_align_index_matches_datetimeindex_series_dict():
     val_exog = pd.DataFrame({"oil": [1.0, 2.0, 3.0]})
     train_idx = pd.date_range("2020-01-01", periods=50, freq="W")
     series_dict = {"__single__": pd.Series([0.0] * 50, index=train_idx)}
-    aligned = _align_val_exog_index(
+    aligned = align_val_exog_index(
         val_exog, series_dict, train_len=50, dt_col="date", freq="W"
     )
     assert isinstance(aligned.index, pd.DatetimeIndex)

@@ -4,7 +4,7 @@ This module only ever sees training-window history. The executor cannot
 construct val_exog for unknown_future columns through any other path.
 """
 from __future__ import annotations
-from typing import Literal
+from typing import Callable, Literal
 
 import pandas as pd
 
@@ -44,11 +44,11 @@ def _try_statistical(
     history: pd.Series,
     horizon: int,
     freq: str | None,
-    fit_fn: object,
+    fit_fn: Callable[[pd.Series, int, str | None], pd.Series | object],
     strategy_name: str,
 ) -> tuple[pd.Series, dict | None]:
     try:
-        preds = fit_fn(history, horizon, freq)  # type: ignore[operator]
+        preds = fit_fn(history, horizon, freq)
         return pd.Series(preds, name=history.name), None
     except Exception as e:
         logger.warning(
@@ -81,6 +81,9 @@ def _fit_auto_arima(history: pd.Series, horizon: int, freq: str | None) -> objec
     return m.predict(h=horizon)["mean"]
 
 
+# Duplicated from models/factories.py intentionally: exog_extender must not
+# import from the models layer to avoid a circular dependency (training → models
+# → training).
 _FREQ_TO_SEASON: dict[str, int] = {
     "H": 24,
     "D": 7,
@@ -98,7 +101,7 @@ def _season_length_for_freq(freq: str | None) -> int:
     return _FREQ_TO_SEASON.get(freq, 1)
 
 
-def _align_val_exog_index(
+def align_val_exog_index(
     val_exog: pd.DataFrame,
     series_dict: dict[str, pd.Series],
     train_len: int,
@@ -112,7 +115,7 @@ def _align_val_exog_index(
     at `train_len`. If DatetimeIndex, val_exog continues from the last
     training timestamp at `freq` cadence.
     """
-    if val_exog.empty or len(val_exog) == 0:
+    if val_exog.empty:
         return val_exog
     sample = next(iter(series_dict.values()))
     if isinstance(sample.index, pd.RangeIndex):
@@ -120,7 +123,12 @@ def _align_val_exog_index(
         val_exog.index = pd.RangeIndex(train_len, train_len + len(val_exog))
         return val_exog
     last_train_ts = sample.index[-1]
-    offset = pd.tseries.frequencies.to_offset(freq) if freq else pd.Timedelta(days=1)
+    if freq is None:
+        raise ValueError(
+            "align_val_exog_index requires freq when series_dict uses a "
+            "DatetimeIndex (cannot infer cadence from None)"
+        )
+    offset = pd.tseries.frequencies.to_offset(freq)
     future_idx = pd.date_range(
         start=last_train_ts + offset,
         periods=len(val_exog),
