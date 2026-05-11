@@ -131,7 +131,7 @@ def minimal_experience_record():
     """Factory: build a minimal ExperienceRecord with overrideable fields."""
     def _make(**overrides):
         base = dict(
-            task_id="test_t_2026-05-11_001",
+            task_id="test_t_fixture_001",
             problem_type="forecasting",
             dataset_profile={"schema_version": 1, "problem_type": "forecasting",
                              "n_rows": "medium"},

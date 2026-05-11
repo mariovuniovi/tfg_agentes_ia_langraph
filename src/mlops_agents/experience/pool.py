@@ -11,42 +11,17 @@ from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_NEW_EXPERIENCE_COLUMNS = [
-    "validation_strategy_json",
-    "exog_availability_json",
-    "exog_strategies_json",
-    "per_fold_metrics_json",
-    "exog_fit_failures_json",
-]
-
-
-def _migrate_experience_columns(conn: sqlite3.Connection) -> None:
-    """Add new TEXT columns idempotently using PRAGMA introspection.
-
-    SQLite does not universally support ADD COLUMN IF NOT EXISTS, so we check
-    the current schema with PRAGMA table_info first.
-    """
-    existing = {
-        row[1] for row in conn.execute("PRAGMA table_info(experiences)").fetchall()
-    }
-    for col in _NEW_EXPERIENCE_COLUMNS:
-        if col not in existing:
-            conn.execute(f"ALTER TABLE experiences ADD COLUMN {col} TEXT")
-
-
 def _opt_json(v: Any) -> str | None:
     return json.dumps(v) if v is not None else None
+
+
+def _opt_load(v: Any) -> Any:
+    return json.loads(v) if v else None
 
 
 class ExperiencePool:
     def __init__(self, db_path: Path, audit_dir: Path | None = None):
         apply_pending_migrations(db_path)
-        conn = sqlite3.connect(str(db_path))
-        try:
-            with conn:
-                _migrate_experience_columns(conn)
-        finally:
-            conn.close()
         self._db_path = db_path
         self._audit_dir = audit_dir
 
@@ -146,6 +121,11 @@ class ExperiencePool:
             metric_direction=row["metric_direction"],
             models_tested=candidates, selected_solution=sol,
             experience_summary=row["experience_summary"],
+            validation_strategy=_opt_load(row["validation_strategy_json"]),
+            exog_availability=_opt_load(row["exog_availability_json"]),
+            exog_strategies=_opt_load(row["exog_strategies_json"]),
+            per_fold_metrics=_opt_load(row["per_fold_metrics_json"]),
+            exog_fit_failures=_opt_load(row["exog_fit_failures_json"]),
         )
 
     def count(self, problem_type: str | None = None) -> int:

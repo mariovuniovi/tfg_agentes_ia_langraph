@@ -55,3 +55,20 @@ def test_insert_record_with_new_fields_round_trips(tmp_path, minimal_experience_
     assert json.loads(es)["oil"] == "naive_carry"
     assert json.loads(pfm)[0]["rmse"] == 1.23
     assert json.loads(ef) == []
+
+
+def test_pool_get_returns_new_fields(tmp_path, minimal_experience_record):
+    db = tmp_path / "test.db"
+    pool = ExperiencePool(db, audit_dir=tmp_path / "audit")
+    record = minimal_experience_record(
+        validation_strategy={"type": "rolling_window", "n_folds": 3, "horizon": 6},
+        exog_strategies={"oil": "ets"},
+        per_fold_metrics=[{"fold_id": 0, "rmse": 1.0}, {"fold_id": 1, "rmse": 1.5}],
+    )
+    pool.insert_from_record(record)
+
+    fetched = pool.get(record.task_id)
+    assert fetched is not None
+    assert fetched.validation_strategy == {"type": "rolling_window", "n_folds": 3, "horizon": 6}
+    assert fetched.exog_strategies == {"oil": "ets"}
+    assert len(fetched.per_fold_metrics) == 2
