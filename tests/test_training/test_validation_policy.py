@@ -2,10 +2,13 @@
 import pytest
 
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate,
-    ValidationStrategy, ExogStrategySettings, ForecastingSettings,
+    ExogStrategySettings,
+    ForecastingSettings,
+    TrainingPlan,
+    TrainingPlanCandidate,
+    TrialBudget,
+    ValidationStrategy,
 )
-from mlops_agents.contracts.training import TrialBudget
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.training.validation_policy import (
     select_validation_strategy,
@@ -66,9 +69,21 @@ def test_long_history_high_drift_returns_rolling():
 # ─── resolve_rolling_window_size ───────────────────────────────────
 
 def test_rolling_window_size_respects_floor_and_capacity():
-    # 200 history, horizon 10, 3 folds → can use up to 170 as window
+    # 200 history, horizon 10, 3 folds → upper=170, base=max(30,50)=50, result=50
     w = resolve_rolling_window_size(total_history=200, horizon=10, n_folds=3, season_length=None)
-    assert 10 <= w <= 170
+    assert w == 50
+
+
+def test_rolling_window_size_clamps_to_horizon_when_capacity_tight():
+    # total=35, horizon=10, n_folds=3 → upper=5, max(upper, horizon)=10, min(base=50, 10)=10
+    w = resolve_rolling_window_size(total_history=35, horizon=10, n_folds=3, season_length=None)
+    assert w == 10
+
+
+def test_rolling_window_size_ignores_season_length_in_mvp():
+    w1 = resolve_rolling_window_size(total_history=200, horizon=10, n_folds=3, season_length=None)
+    w2 = resolve_rolling_window_size(total_history=200, horizon=10, n_folds=3, season_length=52)
+    assert w1 == w2
 
 
 # ─── validate_forecasting_plan ─────────────────────────────────────

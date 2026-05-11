@@ -16,6 +16,12 @@ from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Forecasting capacity heuristics (rule-of-thumb thresholds)
+_MIN_TRAIN_ROWS = 30          # smallest tolerable training set size
+_WINDOW_SIZE_FLOOR = 50       # rolling window minimum regardless of horizon
+_HORIZON_MULTIPLIER = 3       # min training rows = 3 * horizon
+_DEFAULT_N_FOLDS = 3          # K=3 balances backtest stability vs. compute
+
 
 def select_validation_strategy(
     profile: DatasetProfile,
@@ -33,14 +39,14 @@ def select_validation_strategy(
     if drift == "high":
         return ValidationStrategy(
             type="rolling_window",
-            n_folds=3,
+            n_folds=_DEFAULT_N_FOLDS,
             horizon=horizon,
             step_size=horizon,
             window_size=None,
         )
     return ValidationStrategy(
         type="expanding_window",
-        n_folds=3,
+        n_folds=_DEFAULT_N_FOLDS,
         horizon=horizon,
         step_size=horizon,
     )
@@ -53,7 +59,7 @@ def resolve_rolling_window_size(
     season_length: int | None,
 ) -> int:
     # MVP: ignore season_length. TODO: max(3*horizon, 2*season_length, 50)
-    base = max(3 * horizon, 50)
+    base = max(_HORIZON_MULTIPLIER * horizon, _WINDOW_SIZE_FLOOR)
     upper = total_history - n_folds * horizon
     return min(base, max(upper, horizon))
 
@@ -117,7 +123,7 @@ def validate_forecasting_plan(
     # (5) capacity check (single-series only here; panel handled above)
     if single_series:
         total_len = int(train_pool_stats["total_len"])
-        min_train_len = max(3 * horizon_meta, 30)
+        min_train_len = max(_HORIZON_MULTIPLIER * horizon_meta, _MIN_TRAIN_ROWS)
         required = vs.n_folds * horizon_meta + min_train_len
         if total_len < required:
             raise ValueError(
@@ -126,7 +132,12 @@ def validate_forecasting_plan(
             )
 
     # (6) rolling_window window_size sanity
-    if vs.type == "rolling_window" and vs.window_size is not None:
+    if vs.type == "rolling_window":
+        if vs.window_size is None:
+            raise ValueError(
+                "rolling_window plan has window_size=None; resolve via "
+                "validation_policy.resolve_rolling_window_size() before validating"
+            )
         upper = train_pool_stats["total_len"] - vs.n_folds * horizon_meta
         if not (horizon_meta <= vs.window_size <= upper):
             raise ValueError(
