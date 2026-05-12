@@ -14,15 +14,17 @@ def test_graph_compiles_without_error():
 
 
 def test_graph_has_expected_nodes():
-    """Graph should contain all 5 expected nodes."""
+    """Graph should contain all expected nodes including planner and executor (SP5)."""
     from mlops_agents.graphs.mlops_graph import graph
 
     node_names = set(graph.nodes.keys())
     assert "supervisor" in node_names
     assert "data_validator" in node_names
-    assert "trainer" in node_names
+    assert "planner" in node_names
+    assert "executor" in node_names
     assert "evaluator" in node_names
     assert "deployer" in node_names
+    assert "trainer" not in node_names
 
 
 def _make_validator_state(tmp_path=None):

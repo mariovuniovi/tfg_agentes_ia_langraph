@@ -1,7 +1,7 @@
 """Main LangGraph StateGraph — the MLOps pipeline topology.
 
 Architecture:
-  START → supervisor → [data_validator | trainer | evaluator | deployer] → supervisor → … → END
+  START → supervisor → [data_validator | planner | executor | evaluator | deployer] → supervisor → … → END
 
 The supervisor (LLM with structured output) decides routing at every step.
 Worker nodes wrap create_react_agent sub-graphs and return Command(goto="supervisor").
@@ -19,10 +19,12 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.types import Command, interrupt
 
+from mlops_agents.agents.planner import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.agents.supervisor import supervisor_node
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
+from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.utils.logging import get_logger
 
@@ -281,23 +283,22 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     )
 
 
-def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
+def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
     from pathlib import Path as _Path
-    from mlops_agents.contracts.training import TrainingPlan
-    from mlops_agents.training.default_plans import default_training_plan
     from mlops_agents.training.executor import run_training_plan
-    from mlops_agents.training.profiler import build_dataset_profile
 
     processed_path = _Path(state["processed_dataset_path"])
     task_meta = state.get("task_metadata") or {}
 
-    profile = build_dataset_profile(processed_path, task_meta)
-    plan_dict = state.get("training_plan")
-    if plan_dict:
-        plan = TrainingPlan.model_validate(plan_dict)
-    else:
-        problem_type = state.get("problem_type", task_meta.get("problem_type", "classification"))
-        plan = default_training_plan(problem_type, profile)
+    raw_plan = state.get("training_plan")
+    if raw_plan is None:
+        raise RuntimeError(
+            "executor_node expected a planner-generated training_plan, but none was found. "
+            "Ensure the planner node ran successfully before executor."
+        )
+    plan = TrainingPlan.model_validate(raw_plan)
+
+    planner_out = state.get("_planner_output_record")
 
     result = run_training_plan(
         plan=plan,
@@ -306,9 +307,10 @@ def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
         task_metadata=task_meta,
         output_dir=_Path("data/processed"),
         mlflow_experiment=settings.mlflow_experiment_name,
+        planner_output=planner_out,
     )
 
-    logger.info("[trainer] completed — routing back to supervisor")
+    logger.info("[executor] completed — routing back to supervisor")
     return Command(
         goto="supervisor",
         update={
@@ -323,6 +325,25 @@ def trainer_node(state: AgentState) -> Command[Literal["supervisor"]]:
             "experience_record_path": result.experience_record_path,
         },
     )
+
+
+def _planner_node_with_error_handling(
+    state: AgentState,
+) -> Command[Literal["supervisor"]]:
+    """Wrap planner_node to catch PlannerError and route to supervisor gracefully."""
+    try:
+        return planner_node(state)
+    except PlannerError as exc:
+        logger.error(f"[planner] failed after retry: {exc}")
+        return Command(
+            goto="supervisor",
+            update={
+                "planner_status": "failed",
+                "planner_retry_used": True,
+                "error_message": f"Model planner failed: {exc}",
+                "messages": [HumanMessage(content=f"Planner failed: {exc}", name="planner")],
+            },
+        )
 
 
 def evaluator_node(state: AgentState) -> Command[Literal["supervisor"]]:
@@ -396,13 +417,17 @@ def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
 # =============================================================================
 
 def _build_graph(checkpointer=None) -> StateGraph:
-    """Build the MLOps StateGraph. Optionally attach a checkpointer for HITL."""
+    """Build the MLOps StateGraph. Optionally attach a checkpointer for HITL.
+
+    Nodes: supervisor, data_validator, planner, executor, evaluator, deployer.
+    """
     builder = StateGraph(AgentState)
 
     # Add nodes
     builder.add_node("supervisor", supervisor_node)
     builder.add_node("data_validator", data_validator_node)
-    builder.add_node("trainer", trainer_node)
+    builder.add_node("planner", _planner_node_with_error_handling)
+    builder.add_node("executor", executor_node)
     builder.add_node("evaluator", evaluator_node)
     builder.add_node("deployer", deployer_node)
 

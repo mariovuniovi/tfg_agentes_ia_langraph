@@ -383,23 +383,30 @@ def test_data_validator_node_passed_false_when_no_tool_output():
 # ---------------------------------------------------------------------------
 
 
-def test_trainer_node_returns_to_supervisor(tmp_path):
-    """trainer_node (deterministic) routes to supervisor and populates training state fields."""
+def test_executor_node_returns_to_supervisor(tmp_path):
+    """executor_node (deterministic) routes to supervisor and populates training state fields."""
     import pandas as pd
     from sklearn.datasets import load_iris
-    from mlops_agents.graphs.mlops_graph import trainer_node
+    from mlops_agents.graphs.mlops_graph import executor_node
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
 
     data = load_iris(as_frame=True)
     df = pd.concat([data.data, data.target.rename("target")], axis=1)
     csv_path = tmp_path / "iris.csv"
     df.to_csv(csv_path, index=False)
 
+    plan = TrainingPlan(
+        problem_type="classification",
+        candidates=[TrainingPlanCandidate(priority=1, model_key="logistic_regression")],
+        trial_budget=TrialBudget(total_trials=3, min_trials_per_candidate=3, max_trials_per_candidate=3),
+    )
     state = _make_state()
     state["processed_dataset_path"] = str(csv_path)
     state["problem_type"] = "classification"
     state["task_metadata"] = {"target_column": "target", "problem_type": "classification"}
+    state["training_plan"] = plan.model_dump()
 
-    command = trainer_node(state)
+    command = executor_node(state)
 
     assert command.goto == "supervisor"
     assert "trained_model_path" in command.update
@@ -732,11 +739,11 @@ def test_data_validator_node_invokes_agent_with_isolated_context():
     )
 
 
-def test_trainer_node_uses_plan_from_state_when_present(tmp_path):
-    """trainer_node must use training_plan from state when provided."""
+def test_executor_node_uses_plan_from_state(tmp_path):
+    """executor_node must use training_plan from state (planner-generated)."""
     import pandas as pd
     from sklearn.datasets import load_iris
-    from mlops_agents.graphs.mlops_graph import trainer_node
+    from mlops_agents.graphs.mlops_graph import executor_node
     from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
 
     data = load_iris(as_frame=True)
@@ -755,7 +762,7 @@ def test_trainer_node_uses_plan_from_state_when_present(tmp_path):
     state["task_metadata"] = {"target_column": "target", "problem_type": "classification"}
     state["training_plan"] = plan.model_dump()
 
-    command = trainer_node(state)
+    command = executor_node(state)
 
     assert command.goto == "supervisor"
     assert command.update["training_plan"]["candidates"][0]["model_key"] == "logistic_regression"

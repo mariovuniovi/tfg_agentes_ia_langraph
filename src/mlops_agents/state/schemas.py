@@ -14,7 +14,8 @@ class RouterOutput(BaseModel):
 
     next: Literal[
         "data_validator",
-        "trainer",
+        "planner",
+        "executor",
         "evaluator",
         "deployer",
         "FINISH",

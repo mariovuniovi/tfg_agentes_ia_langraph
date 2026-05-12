@@ -28,7 +28,7 @@ _supervisor_prompt = get_prompt("supervisor").template
 
 def supervisor_node(
     state: AgentState,
-) -> Command[Literal["data_validator", "trainer", "evaluator", "deployer", "__end__"]]:
+) -> Command[Literal["data_validator", "planner", "executor", "evaluator", "deployer", "__end__"]]:
     """Supervisor node: reads state and decides which agent to call next.
 
     Uses structured output to enforce a valid routing decision.
@@ -44,6 +44,7 @@ def supervisor_node(
     snapshot_data = {
         "problem_type": state.get("problem_type", ""),
         "validation_passed": state.get("validation_passed") if dv_has_run else None,
+        "planner_status": state.get("planner_status", ""),
         "evaluation_passed": state.get("evaluation_passed"),
         "deployment_decision": state.get("deployment_decision", "pending"),
         "error_message": state.get("error_message", ""),
