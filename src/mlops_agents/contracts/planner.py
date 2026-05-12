@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -53,7 +53,7 @@ class PlannerContext(BaseModel):
     task_metadata: dict[str, str | int | float | bool]
     available_models: list[str]
     similar_experiences: list[ExperienceSummary]
-    matched_rules: list[dict[str, str | int | float | bool | list[str] | dict]]
+    matched_rules: list[dict[str, str | int | float | bool | list[str] | dict[str, Any]]]
 
 
 class PlannerOutput(BaseModel):
