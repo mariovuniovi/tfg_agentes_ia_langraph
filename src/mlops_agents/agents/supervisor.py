@@ -52,7 +52,7 @@ def supervisor_node(
     }
     state_snapshot = HumanMessage(content=f"Pipeline state:\n{json.dumps(snapshot_data)}")
     messages = [SystemMessage(content=_supervisor_prompt)] + list(state["messages"]) + [state_snapshot]
-    response: RouterOutput = _router_llm.with_structured_output(RouterOutput).invoke(messages)
+    response: RouterOutput = _router_llm.with_structured_output(RouterOutput).invoke(messages)  # type: ignore[assignment]
 
     logger.info(f"[{AGENT_SUPERVISOR}] → {response.next} | reason: {response.reasoning}")
 

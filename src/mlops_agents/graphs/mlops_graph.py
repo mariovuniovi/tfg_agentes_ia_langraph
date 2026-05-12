@@ -285,6 +285,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
 def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
     from pathlib import Path as _Path
+
     from mlops_agents.training.executor import run_training_plan
 
     processed_path = _Path(state["processed_dataset_path"])
