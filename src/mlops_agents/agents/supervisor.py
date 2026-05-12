@@ -44,15 +44,19 @@ def supervisor_node(
     snapshot_data = {
         "problem_type": state.get("problem_type", ""),
         "validation_passed": state.get("validation_passed") if dv_has_run else None,
-        "planner_status": state.get("planner_status", ""),
+        "planner_status": state.get("planner_status") or "",
+        "executor_has_run": bool(state.get("training_run_id")),
+        "training_run_id": state.get("training_run_id", ""),
+        "evaluation_report_empty": not bool(state.get("evaluation_report")),
         "evaluation_passed": state.get("evaluation_passed"),
         "deployment_decision": state.get("deployment_decision", "pending"),
         "error_message": state.get("error_message", ""),
-        "training_run_id": state.get("training_run_id", ""),
     }
     state_snapshot = HumanMessage(content=f"Pipeline state:\n{json.dumps(snapshot_data)}")
-    messages = [SystemMessage(content=_supervisor_prompt)] + list(state["messages"]) + [state_snapshot]
-    response: RouterOutput = _router_llm.with_structured_output(RouterOutput).invoke(messages)  # type: ignore[assignment]
+    # The supervisor is a pure router — it only needs the structured snapshot, not the
+    # full message history (which grows with every pipeline step and overflows context).
+    messages = [SystemMessage(content=_supervisor_prompt), state_snapshot]
+    response: RouterOutput = _router_llm.with_structured_output(RouterOutput, method="function_calling").invoke(messages)  # type: ignore[assignment]
 
     logger.info(f"[{AGENT_SUPERVISOR}] → {response.next} | reason: {response.reasoning}")
 

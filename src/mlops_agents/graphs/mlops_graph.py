@@ -12,6 +12,7 @@ Run with:
 """
 
 import json
+from pathlib import Path
 from typing import Any, Literal
 
 from langchain_core.messages import HumanMessage, ToolMessage
@@ -58,31 +59,54 @@ def _build_data_validator_context(
     schema_json: str = "{}",
     schema_path: str = "",
 ) -> HumanMessage:
+    paths: list[str] = state.get("dataset_paths") or []
+    single_file_note = (
+        "\nNOTE: Only ONE file was uploaded. "
+        "Do NOT call merge_datasets. "
+        "After load_dataset, go directly to apply_column_mapping on this single file."
+        if len(paths) == 1 else ""
+    )
     return HumanMessage(content=(
-        f"Raw files: {json.dumps(state.get('dataset_paths', []))}\n"
+        f"Raw files: {json.dumps(paths)}\n"
         f"Schema path: {schema_path}\n"
         f"Target schema:\n{schema_json}"
+        f"{single_file_note}"
     ))
 
 
 
 def _build_evaluator_context(state: AgentState) -> HumanMessage:
+    metrics = state.get("training_metrics") or {}
+    problem_type = state.get("problem_type", "")
+
+    if problem_type == "classification":
+        f1_val = metrics.get("f1_score") or metrics.get("macro_f1") or metrics.get("weighted_f1")
+        normalised = {**metrics}
+        if f1_val is not None:
+            normalised["f1_score"] = f1_val
+        notes = (
+            "NOTE: MLflow stores F1 under the key 'macro_f1'. "
+            "Call get_best_run with metric='macro_f1' (ascending=False) to find the champion."
+        )
+    else:
+        normalised = {**metrics}
+        notes = (
+            "NOTE: This is a forecasting/regression problem. "
+            "Primary metric is 'rmse' (lower is better). "
+            "Call get_best_run with metric='rmse' and ascending=True to find the run with the lowest RMSE. "
+            "Do NOT apply accuracy or macro_f1 thresholds — those are for classification. "
+            "Promotion criterion: candidate RMSE must exist and be lower than (or tie with) the current best RMSE."
+        )
+
     return HumanMessage(content=(
-        f"Problem type: {state.get('problem_type', '')}\n"
+        f"Problem type: {problem_type}\n"
         f"Task metadata: {json.dumps(state.get('task_metadata') or {})}\n"
         f"Training run ID: {state.get('training_run_id', '')}\n"
         f"Trained model path: {state.get('trained_model_path', '')}\n"
-        f"Training metrics: {json.dumps(state.get('training_metrics') or {})}"
+        f"Training metrics: {json.dumps(normalised)}\n"
+        f"{notes}"
     ))
 
-
-def _build_deployer_context(state: AgentState) -> HumanMessage:
-    return HumanMessage(content=(
-        f"Problem type: {state.get('problem_type', '')}\n"
-        f"Best model URI: {state.get('best_model_uri', '')}\n"
-        f"Training run ID: {state.get('training_run_id', '')}\n"
-        f"Evaluation report: {json.dumps(state.get('evaluation_report') or {})}"
-    ))
 
 
 def _validate_schema_contract(schema_data: dict) -> None:
@@ -123,12 +147,20 @@ def _validate_schema_contract(schema_data: dict) -> None:
                 raise ValueError(f"'series_id_columns' entry '{col}' not found in columns.")
 
 
-def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
+def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "data_validator"]]:
     import pandas as pd
 
     schema_json: str = state.get("schema_json") or ""
-    schema_path = "(uploaded via UI)" if schema_json else "(none)"
     schema_data = json.loads(schema_json) if schema_json else {}
+
+    if schema_json:
+        schema_dir = Path("data/schema")
+        schema_dir.mkdir(parents=True, exist_ok=True)
+        schema_file = schema_dir / "uploaded_schema.json"
+        schema_file.write_text(schema_json)
+        schema_path = str(schema_file)
+    else:
+        schema_path = "(none)"
 
     if not schema_json:
         error_msg = "No schema uploaded. Upload a schema JSON before running the pipeline."
@@ -168,8 +200,28 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
             goto="supervisor",
         )
 
+    _max_attempts = 3
+    counts = dict(state.get("agent_attempt_counts") or {})
+    attempt = counts.get("data_validator", 1)
+
+    # Build agent messages; on retry, prepend prior rejection feedback so the
+    # agent knows what the human reviewer objected to and can try a different approach.
+    context_msg = _build_data_validator_context(state, schema_json=schema_json, schema_path=schema_path)
+    agent_messages: list[HumanMessage] = [context_msg]
+    if attempt > 1:
+        for msg in reversed(state.get("messages") or []):
+            if getattr(msg, "name", "") == "data_validator" and "rejected" in str(msg.content).lower():
+                agent_messages.append(HumanMessage(
+                    content=(
+                        f"Your previous attempt was rejected by a human reviewer. "
+                        f"Their feedback: {msg.content}. "
+                        "Please try a different approach to address this feedback."
+                    )
+                ))
+                break
+
     agent = get_agent("data_validator")
-    result = agent.invoke({"messages": [_build_data_validator_context(state, schema_json=schema_json, schema_path=schema_path)]})
+    result = agent.invoke({"messages": agent_messages})
     final_message = result["messages"][-1].content
 
     quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")
@@ -178,7 +230,8 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
     imputation_result: dict = _extract_tool_json(result["messages"], "impute_missing_values")
 
     processed_path = (
-        mapping_result.get("output_path", "")
+        imputation_result.get("output_path", "")
+        or mapping_result.get("output_path", "")
         or validation_result.get("output_path", "")
     )
     validation_passed = bool(validation_result.get("passed", False))
@@ -213,6 +266,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
             "series_id_columns": schema_data.get("series_id_columns", []),
             "forecast_horizon": schema_data.get("forecast_horizon"),
             "frequency": schema_data.get("frequency", ""),
+            "exogenous_columns": schema_data.get("exogenous_columns"),  # [{name, future_availability}]
         })
 
     base_update = {
@@ -236,9 +290,6 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
             goto="supervisor",
         )
 
-    counts = dict(state.get("agent_attempt_counts") or {})
-    attempt = counts.get("data_validator", 1)
-
     missing_vals: dict = {}
     if isinstance(quality_report, dict):
         missing_vals = quality_report.get("missing_values", {})
@@ -260,15 +311,32 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
         logger.info("[data_validator] approved — routing back to supervisor")
         return Command(update=base_update, goto="supervisor")
 
-    # Human rejected a validated+imputed dataset. Abort — retrying cannot help
-    # because tools and strategy are deterministic.
     comment = approval.get("comment", "")
     rejection_text = (
         f"Dataset rejected by human reviewer. Comment: {comment}"
         if comment
         else "Dataset rejected by human reviewer."
     )
-    logger.info(f"[data_validator] rejected — comment: {comment!r}")
+    counts["data_validator"] = attempt + 1
+    logger.info(f"[data_validator] rejected (attempt {attempt}/{_max_attempts}) — comment: {comment!r}")
+
+    if attempt < _max_attempts:
+        # Route back to data_validator for another attempt; rejection feedback
+        # is stored in messages so the next run can inject it into agent context.
+        return Command(
+            update={
+                "messages": [
+                    HumanMessage(content=final_message, name="data_validator"),
+                    HumanMessage(content=rejection_text, name="data_validator"),
+                ],
+                "agent_attempt_counts": counts,
+                "validation_passed": False,
+                "error_message": "",
+            },
+            goto="data_validator",
+        )
+
+    # Max attempts exhausted — abort.
     return Command(
         update={
             **base_update,
@@ -277,19 +345,17 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor"]]:
                 HumanMessage(content=rejection_text, name="data_validator"),
             ],
             "validation_passed": False,
-            "error_message": rejection_text,
+            "error_message": f"Dataset rejected after {_max_attempts} attempts. Last comment: {comment}",
         },
         goto="supervisor",
     )
 
 
 def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    from pathlib import Path as _Path
-
     from mlops_agents.training.executor import run_training_plan
 
-    processed_path = _Path(state["processed_dataset_path"])
-    task_meta = state.get("task_metadata") or {}
+    processed_path = Path(state["processed_dataset_path"])
+    task_meta = {**(state.get("task_metadata") or {}), "problem_type": state.get("problem_type", "")}
 
     raw_plan = state.get("training_plan")
     if raw_plan is None:
@@ -306,7 +372,7 @@ def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
         processed_dataset_path=processed_path,
         target_column=task_meta.get("target_column", "target"),
         task_metadata=task_meta,
-        output_dir=_Path("data/processed"),
+        output_dir=Path("data/processed"),
         mlflow_experiment=settings.mlflow_experiment_name,
         planner_output=planner_out,
     )
@@ -363,12 +429,21 @@ def evaluator_node(state: AgentState) -> Command[Literal["supervisor"]]:
         "baseline_metrics": baseline.get("metrics", {}),
     }
 
-    logger.info("[evaluator] completed — routing back to supervisor")
+    lower = final_message.lower()
+    promoted = (
+        "promot" in lower
+        and "do not promot" not in lower
+        and "not promot" not in lower
+        and "retrain" not in lower
+        and "reject" not in lower
+    )
+
+    logger.info(f"[evaluator] completed — promoted={promoted} — routing back to supervisor")
     return Command(
         update={
             "messages": [HumanMessage(content=final_message, name="evaluator")],
             "evaluation_report": evaluation_report,
-            "evaluation_passed": bool(candidate),
+            "evaluation_passed": promoted,
         },
         goto="supervisor",
     )
@@ -378,17 +453,28 @@ def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
     """Deployment node with HITL interrupt() before champion promotion.
 
     Execution flow:
-    1. Run the deployment agent (registers model, sets 'challenger' alias).
+    1. Register the model and assign 'challenger' alias (deterministic).
     2. Interrupt for human approval.
-    3. On resume: if approved, set 'champion' alias; if rejected, abort.
+    3. On resume: if approved, assign 'champion' alias; if rejected, abort.
     """
-    # Step 1: register model and set challenger alias
-    agent = get_agent("deployer")
-    result = agent.invoke({"messages": [_build_deployer_context(state)]})
-    registration_summary = result["messages"][-1].content
+    import json as _json
+    from mlops_agents.tools.mlflow_tools import register_model, set_model_alias
+
+    run_id = state.get("training_run_id", "")
+
+    # Step 1: register + challenger alias (deterministic, no LLM)
+    reg_raw = register_model.invoke({"run_id": run_id})
+    reg = _json.loads(reg_raw)
+    version = reg.get("version")
+    model_name = reg.get("model_name", "")
+    alias_raw = set_model_alias.invoke({"model_name": model_name, "alias": "challenger", "version": version})
+    registration_summary = (
+        f"Registered '{model_name}' version {version} from run {run_id}. "
+        f"Alias 'challenger' assigned."
+    )
+    logger.info(f"[deployer] {registration_summary}")
 
     # Step 2: HITL — pause and wait for human approval
-    logger.info("[deployer] Pausing for human approval...")
     approval = interrupt({
         "question": "Approve promotion of this model to 'champion' in the MLflow Model Registry?",
         "registration_summary": registration_summary,
@@ -397,12 +483,13 @@ def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
     # Step 3: handle approval decision
     if approval.get("approved", False):
-        outcome = f"APPROVED. Model promoted to champion.\n\nRegistration details:\n{registration_summary}"
-        logger.info("[deployer] Deployment approved by human reviewer.")
+        set_model_alias.invoke({"model_name": model_name, "alias": "champion", "version": version})
+        outcome = f"APPROVED. '{model_name}' v{version} promoted to champion."
+        logger.info(f"[deployer] {outcome}")
     else:
         reason = approval.get("reason", "No reason provided.")
-        outcome = f"REJECTED by human reviewer. Reason: {reason}\n\nModel NOT promoted to champion."
-        logger.warning(f"[deployer] Deployment rejected: {reason}")
+        outcome = f"REJECTED. '{model_name}' v{version} NOT promoted. Reason: {reason}"
+        logger.warning(f"[deployer] {outcome}")
 
     return Command(
         update={

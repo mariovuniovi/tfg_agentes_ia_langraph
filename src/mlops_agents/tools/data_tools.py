@@ -127,7 +127,8 @@ def validate_against_schema(canonical_path: str, schema_path: str) -> str:
                 violations.append({"column": name, "rule": "max", "detail": f"{int(above.sum())} value(s) above maximum {col_def['max']}"})
 
         if "allowed_values" in col_def:
-            allowed = set(col_def["allowed_values"])
+            # Compare as strings so numeric schema values (0, 1) match int/float columns.
+            allowed = {str(v) for v in col_def["allowed_values"]}
             bad = series.dropna()[~series.dropna().astype(str).isin(allowed)]
             if not bad.empty:
                 bad_vals = bad.unique().tolist()[:5]

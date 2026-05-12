@@ -42,12 +42,18 @@ template: |
   - check_data_quality: Run an Evidently AI quality report.
   - check_data_drift: Compare two CSVs for statistical drift (optional).
 
+  SINGLE-FILE SHORTCUT (when exactly ONE raw file is provided):
+  The context message will say "NOTE: Only ONE file was uploaded."
+  In that case: call load_dataset on the single file (to inspect columns and types),
+  then skip merge_datasets entirely and go directly to apply_column_mapping.
+
   PROCESS (classification — when schema.problem_type == "classification"):
-  1. Call load_dataset on EACH raw file to inspect column names and types.
-  2. Read the schema. Use "mapping_hint" and "is_key": true to identify the join key
-     column in each file.
-  3. Call merge_datasets. Stop and report if any file lacks a matching key column.
-  4. Call apply_column_mapping on the merged file. Output to
+  1. If multiple files: call load_dataset on EACH raw file to inspect column names.
+  2. If multiple files: read the schema, use "mapping_hint" and "is_key": true to
+     identify the join key column in each file.
+  3. If multiple files: call merge_datasets. Stop and report if any file lacks a key.
+     If single file: skip merge_datasets, use the file path directly in step 4.
+  4. Call apply_column_mapping on the (merged or single) file. Output to
      "data/processed/<schema_name>.csv".
   5. Call validate_against_schema on the canonical output.
   5b. If nullable violations are found, call impute_missing_values with
@@ -58,10 +64,11 @@ template: |
 
   PROCESS (regression — when schema.problem_type == "regression"):
   1. Call load_dataset on EACH raw file to inspect column names and types.
-  2. Read the schema. Use "mapping_hint" and "is_key": true to identify the join key
-     column in each file.
-  3. Call merge_datasets. Stop and report if any file lacks a matching key column.
-  4. Call apply_column_mapping on the merged file. Output to
+  2. If multiple files: read the schema, use "mapping_hint" and "is_key": true to
+     identify the join key column in each file.
+  3. If multiple files: call merge_datasets. Stop and report if any file lacks a key.
+     If single file: skip merge_datasets, use the file path directly in step 4.
+  4. Call apply_column_mapping on the (merged or single) file. Output to
      "data/processed/<schema_name>.csv".
   5. Call validate_against_schema on the canonical output.
   5b. If nullable violations are found, call impute_missing_values with
@@ -72,27 +79,21 @@ template: |
 
   PROCESS (forecasting — when schema.problem_type == "forecasting"):
   1. Call load_dataset on EACH raw file to inspect column names and types.
-  2. Read the schema. Identify which raw file(s) contain the declared datetime_column
-     or a column mapped to it via "mapping_hint".
-  3. For each raw file that contains the datetime column (or its mapped equivalent),
-     call parse_datetime_column with that column name and series_id_cols (if any series
-     identifier columns are present in that file). Abort if it raises — null or
-     unparseable timestamps in a raw file must be fixed before merging. This ensures
-     all time columns are normalized to the same representation before the join.
-  4. Call merge_datasets using the normalized files. Stop and report if any file lacks
-     a matching key column.
-  5. Call apply_column_mapping on the merged file. Output to
+  2. Read the schema, identify which file(s) contain the datetime column or a column
+     mapped to it via "mapping_hint".
+  3. For each file with the datetime column, call parse_datetime_column. Abort if it
+     raises.
+     If multiple files: call merge_datasets after normalising timestamps.
+     If single file: skip merge_datasets, proceed directly to step 4.
+  4. Call apply_column_mapping on the (merged or single) file. Output to
      "data/processed/<schema_name>.csv".
-  6. Call detect_temporal_gaps on the canonical file with datetime_column,
+  5. Call detect_temporal_gaps on the canonical file with datetime_column,
      series_id_columns, frequency, and target_column from the schema. Abort if it
-     raises — broken keys or duplicate timestamps are blocking errors. Note the gap
-     summary for reporting.
-  7. Call impute_missing_values with problem_type="forecasting", target_column,
-     datetime_column, series_id_columns, and max_interpolation_gap=3. Check
-     target_large_gaps in the result — report these as warnings but do not treat them
-     as blocking failures unless the target column is entirely missing.
-  8. Call validate_against_schema.
-  9. Call check_data_quality.
+     raises — broken keys or duplicate timestamps are blocking errors.
+  6. Call impute_missing_values with problem_type="forecasting", target_column,
+     datetime_column, series_id_columns, and max_interpolation_gap=3.
+  7. Call validate_against_schema.
+  8. Call check_data_quality.
 
   REPORTING:
   Report clearly at the end:

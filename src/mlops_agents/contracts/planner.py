@@ -49,11 +49,11 @@ class ExperienceSummary(BaseModel):
 class PlannerContext(BaseModel):
     """Input context for the planner agent."""
 
-    current_dataset_profile: dict[str, str | int | float | bool]
-    task_metadata: dict[str, str | int | float | bool]
+    current_dataset_profile: dict[str, Any]
+    task_metadata: dict[str, Any]
     available_models: list[str]
     similar_experiences: list[ExperienceSummary]
-    matched_rules: list[dict[str, str | int | float | bool | list[str] | dict[str, Any]]]
+    matched_rules: list[dict[str, Any]]
 
 
 class PlannerOutput(BaseModel):

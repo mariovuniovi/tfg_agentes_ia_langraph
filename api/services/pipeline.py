@@ -125,6 +125,25 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                     await entry.queue.put(hitl_event)
                     return  # exit loop; wait for approval below
 
+                if "planner" in data and isinstance(data["planner"], dict):
+                    rec = data["planner"].get("_planner_output_record") or {}
+                    if rec:
+                        planner_ctx_event: dict = {
+                            "type": "planner_context",
+                            "agent": "planner",
+                            "timestamp_ms": time.time() * 1000,
+                            "data": {
+                                "retrieved_experiences": rec.get("retrieved_experiences", []),
+                                "matched_rules": rec.get("matched_rules", []),
+                                "evidence_used": rec.get("evidence_used", []),
+                                "planning_analysis": rec.get("planning_analysis", ""),
+                                "plan_summary": rec.get("plan_summary", {}),
+                                "warnings": rec.get("risks_or_warnings", []),
+                            },
+                        }
+                        entry.events.append(planner_ctx_event)
+                        await entry.queue.put(planner_ctx_event)
+
                 if "supervisor" in data and isinstance(data["supervisor"], dict):
                     next_agent = data["supervisor"].get("next", "")
                     reasoning = data["supervisor"].get("reasoning", "")

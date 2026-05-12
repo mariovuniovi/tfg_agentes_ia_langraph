@@ -69,12 +69,14 @@ def log_experiment(
 
 
 @tool
-def get_best_run(metric: str = "accuracy", top_n: int = 5) -> str:
+def get_best_run(metric: str = "accuracy", top_n: int = 5, ascending: bool = False) -> str:
     """Query MLflow for the best run in the current experiment by a given metric.
 
     Args:
         metric: The metric name to rank by (default 'accuracy').
         top_n: Number of top runs to return.
+        ascending: If True, sort ascending (use for error metrics like rmse/mae where lower is better).
+                   If False (default), sort descending (use for accuracy/f1/r2 where higher is better).
 
     Returns:
         JSON list of top runs with run_id, metrics, and params.
@@ -84,9 +86,10 @@ def get_best_run(metric: str = "accuracy", top_n: int = 5) -> str:
     if experiment is None:
         return json.dumps({"error": f"Experiment '{settings.mlflow_experiment_name}' not found."})
 
+    direction = "ASC" if ascending else "DESC"
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
-        order_by=[f"metrics.{metric} DESC"],
+        order_by=[f"metrics.{metric} {direction}"],
         max_results=top_n,
     )
     results = [

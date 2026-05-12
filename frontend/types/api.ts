@@ -6,6 +6,7 @@ export type PipelineEventType =
   | 'tool_call'
   | 'tool_result'
   | 'agent_reasoning'
+  | 'planner_context'
   | 'hitl_request'
   | 'run_complete'
 

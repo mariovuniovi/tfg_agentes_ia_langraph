@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # Training executor (SP3)
     train_test_split_ratio: float = 0.2
     cv_folds: int = 5
+    min_rows_for_cv: int = 50
+    min_class_count_for_cv: int = 5
     optuna_total_trials: int = 60
     optuna_min_trials_per_candidate: int = 5
     optuna_max_trials_per_candidate: int = 30

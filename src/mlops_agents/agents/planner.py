@@ -1,7 +1,6 @@
 """Model Planning Agent — context builder, validators, and planner node (SP5)."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -150,25 +149,14 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
     problem_type: str = state.get("problem_type", "")
     task_meta: dict[str, Any] = state.get("task_metadata") or {}
 
-    # Reuse dataset_profile from state (produced by data_validator) to avoid recomputing.
-    # Fall back to building it from the CSV only if the validator didn't store it.
-    profile_raw = state.get("schema_json")
-    if profile_raw:
-        raw_dict = (
-            profile_raw if isinstance(profile_raw, dict) else json.loads(profile_raw)
-        )
-    else:
-        # build_dataset_profile requires "problem_type" in task_metadata
-        profiler_meta = {**task_meta, "problem_type": problem_type}
-        raw_dict = build_dataset_profile(processed_path, profiler_meta).model_dump()
-    # PlannerContext.current_dataset_profile is typed as dict[str, str|int|float|bool]
-    # — strip None values so Pydantic validation doesn't reject them.
+    profiler_meta = {**task_meta, "problem_type": problem_type}
+    raw_dict = build_dataset_profile(processed_path, profiler_meta).model_dump()
     profile_dict = {k: v for k, v in raw_dict.items() if v is not None}
 
     pool = ExperiencePool(settings.experience_db_path)
     ctx = build_planner_context(profile_dict, task_meta, problem_type, pool)
 
-    llm = get_llm("planner").with_structured_output(PlannerOutput)
+    llm = get_llm("planner", max_tokens=16000).with_structured_output(PlannerOutput, method="function_calling")
     last_error = ""
     output: PlannerOutput
 
@@ -209,6 +197,9 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
             "models_not_recommended": [r.model_key for r in output.plan.models_not_recommended],
         },
         "prompt_version": "model_planner_v1",
+        # Full context sent to the LLM — used by the frontend to explain evidence retrieval.
+        "retrieved_experiences": [e.model_dump() for e in ctx.similar_experiences],
+        "matched_rules": ctx.matched_rules,
     }
 
     logger.info(

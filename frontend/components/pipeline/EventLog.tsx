@@ -9,6 +9,7 @@ const TYPE_COLORS: Record<PipelineEventType, string> = {
   tool_call: 'text-slate-500',
   tool_result: 'text-slate-400',
   agent_reasoning: 'text-indigo-500',
+  planner_context: 'text-violet-600',
   hitl_request: 'font-semibold text-amber-600',
   run_complete: 'font-semibold text-green-600',
 }
@@ -32,6 +33,19 @@ function formatContent(event: PipelineEvent, accumulatedContent?: string): strin
     }
     case 'agent_reasoning':
       return accumulatedContent ?? String(event.data.content ?? '')
+    case 'planner_context': {
+      const exps = (event.data.retrieved_experiences as unknown[]) ?? []
+      const rules = (event.data.matched_rules as unknown[]) ?? []
+      const cited = (event.data.evidence_used as unknown[]) ?? []
+      const summary = event.data.plan_summary as Record<string, unknown> | undefined
+      const candidates = (summary?.candidate_models as string[] | undefined) ?? []
+      return (
+        `${exps.length} similar experience${exps.length !== 1 ? 's' : ''} retrieved · ` +
+        `${rules.length} rule${rules.length !== 1 ? 's' : ''} matched · ` +
+        `${cited.length} cited · ` +
+        `candidates: ${candidates.join(', ') || '—'}`
+      )
+    }
     case 'hitl_request':
       return 'Awaiting human approval'
     case 'run_complete':

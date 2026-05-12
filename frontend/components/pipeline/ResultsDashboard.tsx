@@ -27,7 +27,7 @@ interface MissingSummary {
 
 interface ValidationResult {
   passed: boolean
-  violations: Array<{ column: string; rule: string; detail: string }>
+  violations?: Array<{ column: string; rule: string; detail: string }>
 }
 
 interface TuneResult {
@@ -83,6 +83,7 @@ function DatasetPanel({
   validation,
   running,
   hideRawSample,
+  merging,
 }: {
   dataset?: DatasetSummary
   merged?: MergedSummary
@@ -90,7 +91,16 @@ function DatasetPanel({
   validation?: ValidationResult
   running: boolean
   hideRawSample?: boolean
+  merging?: boolean
 }) {
+  if (merging && !merged) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-slate-400">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+        Merging datasets…
+      </div>
+    )
+  }
   if (!dataset && !merged && running) return <PulseRow />
   if (!dataset && !merged) return <p className="text-xs text-slate-400">No dataset results yet.</p>
 
@@ -117,7 +127,7 @@ function DatasetPanel({
                 : 'bg-red-50 text-red-600'
             }`}
           >
-            {validation.passed ? '✓ Valid' : `✗ ${validation.violations.length} violation${validation.violations.length !== 1 ? 's' : ''}`}
+            {validation.passed ? '✓ Valid' : `✗ ${(validation.violations ?? []).length} violation${(validation.violations ?? []).length !== 1 ? 's' : ''}`}
           </span>
         )}
       </div>
@@ -202,7 +212,7 @@ function DatasetPanel({
         <div>
           <p className="mb-1.5 text-xs font-medium text-red-600">Violations</p>
           <ul className="space-y-1">
-            {validation.violations.map((v, i) => (
+            {(validation.violations ?? []).map((v, i) => (
               <li key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-700">
                 <span className="font-medium">{v.column}</span> — {v.detail}
               </li>
@@ -407,13 +417,170 @@ function DatasetReviewPanel({
   )
 }
 
+// ---------------------------------------------------------------------------
+// Planner evidence types
+// ---------------------------------------------------------------------------
+
+interface ExperienceSummary {
+  experience_id: string
+  dataset_name: string
+  problem_type: string
+  best_model: string
+  validation_score: number
+}
+
+interface MatchedRule {
+  rule_id: string
+  prefer?: string[]
+  avoid_or_deprioritize?: string[]
+  recommend?: string
+  summary: string
+}
+
+interface EvidenceRef {
+  evidence_type: 'experience' | 'rule'
+  experience_id?: string
+  rule_id?: string
+  relevance_note: string
+}
+
+interface PlannerContextData {
+  retrieved_experiences: ExperienceSummary[]
+  matched_rules: MatchedRule[]
+  evidence_used: EvidenceRef[]
+  planning_analysis: string
+  plan_summary: { candidate_models: string[]; models_not_recommended: string[] }
+  warnings: string[]
+}
+
+function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; running: boolean }) {
+  if (!ctx && running) return <PulseRow />
+  if (!ctx) return <p className="text-xs text-slate-400">Planner has not run yet.</p>
+
+  const citedExpIds = new Set(ctx.evidence_used.filter(e => e.evidence_type === 'experience').map(e => e.experience_id))
+  const citedRuleIds = new Set(ctx.evidence_used.filter(e => e.evidence_type === 'rule').map(e => e.rule_id))
+
+  return (
+    <div className="space-y-5">
+      {/* Planning analysis */}
+      {ctx.planning_analysis && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-slate-600">Planning Analysis</p>
+          <p className="text-xs leading-relaxed text-slate-600">{ctx.planning_analysis}</p>
+        </div>
+      )}
+
+      {/* Candidate models */}
+      {ctx.plan_summary?.candidate_models?.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-slate-600">Selected Candidates</p>
+          <div className="flex flex-wrap gap-1">
+            {ctx.plan_summary.candidate_models.map((m) => (
+              <span key={m} className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">{m}</span>
+            ))}
+          </div>
+          {ctx.plan_summary.models_not_recommended?.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {ctx.plan_summary.models_not_recommended.map((m) => (
+                <span key={m} className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-500 line-through">{m}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Similar experiences */}
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-slate-600">
+          Similar Past Runs <span className="font-normal text-slate-400">({ctx.retrieved_experiences.length} retrieved)</span>
+        </p>
+        {ctx.retrieved_experiences.length === 0
+          ? <p className="text-xs text-slate-400">No similar experiences in the pool.</p>
+          : (
+            <div className="space-y-1.5">
+              {ctx.retrieved_experiences.map((exp) => {
+                const cited = citedExpIds.has(exp.experience_id)
+                return (
+                  <div key={exp.experience_id} className={`rounded border px-3 py-2 text-xs ${cited ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-700">{exp.dataset_name}</span>
+                      <span className="text-slate-400">{exp.problem_type}</span>
+                      {cited && <span className="ml-auto rounded-full bg-violet-100 px-2 py-0.5 text-violet-700">cited</span>}
+                    </div>
+                    <div className="mt-0.5 text-slate-500">
+                      Best model: <span className="font-medium text-slate-700">{exp.best_model}</span>
+                      {' · '}score: <span className="font-medium text-slate-700">{exp.validation_score.toFixed(4)}</span>
+                    </div>
+                    {cited && ctx.evidence_used.find(e => e.experience_id === exp.experience_id)?.relevance_note && (
+                      <div className="mt-1 italic text-violet-600">
+                        {ctx.evidence_used.find(e => e.experience_id === exp.experience_id)!.relevance_note}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        }
+      </div>
+
+      {/* Matched rules */}
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-slate-600">
+          ML Rules Matched <span className="font-normal text-slate-400">({ctx.matched_rules.length} rules)</span>
+        </p>
+        {ctx.matched_rules.length === 0
+          ? <p className="text-xs text-slate-400">No rules matched.</p>
+          : (
+            <div className="space-y-1.5">
+              {ctx.matched_rules.map((rule) => {
+                const cited = citedRuleIds.has(rule.rule_id)
+                return (
+                  <div key={rule.rule_id} className={`rounded border px-3 py-2 text-xs ${cited ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-slate-400">{rule.rule_id}</span>
+                      {cited && <span className="ml-auto rounded-full bg-violet-100 px-2 py-0.5 text-violet-700">cited</span>}
+                    </div>
+                    <p className="mt-0.5 text-slate-600">{rule.summary}</p>
+                    {rule.prefer && rule.prefer.length > 0 && (
+                      <p className="mt-0.5 text-emerald-700">↑ prefer: {rule.prefer.join(', ')}</p>
+                    )}
+                    {rule.avoid_or_deprioritize && rule.avoid_or_deprioritize.length > 0 && (
+                      <p className="mt-0.5 text-red-600">↓ avoid: {rule.avoid_or_deprioritize.join(', ')}</p>
+                    )}
+                    {rule.recommend && (
+                      <p className="mt-0.5 text-slate-500 italic">{rule.recommend}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        }
+      </div>
+
+      {/* Warnings */}
+      {ctx.warnings?.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-amber-700">Planner Warnings</p>
+          <ul className="space-y-0.5">
+            {ctx.warnings.map((w, i) => (
+              <li key={i} className="text-xs text-amber-700">⚠ {w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ResultsDashboard() {
   const events = useRunStore((s) => s.events)
   const status = useRunStore((s) => s.status)
   const runId = useRunStore((s) => s.runId)
   const hitlPending = useRunStore((s) => s.hitlPending)
   const interruptValue = useRunStore((s) => s.interruptValue)
-  const [tab, setTab] = useState<'dataset' | 'model'>('dataset')
+  const [tab, setTab] = useState<'dataset' | 'model' | 'planner'>('dataset')
   const reviewPanelRef = useRef<HTMLDivElement>(null)
 
   const isDataValidationHITL = hitlPending && (interruptValue as { type?: string })?.type === 'data_validation'
@@ -439,6 +606,11 @@ export function ResultsDashboard() {
     return results
   }, [events])
 
+  const plannerCtx = useMemo(() => {
+    const ev = events.findLast((e) => e.type === 'planner_context')
+    return ev ? (ev.data as unknown as PlannerContextData) : null
+  }, [events])
+
   const dataset = toolResults['load_dataset'] as DatasetSummary | undefined
   const merged = toolResults['merge_datasets'] as MergedSummary | undefined
   const missing = toolResults['check_missing_values'] as MissingSummary | undefined
@@ -446,8 +618,15 @@ export function ResultsDashboard() {
   const trained = toolResults['train_model'] as TrainResult | undefined
   const tuned = toolResults['tune_hyperparameters'] as TuneResult | undefined
 
-  const hasDataset = !!dataset || !!merged
+  const mergeWasStarted = useMemo(
+    () => events.some((e) => e.type === 'tool_call' && e.data.tool_name === 'merge_datasets'),
+    [events],
+  )
+  const isMerging = mergeWasStarted && !merged
+
+  const hasDataset = !!dataset || !!merged || isMerging
   const hasModel = !!trained || !!tuned
+  const hasPlanner = !!plannerCtx
   const running = status === 'running' || status === 'awaiting_approval'
   const active = running || hasDataset || hasModel
 
@@ -456,40 +635,38 @@ export function ResultsDashboard() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white">
       <div className="flex border-b border-slate-200">
-        {(['dataset', 'model'] as const).map((t) => {
-          const ready = t === 'dataset' ? hasDataset : hasModel
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors ${
-                tab === t
-                  ? 'border-b-2 border-navy text-navy-900'
-                  : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {t === 'dataset' ? 'Dataset' : 'Model'}
-              {ready && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              )}
-              {!ready && running && (
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-300" />
-              )}
-            </button>
-          )
-        })}
+        {([
+          { key: 'dataset', label: 'Dataset', ready: hasDataset },
+          { key: 'planner', label: 'Planner', ready: hasPlanner },
+          { key: 'model', label: 'Model', ready: hasModel },
+        ] as const).map(({ key, label, ready }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors ${
+              tab === key
+                ? 'border-b-2 border-navy text-navy-900'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {label}
+            {ready && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+            {!ready && running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-300" />}
+          </button>
+        ))}
       </div>
       <div className="p-4">
         {tab === 'dataset' && (
           <>
             <DatasetPanel
-              dataset={dataset}
+              dataset={mergeWasStarted ? undefined : dataset}
               merged={merged}
               missing={missing}
               validation={validation}
               running={running}
               hideRawSample={isDataValidationHITL && !!merged}
+              merging={isMerging}
             />
             {isDataValidationHITL && (
               <DatasetReviewPanel
@@ -499,6 +676,9 @@ export function ResultsDashboard() {
               />
             )}
           </>
+        )}
+        {tab === 'planner' && (
+          <PlannerPanel ctx={plannerCtx} running={running} />
         )}
         {tab === 'model' && (
           <ModelPanel trained={trained} tuned={tuned} running={running} />

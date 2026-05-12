@@ -36,4 +36,4 @@ def get_router_llm(temperature: float = 0) -> ChatOpenAI:
     """Return the LLM for the supervisor routing node."""
     model = settings.openai_model_supervisor
     logger.info(f"LLM init — agent=supervisor model={model}")
-    return _make_llm(model, temperature, max_tokens=1000)
+    return _make_llm(model, temperature, max_tokens=2000)

@@ -12,7 +12,7 @@ def get_agent(name: str) -> Any:
         name: One of 'data_validator', 'trainer', 'evaluator', 'deployer'.
 
     Returns:
-        A compiled create_react_agent graph.
+        A compiled agent graph.
     """
     if name == "data_validator":
         from mlops_agents.agents.data_agent import build_data_agent
@@ -20,7 +20,4 @@ def get_agent(name: str) -> Any:
     if name == "evaluator":
         from mlops_agents.agents.evaluation_agent import build_evaluation_agent
         return build_evaluation_agent()
-    if name == "deployer":
-        from mlops_agents.agents.deployment_agent import build_deployment_agent
-        return build_deployment_agent()
-    raise ValueError(f"Unknown agent: '{name}'. Valid names: data_validator, evaluator, deployer")
+    raise ValueError(f"Unknown agent: '{name}'. Valid names: data_validator, evaluator")

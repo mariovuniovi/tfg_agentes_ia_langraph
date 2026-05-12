@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import mlflow
+import mlflow.sklearn
 import numpy as np
 import optuna
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
+from sklearn.preprocessing import LabelEncoder
 
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.profile import DatasetProfile
@@ -116,6 +118,55 @@ def _pick_champion(results: list[dict], direction: str, tol: float) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Tabular validation strategy selectors
+# ---------------------------------------------------------------------------
+
+
+def _select_cls_validation(y: pd.Series) -> tuple:
+    """Return ('single_split',) or ('stratified_kfold', n_folds).
+
+    Falls back to single_split when the dataset is too small for reliable CV:
+    - fewer than settings.min_rows_for_cv total training rows, or
+    - fewer than settings.min_class_count_for_cv samples in the smallest class.
+    A single deterministic split is much more honest than 2-fold CV on 8 rows.
+    """
+    n_rows = len(y)
+    min_class_count = int(y.value_counts().min())
+
+    if min_class_count < 2:
+        logger.warning(
+            f"[executor] smallest class has {min_class_count} sample(s) — "
+            "stratified CV impossible, using single split"
+        )
+        return ("single_split",)
+
+    if n_rows < settings.min_rows_for_cv or min_class_count < settings.min_class_count_for_cv:
+        logger.warning(
+            f"[executor] dataset too small for reliable CV "
+            f"(rows={n_rows}, min_class={min_class_count}) — using single stratified split"
+        )
+        return ("single_split",)
+
+    n_folds = min(settings.cv_folds, min_class_count)
+    return ("stratified_kfold", n_folds)
+
+
+def _select_reg_validation(y: pd.Series) -> tuple:
+    """Return ('single_split',) or ('kfold', n_folds)."""
+    n_rows = len(y)
+
+    if n_rows < settings.min_rows_for_cv:
+        logger.warning(
+            f"[executor] dataset too small for reliable CV "
+            f"(rows={n_rows}) — using single split"
+        )
+        return ("single_split",)
+
+    n_folds = min(settings.cv_folds, n_rows)
+    return ("kfold", n_folds)
+
+
+# ---------------------------------------------------------------------------
 # Candidate runner — classification
 # ---------------------------------------------------------------------------
 
@@ -138,20 +189,44 @@ def _run_candidate_classification(
     factory = FACTORY_REGISTRY[spec.factory]
     X = train_pool.drop(columns=[target])
     y = train_pool[target]
+    val_strategy = _select_cls_validation(y)
     started = time.perf_counter()
 
-    def objective(trial: optuna.Trial) -> float:
-        params = suggest_fn(trial)
-        skf = StratifiedKFold(n_splits=settings.cv_folds, shuffle=True, random_state=42)
-        scores = [
-            _cls_metrics(
-                y.iloc[vi],
-                factory(params).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]),
-            )[metric]
+    if val_strategy[0] == "single_split":
+        # Fix the split once so all Optuna trials see the same validation set.
+        stratify = y if int(y.value_counts().min()) >= 2 else None
+        X_tr, X_val, y_tr, y_val = train_test_split(
+            X, y, test_size=0.25, stratify=stratify, random_state=42
+        )
+
+        def objective(trial: optuna.Trial) -> float:
+            params = suggest_fn(trial)
+            score = _cls_metrics(y_val, factory(params).fit(X_tr, y_tr).predict(X_val))[metric]
+            trial.set_user_attr("fold_scores", [score])
+            return float(score)
+
+        fallback_score_fn = lambda p: _cls_metrics(  # noqa: E731
+            y_val, factory(p).fit(X_tr, y_tr).predict(X_val)
+        )[metric]
+        val_strategy_label = "single_split"
+    else:
+        n_folds = val_strategy[1]
+        skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+
+        def objective(trial: optuna.Trial) -> float:
+            params = suggest_fn(trial)
+            scores = [
+                _cls_metrics(y.iloc[vi], factory(params).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]))[metric]
+                for ti, vi in skf.split(X, y)
+            ]
+            trial.set_user_attr("fold_scores", scores)
+            return float(np.mean(scores))
+
+        fallback_score_fn = lambda p: float(np.mean([  # noqa: E731
+            _cls_metrics(y.iloc[vi], factory(p).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]))[metric]
             for ti, vi in skf.split(X, y)
-        ]
-        trial.set_user_attr("fold_scores", scores)
-        return float(np.mean(scores))
+        ]))
+        val_strategy_label = f"stratified_kfold_{n_folds}"
 
     try:
         study = optuna.create_study(
@@ -168,15 +243,8 @@ def _run_candidate_classification(
         )
     except Exception:
         try:
-            skf = StratifiedKFold(n_splits=settings.cv_folds, shuffle=True, random_state=42)
-            scores = [
-                _cls_metrics(
-                    y.iloc[vi],
-                    factory(spec.default_params).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]),
-                )[metric]
-                for ti, vi in skf.split(X, y)
-            ]
-            best_params, best_score, best_fold_scores, n_used = spec.default_params, float(np.mean(scores)), scores, 1
+            score = fallback_score_fn(spec.default_params)
+            best_params, best_score, best_fold_scores, n_used = spec.default_params, score, [score], 1
         except Exception as e2:
             return {
                 "model_key": candidate.model_key,
@@ -193,6 +261,7 @@ def _run_candidate_classification(
         "best_params": best_params,
         "best_score": float(best_score),
         "best_score_std": float(np.std(best_fold_scores)) if best_fold_scores else 0.0,
+        "validation_strategy": val_strategy_label,
         "n_trials_used": n_used,
         "duration_s": time.perf_counter() - started,
         "complexity_rank": spec.complexity_rank,
@@ -222,20 +291,40 @@ def _run_candidate_regression(
     factory = FACTORY_REGISTRY[spec.factory]
     X = train_pool.drop(columns=[target])
     y = train_pool[target]
+    val_strategy = _select_reg_validation(y)
     started = time.perf_counter()
 
-    def objective(trial: optuna.Trial) -> float:
-        params = suggest_fn(trial)
-        kf = KFold(n_splits=settings.cv_folds, shuffle=True, random_state=42)
-        scores = [
-            _reg_metrics(
-                y.iloc[vi],
-                factory(params).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]),
-            )[metric]
+    if val_strategy[0] == "single_split":
+        X_tr, X_val, y_tr, y_val = train_test_split(X, y, test_size=0.25, random_state=42)
+
+        def objective(trial: optuna.Trial) -> float:
+            params = suggest_fn(trial)
+            score = _reg_metrics(y_val, factory(params).fit(X_tr, y_tr).predict(X_val))[metric]
+            trial.set_user_attr("fold_scores", [score])
+            return float(score)
+
+        fallback_score_fn = lambda p: _reg_metrics(  # noqa: E731
+            y_val, factory(p).fit(X_tr, y_tr).predict(X_val)
+        )[metric]
+        val_strategy_label = "single_split"
+    else:
+        n_folds = val_strategy[1]
+        kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+
+        def objective(trial: optuna.Trial) -> float:
+            params = suggest_fn(trial)
+            scores = [
+                _reg_metrics(y.iloc[vi], factory(params).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]))[metric]
+                for ti, vi in kf.split(X)
+            ]
+            trial.set_user_attr("fold_scores", scores)
+            return float(np.mean(scores))
+
+        fallback_score_fn = lambda p: float(np.mean([  # noqa: E731
+            _reg_metrics(y.iloc[vi], factory(p).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]))[metric]
             for ti, vi in kf.split(X)
-        ]
-        trial.set_user_attr("fold_scores", scores)
-        return float(np.mean(scores))
+        ]))
+        val_strategy_label = f"kfold_{n_folds}"
 
     try:
         study = optuna.create_study(
@@ -252,15 +341,8 @@ def _run_candidate_regression(
         )
     except Exception:
         try:
-            kf = KFold(n_splits=settings.cv_folds, shuffle=True, random_state=42)
-            scores = [
-                _reg_metrics(
-                    y.iloc[vi],
-                    factory(spec.default_params).fit(X.iloc[ti], y.iloc[ti]).predict(X.iloc[vi]),
-                )[metric]
-                for ti, vi in kf.split(X)
-            ]
-            best_params, best_score, best_fold_scores, n_used = spec.default_params, float(np.mean(scores)), scores, 1
+            score = fallback_score_fn(spec.default_params)
+            best_params, best_score, best_fold_scores, n_used = spec.default_params, score, [score], 1
         except Exception as e2:
             return {
                 "model_key": candidate.model_key,
@@ -277,6 +359,7 @@ def _run_candidate_regression(
         "best_params": best_params,
         "best_score": float(best_score),
         "best_score_std": float(np.std(best_fold_scores)) if best_fold_scores else 0.0,
+        "validation_strategy": val_strategy_label,
         "n_trials_used": n_used,
         "duration_s": time.perf_counter() - started,
         "complexity_rank": spec.complexity_rank,
@@ -707,6 +790,18 @@ def run_training_plan(
         processed_dataset_path, task_metadata, output_dir, random_state=random_state
     )
     train_pool = pd.read_csv(train_pool_path)
+
+    # XGBoost and some other models require numeric class labels.
+    # Encode the target in-place so all candidate runs and the champion retrain see integers.
+    # Keep the encoder so we can apply the same transform to the test set later.
+    label_encoder: LabelEncoder | None = None
+    if plan.problem_type == "classification" and not pd.api.types.is_numeric_dtype(
+        train_pool[target_column]
+    ):
+        label_encoder = LabelEncoder()
+        train_pool[target_column] = label_encoder.fit_transform(train_pool[target_column])
+        logger.info(f"[executor] label-encoded target '{target_column}': {list(label_encoder.classes_)}")
+
     allocations = allocate_trials(plan.candidates, plan.trial_budget)
 
     mlflow.set_experiment(mlflow_experiment)
@@ -757,7 +852,36 @@ def run_training_plan(
         with mlflow.start_run(run_id=champion["mlflow_run_id"], nested=True):
             mlflow.set_tag("champion", "true")
             mlflow.log_artifact(str(champion_path))
+
+        # Log champion as a proper MLflow model on the parent run so that
+        # register_model can find it via runs:/<parent_run_id>/model.
+        with champion_path.open("rb") as _f:
+            _model_obj = pickle.load(_f)
+        mlflow.sklearn.log_model(_model_obj, artifact_path="model")
+
         mlflow.set_tag("champion_run_id", champion["mlflow_run_id"])
+
+        # Evaluate champion on the held-out test set to get all metrics.
+        # Evaluate champion on the held-out test set to get all metrics.
+        # For classification/regression: predict on X_test using the pkl model.
+        # For forecasting: the validation score from Optuna is already the best
+        # available metric (StatsForecast models use temporal splits, not X/y pairs).
+        if plan.problem_type in ("classification", "regression"):
+            _test_df = pd.read_csv(test_path)
+            _X_test = _test_df.drop(columns=[target_column])
+            _y_test = _test_df[target_column]
+            if label_encoder is not None:
+                _y_test = pd.Series(label_encoder.transform(_y_test), index=_y_test.index)
+            with champion_path.open("rb") as _f:
+                _eval_model = pickle.load(_f)
+            if plan.problem_type == "classification":
+                all_champion_metrics = _cls_metrics(_y_test, _eval_model.predict(_X_test))
+            else:
+                all_champion_metrics = _reg_metrics(_y_test, _eval_model.predict(_X_test))
+        else:
+            all_champion_metrics = {metric: champion["best_score"]}
+        mlflow.log_metrics(all_champion_metrics)
+        logger.info(f"[executor] champion metrics: {all_champion_metrics}")
 
         val_strategy = (
             "stratified_5_fold_cv"
@@ -855,5 +979,5 @@ def run_training_plan(
         split_metadata_path=str(split_meta_path),
         mlflow_parent_run_id=parent_run_id,
         experience_record_path=str(record_path),
-        champion_metrics={metric: champion["best_score"]},
+        champion_metrics=all_champion_metrics,
     )
