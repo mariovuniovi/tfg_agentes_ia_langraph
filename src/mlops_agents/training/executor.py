@@ -677,6 +677,7 @@ def run_training_plan(
     output_dir: Path,
     mlflow_experiment: str,
     random_state: int = 42,
+    planner_output: dict | None = None,
 ) -> TrainingResult:
     metric = plan.metric_to_optimize or DEFAULT_METRIC[plan.problem_type]
     direction = METRIC_DIRECTION[metric]
@@ -841,6 +842,7 @@ def run_training_plan(
                 "complexity_rank": champion["complexity_rank"],
             },
             "experience_summary": "",
+            "planner_output": planner_output,
             **forecasting_extras,
         }
         record_path = write_experience_record(record, settings.experience_pool_dir)
