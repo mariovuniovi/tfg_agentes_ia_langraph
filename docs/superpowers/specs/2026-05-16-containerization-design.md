@@ -134,6 +134,8 @@ Plus a **"Using GitHub Models (free alternative)"** subsection:
 3. Change model names to `openai/gpt-4.1-mini` format
 4. No code changes needed — the OpenAI SDK reads `OPENAI_BASE_URL` automatically
 
+**Quality note (must be included in the README):** This project was developed and tested against OpenAI's API. GitHub Models uses compatible model names but is a different hosted service with a 150 requests/day rate limit on the free tier. Agent behaviour — especially the data validator and planner, which require precise instruction-following — may be less reliable. Use GitHub Models to explore the system; use OpenAI's API for consistent results.
+
 ---
 
 ## Files Changed
