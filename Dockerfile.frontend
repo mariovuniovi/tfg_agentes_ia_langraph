@@ -1,0 +1,43 @@
+# =============================================================================
+# Stage 1: Install dependencies
+# =============================================================================
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# =============================================================================
+# Stage 2: Build
+# =============================================================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Baked into the static bundle — must be the URL the browser uses
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+RUN npm run build
+
+# =============================================================================
+# Stage 3: Runtime — standalone output only, no node_modules
+# =============================================================================
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+
+RUN addgroup -g 1001 app && adduser -u 1001 -G app -s /bin/sh -D app
+
+COPY --from=builder --chown=app:app /app/.next/standalone ./
+COPY --from=builder --chown=app:app /app/.next/static ./.next/static
+COPY --from=builder --chown=app:app /app/public ./public
+
+USER app
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+CMD ["node", "server.js"]
