@@ -20,7 +20,7 @@ See [PLAN.md](PLAN.md) for the full status board and [ARCHITECTURE.md](ARCHITECT
 
 - **Python 3.12 + UV** (src-layout)
 - **LangGraph + LangChain** for agent orchestration
-- **GitHub Models** (gpt-4.1-mini) — free LLM tier
+- **OpenAI API** (gpt-4.1-mini) — LLM provider (GitHub Models free tier also supported, see Getting started)
 - **scikit-learn, LightGBM, XGBoost, CatBoost** for tabular models
 - **statsforecast + skforecast** for forecasting (AutoETS, AutoARIMA, recursive multi-series ML)
 - **Optuna** for hyperparameter search
@@ -29,33 +29,65 @@ See [PLAN.md](PLAN.md) for the full status board and [ARCHITECTURE.md](ARCHITECT
 - **FastAPI + Next.js** for the user-facing API and UI
 - **SQLite** for the experience pool (`storage/mlops_metadata.db`)
 
-## Quick start
+## Getting started
+
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) — no Python, Node, or any other tool needed.
 
 ```bash
-uv sync                                    # install all dependencies
-cp .env.example .env                       # add GITHUB_TOKEN + GITHUB_MODEL
+git clone https://github.com/mariovuniovi/tfg_agentes_ia_langraph.git
+cd tfg_agentes_ia_langraph
+cp .env.example .env          # then edit .env and fill in OPENAI_API_KEY
+docker compose up --build
 ```
 
-**Run the full stack** (two terminals):
+Open **http://localhost:3000** — the pipeline UI is ready.
 
+| Service | URL |
+|---|---|
+| Next.js UI | http://localhost:3000 |
+| FastAPI backend | http://localhost:8000 |
+| MLflow | http://localhost:5000 |
+
+**After making code changes:**
+```bash
+docker compose up --build     # rebuilds only what changed, takes ~1-2 min
+```
+
+---
+
+### Using GitHub Models (free alternative)
+
+> **Note on model quality:** This project was developed and tested against OpenAI's API. GitHub Models offers compatible model names but is a different hosted service with a **150 requests/day rate limit** on the free tier. Agent reliability — especially the data validator and planner, which require precise instruction-following — may be lower than with OpenAI's API. Use GitHub Models to explore the system; use OpenAI's API for consistent results.
+
+1. Create a free [GitHub Personal Access Token](https://github.com/settings/tokens) (no special scopes needed)
+2. In your `.env`, make these changes:
+   ```bash
+   OPENAI_API_KEY=your_github_personal_access_token
+   OPENAI_BASE_URL=https://models.inference.ai.azure.com
+   OPENAI_MODEL_SUPERVISOR=openai/gpt-4.1-mini
+   OPENAI_MODEL_DATA_VALIDATOR=openai/gpt-4.1-mini
+   OPENAI_MODEL_PLANNER=openai/gpt-4.1-mini
+   OPENAI_MODEL_EVALUATOR=openai/gpt-4.1-mini
+   OPENAI_MODEL_DEPLOYER=openai/gpt-4.1-mini
+   ```
+3. Run `docker compose up --build` — no code changes needed. The OpenAI SDK reads `OPENAI_BASE_URL` automatically.
+
+---
+
+### Local development (without Docker)
+
+```bash
+uv sync                                    # install all Python dependencies
+cp .env.example .env                       # fill in OPENAI_API_KEY
+```
+
+Two terminals:
 ```bash
 # Terminal 1 — FastAPI backend (port 8000)
 uv run uvicorn api.main:app --reload --port 8000
 
 # Terminal 2 — Next.js frontend (port 3000)
 cd frontend && npm install && npm run dev
-```
-
-**Alternative — Streamlit dashboard** (single process, less polished):
-
-```bash
-uv run streamlit run dashboard/app.py
-```
-
-**Alternative — CLI:**
-
-```bash
-uv run python scripts/run_pipeline.py data/samples/iris.csv
 ```
 
 ## Seeding the experience pool
