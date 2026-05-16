@@ -34,6 +34,5 @@ COPY --from=build --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 USER app
-EXPOSE 8501
-CMD ["streamlit", "run", "dashboard/app.py", \
-     "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+EXPOSE 8000
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
