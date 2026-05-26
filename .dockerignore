@@ -23,6 +23,7 @@ frontend/.next/
 .git/
 docs/
 *.md
+!README.md
 
 # Secrets
 .env
