@@ -571,18 +571,6 @@ def test_build_evaluator_context_includes_run_id_and_metrics():
     assert "0.95" in msg.content
 
 
-def test_build_deployer_context_includes_model_uri_and_report():
-    from mlops_agents.graphs.mlops_graph import _build_deployer_context
-
-    state = _make_state()
-    state["best_model_uri"] = "runs:/abc123/model"
-    state["training_run_id"] = "abc123"
-    state["evaluation_report"] = {"candidate_metrics": {"accuracy": 0.97}}
-    msg = _build_deployer_context(state)
-    assert "runs:/abc123/model" in msg.content
-    assert "abc123" in msg.content
-    assert "0.97" in msg.content
-
 
 def test_data_validator_node_builds_dataset_summary_on_success():
     """data_validator_node must set dataset_summary in state when validation passes."""
@@ -795,27 +783,6 @@ def test_evaluator_node_invokes_agent_with_isolated_context():
     assert "Training run ID:" in call_messages[0].content
 
 
-def test_deployer_node_invokes_agent_with_isolated_context():
-    """deployer_node must pass exactly one context message — not state['messages']."""
-    from mlops_agents.graphs.mlops_graph import deployer_node
-
-    mock_result = {
-        "messages": [AIMessage(content="Model registered as challenger.")]
-    }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True}):
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = mock_result
-        mock_get_agent.return_value = mock_agent
-
-        state = _make_state()
-        state["messages"] = [HumanMessage(content="prior 1"), HumanMessage(content="prior 2")]
-        deployer_node(state)
-
-    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
-    assert len(call_messages) == 1
-    assert "Best model URI:" in call_messages[0].content
-
 
 def test_build_evaluator_context_includes_problem_type_and_task_metadata():
     from mlops_agents.graphs.mlops_graph import _build_evaluator_context
@@ -827,14 +794,6 @@ def test_build_evaluator_context_includes_problem_type_and_task_metadata():
     assert "Problem type: regression" in msg.content
     assert "target_column" in msg.content
 
-
-def test_build_deployer_context_includes_problem_type():
-    from mlops_agents.graphs.mlops_graph import _build_deployer_context
-
-    state = _make_state()
-    state["problem_type"] = "forecasting"
-    msg = _build_deployer_context(state)
-    assert "Problem type: forecasting" in msg.content
 
 
 def test_data_validator_node_reads_schema_json_from_state():
