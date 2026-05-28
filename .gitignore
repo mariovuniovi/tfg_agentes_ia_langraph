@@ -84,3 +84,7 @@ artifacts/
 
 # User planning notes
 plan_model_agent.md
+
+# Log files (rotation-managed, not committed)
+logs/*.log
+logs/*.log.*

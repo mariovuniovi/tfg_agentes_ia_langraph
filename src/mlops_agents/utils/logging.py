@@ -5,12 +5,14 @@ binds a name into the context — it never touches global handler state.
 """
 
 import sys
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
 from mlops_agents.config.settings import settings
 
-# Configure once — any subsequent import of this module reuses the same handlers
+_LOG_FILE = Path("logs/pipeline.log")
+
 logger.remove()
 logger.add(
     sys.stderr,
@@ -21,6 +23,14 @@ logger.add(
         "<cyan>{extra[name]}</cyan> | "
         "{message}"
     ),
+)
+logger.add(
+    _LOG_FILE,
+    level="DEBUG",
+    rotation="10 MB",
+    retention=3,
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {extra[name]} | {message}",
+    encoding="utf-8",
 )
 
 
