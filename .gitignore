@@ -51,6 +51,8 @@ Thumbs.db
 
 # folder
 .claude/
+!.claude/agents/
+!.claude/agents/**
 
 # files
 CLAUDE.md
