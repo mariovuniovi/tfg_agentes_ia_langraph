@@ -30,6 +30,13 @@ from mlops_agents.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def build_planner_agent():
+    """Return the planner LLM bound to PlannerOutput structured output."""
+    return get_llm("planner", max_tokens=16000).with_structured_output(
+        PlannerOutput, method="function_calling"
+    )
+
+
 class PlannerError(Exception):
     """Raised when the planner fails validation after all retry attempts."""
 
@@ -58,6 +65,7 @@ def _to_experience_summary(view: RetrievalView) -> ExperienceSummary:
         models_trained=[c.model_key for c in view.models_tested],
         best_model=sel_key,
         validation_score=view.selected_solution.validation_score,
+        metric_name=view.metric_to_optimize,
         candidate_results=compact,
     )
 
@@ -156,7 +164,8 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
     pool = ExperiencePool(settings.experience_db_path)
     ctx = build_planner_context(profile_dict, task_meta, problem_type, pool)
 
-    llm = get_llm("planner", max_tokens=16000).with_structured_output(PlannerOutput, method="function_calling")
+    from mlops_agents.agents.registry import get_agent
+    llm = get_agent("planner")
     last_error = ""
     output: PlannerOutput
 
