@@ -97,7 +97,7 @@ def test_executor_node_full_training_run(tmp_path, iris_canonical_csv, iris_trai
     from mlops_agents.graphs.mlops_graph import executor_node
     command = executor_node(state)
 
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
     assert command.update["training_run_id"], "MLflow run ID must be set after training"
     assert Path(command.update["trained_model_path"]).exists(), "Champion model file must exist"
     assert command.update["training_metrics"].get("macro_f1", 0) > 0
@@ -214,12 +214,11 @@ def test_graph_state_flows_through_data_validator_to_supervisor(tmp_path, iris_s
         "_planner_output_record": None,
     }
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", side_effect=lambda _: make_agent()), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent", side_effect=lambda _: make_agent()):
         from mlops_agents.graphs.mlops_graph import data_validator_node
         command = data_validator_node(state)
 
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
     assert command.update["problem_type"] == "classification"
     assert command.update["validation_passed"] is True
     assert command.update["processed_dataset_path"] != ""
@@ -284,8 +283,8 @@ def test_full_pipeline_iris_classification(tmp_path, iris_schema_json, monkeypat
         "agent_attempt_counts": {},
     }
 
-    # Auto-approve the data validation HITL so the test runs non-interactively
-    with patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+    # Auto-approve the HITL gates so the test runs non-interactively
+    with patch("mlops_agents.graphs.approval_nodes.interrupt", return_value={"approved": True, "comment": ""}):
         result = graph.invoke(initial_state, config=config)
 
     assert result is not None

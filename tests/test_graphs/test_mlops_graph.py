@@ -14,17 +14,33 @@ def test_graph_compiles_without_error():
 
 
 def test_graph_has_expected_nodes():
-    """Graph should contain all expected nodes including planner and executor (SP5)."""
-    from mlops_agents.graphs.mlops_graph import graph
+    """Graph should contain all expected nodes after the architecture refactor."""
+    from mlops_agents.graphs.mlops_graph import _build_graph
+    graph = _build_graph()
 
     node_names = set(graph.nodes.keys())
-    assert "supervisor" in node_names
-    assert "data_validator" in node_names
-    assert "planner" in node_names
-    assert "executor" in node_names
-    assert "evaluator" in node_names
-    assert "deployer" in node_names
+    expected = {
+        "workflow_controller", "data_validator", "dataset_approval",
+        "planner", "executor", "evaluation", "report_writer",
+        "deployment_approval", "deployer",
+    }
+    assert expected.issubset(node_names)
+    assert "supervisor" not in node_names
+    assert "evaluator" not in node_names
     assert "trainer" not in node_names
+
+
+def test_graph_contains_all_refactored_nodes():
+    from mlops_agents.graphs.mlops_graph import _build_graph
+    graph = _build_graph()
+    expected = {
+        "workflow_controller", "data_validator", "dataset_approval",
+        "planner", "executor", "evaluation", "report_writer",
+        "deployment_approval", "deployer",
+    }
+    assert expected.issubset(set(graph.nodes.keys()))
+    assert "supervisor" not in graph.nodes
+    assert "evaluator" not in graph.nodes
 
 
 def _make_validator_state(tmp_path=None):
@@ -76,90 +92,26 @@ def _make_mock_agent(final_content="done", tool_name=None, tool_content="{}"):
     return mock_agent
 
 
-def test_data_validator_node_approved_returns_to_supervisor(tmp_path):
-    """On approval, node returns Command(goto='supervisor') with validation fields."""
+def test_data_validator_node_routes_to_workflow_controller(tmp_path):
+    """data_validator_node routes to workflow_controller (not supervisor) after refactor."""
     state = _make_validator_state(tmp_path)
     mock_agent = _make_mock_agent(
         tool_name="apply_column_mapping",
         tool_content=f'{{"output_path": "{state["processed_dataset_path"]}", "mapped_columns": 2}}',
     )
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent):
         from mlops_agents.graphs.mlops_graph import data_validator_node
         command = data_validator_node(state)
 
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
     assert command.update["validation_passed"] is False  # tool returned empty {}
 
 
-def test_data_validator_node_rejected_routes_to_data_validator(tmp_path):
-    """First rejection (attempt < max) routes back to data_validator for retry, not supervisor."""
+def test_data_validator_node_injects_rejection_comment_into_agent(tmp_path):
+    """When dataset_rejection_comment is set (retry), the agent receives prior feedback."""
     state = _make_validator_state(tmp_path)
-    mock_agent = _make_mock_agent(
-        tool_name="validate_against_schema",
-        tool_content='{"passed": true}',
-    )
-
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": False, "comment": "rename column X"}):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
-        command = data_validator_node(state)
-
-    assert command.goto == "data_validator"
-    assert command.update["validation_passed"] is False
-    assert command.update["error_message"] == ""
-    rejection_msgs = [
-        m for m in command.update["messages"]
-        if isinstance(m, HumanMessage) and "rename column X" in m.content
-    ]
-    assert len(rejection_msgs) == 1
-
-
-def test_data_validator_node_rejected_at_max_attempts_routes_to_supervisor(tmp_path):
-    """Rejection on the final attempt routes to supervisor with error_message set."""
-    state = _make_validator_state(tmp_path)
-    state["agent_attempt_counts"] = {"data_validator": 3}  # attempt == max
-    mock_agent = _make_mock_agent(
-        tool_name="validate_against_schema",
-        tool_content='{"passed": true}',
-    )
-
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": False, "comment": "still bad"}):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
-        command = data_validator_node(state)
-
-    assert command.goto == "supervisor"
-    assert command.update["validation_passed"] is False
-    assert "rejected after" in command.update["error_message"]
-    assert "still bad" in command.update["error_message"]
-
-
-def test_data_validator_node_retry_increments_attempt_count(tmp_path):
-    """Retry Command must increment agent_attempt_counts['data_validator']."""
-    state = _make_validator_state(tmp_path)
-    state["agent_attempt_counts"] = {"data_validator": 1}
-    mock_agent = _make_mock_agent(
-        tool_name="validate_against_schema",
-        tool_content='{"passed": true}',
-    )
-
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": False, "comment": ""}):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
-        command = data_validator_node(state)
-
-    assert command.update["agent_attempt_counts"]["data_validator"] == 2
-
-
-def test_data_validator_node_retry_injects_prior_feedback(tmp_path):
-    """On a retry attempt the agent invocation must include prior rejection feedback."""
-    state = _make_validator_state(tmp_path)
-    state["agent_attempt_counts"] = {"data_validator": 2}
-    state["messages"] = [
-        HumanMessage(content="Dataset rejected by human reviewer. Comment: drop nulls", name="data_validator"),
-    ]
+    state["dataset_rejection_comment"] = "drop nulls"
     captured_messages = []
     mock_agent = _make_mock_agent(
         tool_name="validate_against_schema",
@@ -174,37 +126,33 @@ def test_data_validator_node_retry_injects_prior_feedback(tmp_path):
 
     mock_agent.invoke = capturing_invoke
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent):
         from mlops_agents.graphs.mlops_graph import data_validator_node
         data_validator_node(state)
 
     feedback_msgs = [m for m in captured_messages if "rejected" in m.content.lower()]
-    assert len(feedback_msgs) >= 1, "Agent should receive prior rejection feedback on retry"
+    assert len(feedback_msgs) >= 1, "Agent must receive prior rejection comment on retry"
 
 
-def test_data_validator_node_interrupt_payload_has_type(tmp_path):
-    """The interrupt payload must have type='data_validation'."""
+def test_dataset_approval_node_interrupt_payload_has_type(tmp_path):
+    """dataset_approval_node interrupt payload must have type='data_validation'."""
+    from unittest.mock import patch
+
     state = _make_validator_state(tmp_path)
-    mock_agent = _make_mock_agent(
-        tool_name="validate_against_schema",
-        tool_content='{"passed": true}',
-    )
     captured = {}
 
     def fake_interrupt(value):
         captured["payload"] = value
         return {"approved": True, "comment": ""}
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent), \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fake_interrupt):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
-        data_validator_node(state)
+    with patch("mlops_agents.graphs.approval_nodes.interrupt", side_effect=fake_interrupt):
+        from mlops_agents.graphs.approval_nodes import dataset_approval_node
+        command = dataset_approval_node(state)
 
     assert captured["payload"]["type"] == "data_validation"
-    assert "dataset_preview" in captured["payload"]
-    assert "validation_summary" in captured["payload"]
     assert "attempt" in captured["payload"]
+    assert command.goto == "workflow_controller"
+    assert command.update["dataset_approved"] is True
 
 
 # ---------------------------------------------------------------------------

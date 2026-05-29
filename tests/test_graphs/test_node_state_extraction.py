@@ -346,8 +346,7 @@ def test_data_validator_node_populates_validation_report():
             AIMessage(content="Data validation passed."),
         ]
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -357,7 +356,7 @@ def test_data_validator_node_populates_validation_report():
     assert command.update["validation_report"]["passed"] is True
     assert command.update["validation_report"]["row_count"] == 150
     assert command.update["validation_passed"] is True
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
 
 
 def test_data_validator_node_passed_false_when_no_tool_output():
@@ -375,7 +374,7 @@ def test_data_validator_node_passed_false_when_no_tool_output():
     assert command.update["validation_passed"] is False
     assert "error_message" in command.update
     assert len(command.update["error_message"]) > 0
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +383,7 @@ def test_data_validator_node_passed_false_when_no_tool_output():
 
 
 def test_executor_node_returns_to_supervisor(tmp_path):
-    """executor_node (deterministic) routes to supervisor and populates training state fields."""
+    """executor_node (deterministic) routes to workflow_controller and populates training state fields."""
     import pandas as pd
     from sklearn.datasets import load_iris
     from mlops_agents.graphs.mlops_graph import executor_node
@@ -408,7 +407,7 @@ def test_executor_node_returns_to_supervisor(tmp_path):
 
     command = executor_node(state)
 
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
     assert "trained_model_path" in command.update
     assert "training_run_id" in command.update
     assert "training_metrics" in command.update
@@ -418,49 +417,42 @@ def test_executor_node_returns_to_supervisor(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# evaluator_node
+# evaluation_node (deterministic — replaced the old LLM-based evaluator_node)
 # ---------------------------------------------------------------------------
 
 
-def test_evaluator_node_populates_evaluation_report():
-    from mlops_agents.graphs.mlops_graph import evaluator_node
+def test_evaluation_node_populates_evaluation_report():
+    """evaluation_node (deterministic) populates evaluation_report and routes to workflow_controller."""
+    from mlops_agents.graphs.mlops_graph import evaluation_node
 
-    runs_json = json.dumps(
-        [
-            {
-                "run_id": "run1",
-                "metrics": {"accuracy": 0.97, "f1_score": 0.96},
-                "params": {},
-                "model_uri": "runs:/run1/model",
-            },
-            {
-                "run_id": "run0",
-                "metrics": {"accuracy": 0.93, "f1_score": 0.92},
-                "params": {},
-                "model_uri": "runs:/run0/model",
-            },
-        ]
-    )
+    state = _make_state()
+    state["problem_type"] = "classification"
+    state["training_run_id"] = "run1"
+    state["training_metrics"] = {"accuracy": 0.97, "macro_f1": 0.96}
+
     mock_result = {
-        "messages": [
-            ToolMessage(content=runs_json, tool_call_id="1", name="get_best_run"),
-            AIMessage(content="Candidate beats baseline. Recommend promote."),
-        ]
+        "evaluation_passed": True,
+        "candidate_metrics": {"accuracy": 0.97, "macro_f1": 0.96},
+        "champion_metrics": {"accuracy": 0.93, "macro_f1": 0.92},
+        "thresholds_applied": {"accuracy_min": 0.80, "macro_f1_min": 0.75},
+        "evaluation_report": {
+            "candidate_metrics": {"accuracy": 0.97, "macro_f1": 0.96},
+            "candidate_run_id": "run1",
+            "baseline_metrics": {"accuracy": 0.93, "macro_f1": 0.92},
+        },
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = mock_result
-        mock_get_agent.return_value = mock_agent
 
-        command = evaluator_node(_make_state())
+    with patch("mlops_agents.graphs.mlops_graph.evaluate_promotion", return_value=mock_result):
+        command = evaluation_node(state)
 
     assert command.update["evaluation_report"]["candidate_metrics"]["accuracy"] == 0.97
     assert command.update["evaluation_report"]["baseline_metrics"]["accuracy"] == 0.93
     assert command.update["evaluation_report"]["candidate_run_id"] == "run1"
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
 
 
-def test_data_validator_node_includes_imputation_in_hitl_payload():
+def test_data_validator_node_extracts_imputation_result():
+    """data_validator_node sets validation_passed=True when impute_missing_values succeeds."""
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
     imputation_json = json.dumps({
@@ -478,27 +470,19 @@ def test_data_validator_node_includes_imputation_in_hitl_payload():
         ]
     }
 
-    captured_payload: dict = {}
-
-    def fake_interrupt(payload: dict) -> dict:
-        captured_payload.update(payload)
-        return {"approved": True, "comment": ""}
-
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fake_interrupt):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
 
         command = data_validator_node(_make_state())
 
-    assert "imputation_applied" in captured_payload
-    assert "sepal_width" in captured_payload["imputation_applied"]["imputed_columns"]
     assert command.update["validation_passed"] is True
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
 
 
-def test_data_validator_node_no_hitl_when_validation_fails():
+def test_data_validator_node_routes_to_workflow_controller_on_failure():
+    """data_validator_node routes to workflow_controller (not supervisor) on validation failure."""
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
     validation_json = json.dumps({"passed": False, "violations": [{"column": "target", "rule": "allowed_values", "detail": "Unexpected values: ['bad']"}]})
@@ -509,24 +493,16 @@ def test_data_validator_node_no_hitl_when_validation_fails():
         ]
     }
 
-    interrupt_called = []
-
-    def fail_if_called(payload: dict) -> dict:
-        interrupt_called.append(payload)
-        return {}
-
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
 
         command = data_validator_node(_make_state())
 
-    assert len(interrupt_called) == 0
     assert command.update["validation_passed"] is False
     assert "error_message" in command.update
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
 
 
 # ---------------------------------------------------------------------------
@@ -592,8 +568,7 @@ def test_data_validator_node_builds_dataset_summary_on_success():
     }
 
     try:
-        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
@@ -650,8 +625,7 @@ def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
     }
 
     try:
-        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
@@ -672,14 +646,7 @@ def test_data_validator_node_aborts_on_contract_violation():
 
     bad_schema = json.dumps({"columns": [{"name": "feature_a"}]})  # no problem_type
 
-    interrupt_called = []
-
-    def fail_if_called(payload: dict) -> dict:
-        interrupt_called.append(payload)
-        return {}
-
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", side_effect=fail_if_called):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_get_agent.return_value = mock_agent
 
@@ -688,12 +655,11 @@ def test_data_validator_node_aborts_on_contract_violation():
         command = data_validator_node(state)
 
     mock_agent.invoke.assert_not_called()
-    assert len(interrupt_called) == 0
     assert "problem_type" in command.update.get("error_message", "")
     assert command.update.get("validation_passed") is False
     assert command.update.get("problem_type") == ""
     assert command.update.get("task_metadata") == {}
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
 
 
 def test_data_validator_node_invokes_agent_with_isolated_context():
@@ -707,8 +673,7 @@ def test_data_validator_node_invokes_agent_with_isolated_context():
             AIMessage(content="Validation passed."),
         ]
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -752,35 +717,37 @@ def test_executor_node_uses_plan_from_state(tmp_path):
 
     command = executor_node(state)
 
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"
     assert command.update["training_plan"]["candidates"][0]["model_key"] == "logistic_regression"
 
 
-def test_evaluator_node_invokes_agent_with_isolated_context():
-    """evaluator_node must pass exactly one context message — not state['messages']."""
-    from mlops_agents.graphs.mlops_graph import evaluator_node
+def test_evaluation_node_is_deterministic_no_agent():
+    """evaluation_node is deterministic — it calls evaluate_promotion, not an LLM agent."""
+    from mlops_agents.graphs.mlops_graph import evaluation_node
 
-    runs_json = json.dumps([
-        {"run_id": "run1", "metrics": {"accuracy": 0.97}, "params": {}, "model_uri": "runs:/run1/model"},
-    ])
+    state = _make_state()
+    state["problem_type"] = "classification"
+    state["training_run_id"] = "run1"
+    state["training_metrics"] = {"accuracy": 0.97, "macro_f1": 0.96}
+
     mock_result = {
-        "messages": [
-            ToolMessage(content=runs_json, tool_call_id="1", name="get_best_run"),
-            AIMessage(content="Evaluation complete."),
-        ]
+        "evaluation_passed": True,
+        "candidate_metrics": {"accuracy": 0.97, "macro_f1": 0.96},
+        "champion_metrics": {},
+        "thresholds_applied": {},
+        "evaluation_report": {
+            "candidate_metrics": {"accuracy": 0.97, "macro_f1": 0.96},
+            "candidate_run_id": "run1",
+            "baseline_metrics": {},
+        },
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = mock_result
-        mock_get_agent.return_value = mock_agent
 
-        state = _make_state()
-        state["messages"] = [HumanMessage(content="prior msg 1"), HumanMessage(content="prior msg 2")]
-        evaluator_node(state)
+    with patch("mlops_agents.graphs.mlops_graph.evaluate_promotion", return_value=mock_result) as mock_eval:
+        command = evaluation_node(state)
 
-    call_messages = mock_agent.invoke.call_args[0][0]["messages"]
-    assert len(call_messages) == 1
-    assert "Training run ID:" in call_messages[0].content
+    mock_eval.assert_called_once_with(state)
+    assert command.goto == "workflow_controller"
+    assert command.update["evaluation_passed"] is True
 
 
 
@@ -821,8 +788,7 @@ def test_data_validator_node_reads_schema_json_from_state():
     }
 
     try:
-        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-             patch("mlops_agents.graphs.mlops_graph.interrupt", return_value={"approved": True, "comment": ""}):
+        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
@@ -841,8 +807,7 @@ def test_data_validator_node_aborts_when_schema_json_empty():
     """data_validator_node must abort immediately when schema_json is empty."""
     from mlops_agents.graphs.mlops_graph import data_validator_node
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent, \
-         patch("mlops_agents.graphs.mlops_graph.interrupt") as mock_interrupt:
+    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_get_agent.return_value = mock_agent
 
@@ -851,7 +816,6 @@ def test_data_validator_node_aborts_when_schema_json_empty():
         command = data_validator_node(state)
 
     mock_agent.invoke.assert_not_called()
-    mock_interrupt.assert_not_called()
     assert command.update.get("validation_passed") is False
     assert "schema" in command.update.get("error_message", "").lower()
-    assert command.goto == "supervisor"
+    assert command.goto == "workflow_controller"

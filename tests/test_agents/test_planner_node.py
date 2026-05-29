@@ -51,12 +51,12 @@ def test_planner_node_happy_path(tmp_path):
     state = _minimal_state(tmp_path)
     mock_output = _valid_planner_output()
 
-    with patch("mlops_agents.agents.planner.get_llm") as mock_get_llm, \
+    with patch("mlops_agents.agents.registry.get_agent") as mock_get_agent, \
          patch("mlops_agents.agents.planner.ExperiencePool") as mock_pool_cls:
         mock_pool_cls.return_value.find_similar.return_value = []
         mock_llm = MagicMock()
-        mock_llm.with_structured_output.return_value.invoke.return_value = mock_output
-        mock_get_llm.return_value = mock_llm
+        mock_llm.invoke.return_value = mock_output
+        mock_get_agent.return_value = mock_llm
 
         cmd = planner_node(state)
 
@@ -71,13 +71,13 @@ def test_planner_node_retry_on_first_failure(tmp_path):
     state = _minimal_state(tmp_path)
     mock_output = _valid_planner_output()
 
-    with patch("mlops_agents.agents.planner.get_llm") as mock_get_llm, \
+    with patch("mlops_agents.agents.registry.get_agent") as mock_get_agent, \
          patch("mlops_agents.agents.planner.ExperiencePool") as mock_pool_cls:
         mock_pool_cls.return_value.find_similar.return_value = []
         mock_llm = MagicMock()
-        invoke_mock = mock_llm.with_structured_output.return_value.invoke
+        invoke_mock = mock_llm.invoke
         invoke_mock.side_effect = [PlannerError("bad evidence"), mock_output]
-        mock_get_llm.return_value = mock_llm
+        mock_get_agent.return_value = mock_llm
 
         cmd = planner_node(state)
 
@@ -90,12 +90,12 @@ def test_planner_node_retry_on_first_failure(tmp_path):
 def test_planner_node_raises_after_two_failures(tmp_path):
     state = _minimal_state(tmp_path)
 
-    with patch("mlops_agents.agents.planner.get_llm") as mock_get_llm, \
+    with patch("mlops_agents.agents.registry.get_agent") as mock_get_agent, \
          patch("mlops_agents.agents.planner.ExperiencePool") as mock_pool_cls:
         mock_pool_cls.return_value.find_similar.return_value = []
         mock_llm = MagicMock()
-        mock_llm.with_structured_output.return_value.invoke.side_effect = PlannerError("bad")
-        mock_get_llm.return_value = mock_llm
+        mock_llm.invoke.side_effect = PlannerError("bad")
+        mock_get_agent.return_value = mock_llm
 
         with pytest.raises(PlannerError, match="Planner failed after retry"):
             planner_node(state)
@@ -114,12 +114,12 @@ def test_planner_node_check_integrity_failure_triggers_retry(tmp_path):
     bad_output = PlannerOutput(planning_analysis="bad", plan=bad_plan)
     good_output = _valid_planner_output()
 
-    with patch("mlops_agents.agents.planner.get_llm") as mock_get_llm, \
+    with patch("mlops_agents.agents.registry.get_agent") as mock_get_agent, \
          patch("mlops_agents.agents.planner.ExperiencePool") as mock_pool_cls:
         mock_pool_cls.return_value.find_similar.return_value = []
         mock_llm = MagicMock()
-        mock_llm.with_structured_output.return_value.invoke.side_effect = [bad_output, good_output]
-        mock_get_llm.return_value = mock_llm
+        mock_llm.invoke.side_effect = [bad_output, good_output]
+        mock_get_agent.return_value = mock_llm
 
         cmd = planner_node(state)
 
