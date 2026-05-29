@@ -17,6 +17,66 @@ from api.services.pipeline_helpers import (
 from mlops_agents.graphs.mlops_graph import graph
 
 
+def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
+    """Transform _planner_output_record to the shape the frontend PlannerContextData expects.
+
+    Backend uses EvidenceReference field names (source/source_id/summary);
+    frontend expects (evidence_type/experience_id|rule_id/relevance_note).
+    Backend ExperienceSummary has dataset_summary; frontend expects dataset_name.
+    """
+    # evidence_used: {source, source_id, summary} → {evidence_type, experience_id|rule_id, relevance_note}
+    evidence_used: list[dict[str, Any]] = []
+    for ev in rec.get("evidence_used", []):
+        source = ev.get("source", "")
+        source_id = ev.get("source_id")
+        item: dict[str, Any] = {
+            "evidence_type": source if source in ("experience", "rule") else "rule",
+            "relevance_note": ev.get("summary", ""),
+        }
+        if source == "experience":
+            item["experience_id"] = source_id
+        elif source == "rule":
+            item["rule_id"] = source_id
+        evidence_used.append(item)
+
+    # retrieved_experiences: ExperienceSummary.model_dump() → frontend ExperienceSummary
+    retrieved_experiences: list[dict[str, Any]] = [
+        {
+            "experience_id": exp.get("experience_id", ""),
+            "dataset_name": exp.get("dataset_summary", exp.get("dataset_name", "")),
+            "problem_type": exp.get("problem_type", ""),
+            "best_model": exp.get("best_model", ""),
+            # Guard against None so frontend .toFixed(4) never throws
+            "validation_score": float(exp.get("validation_score") or 0.0),
+            "metric_name": exp.get("metric_name"),
+        }
+        for exp in rec.get("retrieved_experiences", [])
+    ]
+
+    # matched_rules: coerce recommend (dict in Python) to a string so React can render it
+    matched_rules: list[dict[str, Any]] = []
+    for rule in rec.get("matched_rules", []):
+        recommend_raw = rule.get("recommend")
+        if isinstance(recommend_raw, dict):
+            recommend_str: str | None = (
+                ", ".join(f"{k}: {v}" for k, v in recommend_raw.items()) or None
+            )
+        elif isinstance(recommend_raw, str) and recommend_raw.strip():
+            recommend_str = recommend_raw
+        else:
+            recommend_str = None
+        matched_rules.append({**rule, "recommend": recommend_str})
+
+    return {
+        "retrieved_experiences": retrieved_experiences,
+        "matched_rules": matched_rules,
+        "evidence_used": evidence_used,
+        "planning_analysis": rec.get("planning_analysis", ""),
+        "plan_summary": rec.get("plan_summary", {}),
+        "warnings": rec.get("risks_or_warnings", []),
+    }
+
+
 def run_evidently(reference_df: pd.DataFrame, current_df: pd.DataFrame) -> dict:
     """Run Evidently DataDriftPreset and return a DriftReport-shaped dict."""
     from datetime import datetime, timezone
@@ -69,11 +129,9 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
         "timestamp_ms": time.time() * 1000,
         "data": {
             "models": {
-                "supervisor":     settings.openai_model_supervisor,
                 "data_validator": settings.openai_model_data_validator,
-                "trainer":        settings.openai_model_trainer,
-                "evaluator":      settings.openai_model_evaluator,
-                "deployer":       settings.openai_model_deployer,
+                "planner":        settings.openai_model_planner,
+                "report_writer":  settings.openai_model_report_writer,
             }
         },
     }
@@ -132,30 +190,27 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                             "type": "planner_context",
                             "agent": "planner",
                             "timestamp_ms": time.time() * 1000,
-                            "data": {
-                                "retrieved_experiences": rec.get("retrieved_experiences", []),
-                                "matched_rules": rec.get("matched_rules", []),
-                                "evidence_used": rec.get("evidence_used", []),
-                                "planning_analysis": rec.get("planning_analysis", ""),
-                                "plan_summary": rec.get("plan_summary", {}),
-                                "warnings": rec.get("risks_or_warnings", []),
-                            },
+                            "data": _build_planner_ctx_event(rec),
                         }
                         entry.events.append(planner_ctx_event)
                         await entry.queue.put(planner_ctx_event)
 
-                if "supervisor" in data and isinstance(data["supervisor"], dict):
-                    next_agent = data["supervisor"].get("next", "")
-                    reasoning = data["supervisor"].get("reasoning", "")
-                    if next_agent and next_agent != "FINISH":
+                worker_nodes = {
+                    "data_validator", "dataset_approval", "planner",
+                    "executor", "evaluation", "report_writer",
+                    "deployment_approval", "deployer",
+                }
+                for node_name in data:
+                    if node_name in worker_nodes:
                         event = {
                             "type": "routing",
-                            "agent": "supervisor",
+                            "agent": "supervisor",  # UI label, preserved for FE
                             "timestamp_ms": time.time() * 1000,
-                            "data": {"next": next_agent, "reasoning": reasoning},
+                            "data": {"next": node_name, "reasoning": ""},
                         }
                         entry.events.append(event)
                         await entry.queue.put(event)
+                        break
 
             elif mode == "messages":
                 pipeline_event = parse_stream_event(data)
