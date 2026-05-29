@@ -30,3 +30,33 @@ def _thresholds_for(problem_type: str) -> dict[str, float]:
         return {"r2_min": 0.70}
     # forecasting has no absolute thresholds — only relative comparison vs champion
     return {}
+
+
+def _apply_thresholds(
+    problem_type: str,
+    candidate: dict[str, Any],
+    champion: dict[str, Any],
+) -> bool:
+    """Apply absolute thresholds AND relative-vs-champion comparison."""
+    metric, ascending = _metric_for_problem_type(problem_type)
+
+    cand_value = candidate.get(metric)
+    if cand_value is None:
+        return False
+
+    # Absolute thresholds
+    thresholds = _thresholds_for(problem_type)
+    if problem_type == "classification":
+        if candidate.get("accuracy", 0.0) < thresholds["accuracy_min"]:
+            return False
+        if candidate.get("macro_f1", 0.0) < thresholds["macro_f1_min"]:
+            return False
+    elif problem_type == "regression":
+        if candidate.get("r2", -1.0) < thresholds["r2_min"]:
+            return False
+
+    # Relative comparison
+    champ_value = champion.get(metric) if champion else None
+    if champ_value is None:
+        return True
+    return cand_value <= champ_value if ascending else cand_value >= champ_value
