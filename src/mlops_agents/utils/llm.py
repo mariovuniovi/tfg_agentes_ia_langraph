@@ -21,20 +21,10 @@ def get_llm(agent: str = "", temperature: float = 0, max_tokens: int = 4000) -> 
     """Return the LLM for a named worker agent. Pass agent="" to get the default model."""
     model_map = {
         "data_validator": settings.openai_model_data_validator,
-        "trainer":        settings.openai_model_trainer,
         "planner":        settings.openai_model_planner,
-        "evaluator":      settings.openai_model_evaluator,
-        "deployer":       settings.openai_model_deployer,
         "report_writer":  settings.openai_model_report_writer,
     }
     model = model_map.get(agent, settings.openai_model)
     label = agent if agent else "default"
     logger.info(f"LLM init — agent={label} model={model}")
     return _make_llm(model, temperature, max_tokens)
-
-
-def get_router_llm(temperature: float = 0) -> ChatOpenAI:
-    """Return the LLM for the supervisor routing node."""
-    model = settings.openai_model_supervisor
-    logger.info(f"LLM init — agent=supervisor model={model}")
-    return _make_llm(model, temperature, max_tokens=2000)

@@ -17,7 +17,3 @@ GRAPH_RECURSION_LIMIT = 30
 
 # Agent names (must match node names in the graph)
 AGENT_DATA_VALIDATOR = "data_validator"
-AGENT_TRAINER = "trainer"
-AGENT_EVALUATOR = "evaluator"
-AGENT_DEPLOYER = "deployer"
-AGENT_SUPERVISOR = "supervisor"

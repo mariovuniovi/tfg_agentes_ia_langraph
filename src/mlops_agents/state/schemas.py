@@ -5,24 +5,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class RouterOutput(BaseModel):
-    """Structured output for the supervisor routing decision.
-
-    The `reasoning` field makes every routing decision auditable —
-    useful for thesis analysis and debugging agent behavior.
-    """
-
-    next: Literal[
-        "data_validator",
-        "planner",
-        "executor",
-        "evaluator",
-        "deployer",
-        "FINISH",
-    ] = Field(description="The next agent to delegate to, or FINISH to end the pipeline.")
-    reasoning: str = Field(description="One sentence explaining why this agent was chosen.")
-
-
 class ValidationResult(BaseModel):
     """Output schema for the data validation tool."""
 
