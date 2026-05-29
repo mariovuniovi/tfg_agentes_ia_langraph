@@ -84,3 +84,72 @@ def test_apply_thresholds_forecasting_with_champion_pass():
 
 def test_apply_thresholds_forecasting_missing_rmse():
     assert _apply_thresholds("forecasting", {}, {}) is False
+
+
+from unittest.mock import MagicMock, patch
+
+
+def _fake_runs(metric_values: list[float]):
+    runs = []
+    for v in metric_values:
+        r = MagicMock()
+        r.info.run_id = f"run-{v}"
+        r.data.metrics = {"macro_f1": v}
+        runs.append(r)
+    return runs
+
+
+def test_fetch_current_champion_returns_top_run_metrics():
+    with patch("mlops_agents.evaluation.promotion._get_client") as mock_get_client:
+        client = MagicMock()
+        client.get_experiment_by_name.return_value = MagicMock(experiment_id="exp-1")
+        client.search_runs.return_value = _fake_runs([0.92, 0.85])
+        mock_get_client.return_value = client
+
+        from mlops_agents.evaluation.promotion import _fetch_current_champion
+        result = _fetch_current_champion("macro_f1", ascending=False)
+        assert result == {"macro_f1": 0.92}
+
+
+def test_fetch_current_champion_no_experiment_returns_empty():
+    with patch("mlops_agents.evaluation.promotion._get_client") as mock_get_client:
+        client = MagicMock()
+        client.get_experiment_by_name.return_value = None
+        mock_get_client.return_value = client
+
+        from mlops_agents.evaluation.promotion import _fetch_current_champion
+        assert _fetch_current_champion("macro_f1", ascending=False) == {}
+
+
+def test_evaluate_promotion_end_to_end_classification():
+    state = {
+        "problem_type": "classification",
+        "training_metrics": {"accuracy": 0.85, "macro_f1": 0.80},
+    }
+    with patch("mlops_agents.evaluation.promotion._fetch_current_champion") as f:
+        f.return_value = {"macro_f1": 0.78}
+        from mlops_agents.evaluation.promotion import evaluate_promotion
+        result = evaluate_promotion(state)
+
+    assert result["evaluation_passed"] is True
+    assert result["candidate_metrics"] == {"accuracy": 0.85, "macro_f1": 0.80}
+    assert result["champion_metrics"] == {"macro_f1": 0.78}
+    assert result["thresholds_applied"] == {"accuracy_min": 0.80, "macro_f1_min": 0.75}
+
+
+def test_evaluate_promotion_writes_legacy_evaluation_report_shape():
+    state = {
+        "problem_type": "classification",
+        "training_metrics": {"accuracy": 0.85, "macro_f1": 0.80},
+        "training_run_id": "run-42",
+    }
+    with patch("mlops_agents.evaluation.promotion._fetch_current_champion") as f:
+        f.return_value = {"macro_f1": 0.78}
+        from mlops_agents.evaluation.promotion import evaluate_promotion
+        result = evaluate_promotion(state)
+
+    assert result["evaluation_report"] == {
+        "candidate_metrics": {"accuracy": 0.85, "macro_f1": 0.80},
+        "candidate_run_id": "run-42",
+        "baseline_metrics": {"macro_f1": 0.78},
+    }
