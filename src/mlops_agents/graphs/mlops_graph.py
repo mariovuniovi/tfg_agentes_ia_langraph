@@ -18,14 +18,18 @@ from typing import Any, Literal
 from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
-from langgraph.types import Command, interrupt
+from langgraph.types import Command
 
 from mlops_agents.agents.planner import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
-from mlops_agents.agents.supervisor import supervisor_node
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.training import TrainingPlan
+from mlops_agents.deployment.deployer import run_deployer as run_deployer_module
+from mlops_agents.evaluation.promotion import evaluate_promotion
+from mlops_agents.evaluation.report_writer import run_report_writer
+from mlops_agents.graphs.approval_nodes import dataset_approval_node, deployment_approval_node
+from mlops_agents.graphs.workflow_controller import workflow_controller
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.utils.logging import get_logger
 
@@ -284,7 +288,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
     )
 
 
-def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
+def executor_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     from mlops_agents.training.executor import run_training_plan
 
     processed_path = Path(state["processed_dataset_path"])
@@ -310,9 +314,9 @@ def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
         planner_output=planner_out,
     )
 
-    logger.info("[executor] completed — routing back to supervisor")
+    logger.info("[executor] completed — routing back to workflow_controller")
     return Command(
-        goto="supervisor",
+        goto="workflow_controller",
         update={
             "training_plan": plan.model_dump(),
             "train_pool_path": result.train_pool_path,
@@ -329,14 +333,14 @@ def executor_node(state: AgentState) -> Command[Literal["supervisor"]]:
 
 def _planner_node_with_error_handling(
     state: AgentState,
-) -> Command[Literal["supervisor"]]:
-    """Wrap planner_node to catch PlannerError and route to supervisor gracefully."""
+) -> Command[Literal["workflow_controller"]]:
+    """Wrap planner_node to catch PlannerError and route to workflow_controller gracefully."""
     try:
         return planner_node(state)
     except PlannerError as exc:
         logger.error(f"[planner] failed after retry: {exc}")
         return Command(
-            goto="supervisor",
+            goto="workflow_controller",
             update={
                 "planner_status": "failed",
                 "planner_retry_used": True,
@@ -346,91 +350,23 @@ def _planner_node_with_error_handling(
         )
 
 
-def evaluator_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    agent = get_agent("evaluator")
-    result = agent.invoke({"messages": [_build_evaluator_context(state)]})
-    final_message = result["messages"][-1].content
-
-    best_runs_raw = _extract_tool_json(result["messages"], "get_best_run")
-    runs_list: list = best_runs_raw if isinstance(best_runs_raw, list) else []
-    candidate = runs_list[0] if runs_list else {}
-    baseline = runs_list[1] if len(runs_list) > 1 else {}
-
-    evaluation_report = {
-        "candidate_metrics": candidate.get("metrics", {}),
-        "candidate_run_id": candidate.get("run_id", ""),
-        "baseline_metrics": baseline.get("metrics", {}),
-    }
-
-    lower = final_message.lower()
-    promoted = (
-        "promot" in lower
-        and "do not promot" not in lower
-        and "not promot" not in lower
-        and "retrain" not in lower
-        and "reject" not in lower
-    )
-
-    logger.info(f"[evaluator] completed — promoted={promoted} — routing back to supervisor")
-    return Command(
-        update={
-            "messages": [HumanMessage(content=final_message, name="evaluator")],
-            "evaluation_report": evaluation_report,
-            "evaluation_passed": promoted,
-        },
-        goto="supervisor",
-    )
+def evaluation_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
+    """Deterministic promotion decision — no LLM."""
+    result = evaluate_promotion(state)
+    logger.info(f"[evaluation] passed={result['evaluation_passed']}")
+    return Command(update=result, goto="workflow_controller")
 
 
-def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
-    """Deployment node with HITL interrupt() before champion promotion.
+def report_writer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
+    """Audit LLM node — produces structured EvaluationReport."""
+    result = run_report_writer(state)
+    return Command(update=result, goto="workflow_controller")
 
-    Execution flow:
-    1. Register the model and assign 'challenger' alias (deterministic).
-    2. Interrupt for human approval.
-    3. On resume: if approved, assign 'champion' alias; if rejected, abort.
-    """
-    import json as _json
-    from mlops_agents.tools.mlflow_tools import register_model, set_model_alias
 
-    run_id = state.get("training_run_id", "")
-
-    # Step 1: register + challenger alias (deterministic, no LLM)
-    reg_raw = register_model.invoke({"run_id": run_id})
-    reg = _json.loads(reg_raw)
-    version = reg.get("version")
-    model_name = reg.get("model_name", "")
-    alias_raw = set_model_alias.invoke({"model_name": model_name, "alias": "challenger", "version": version})
-    registration_summary = (
-        f"Registered '{model_name}' version {version} from run {run_id}. "
-        f"Alias 'challenger' assigned."
-    )
-    logger.info(f"[deployer] {registration_summary}")
-
-    # Step 2: HITL — pause and wait for human approval
-    approval = interrupt({
-        "question": "Approve promotion of this model to 'champion' in the MLflow Model Registry?",
-        "registration_summary": registration_summary,
-        "instructions": "Reply with {'approved': true} to promote, or {'approved': false} to reject.",
-    })
-
-    # Step 3: handle approval decision
-    if approval.get("approved", False):
-        set_model_alias.invoke({"model_name": model_name, "alias": "champion", "version": version})
-        outcome = f"APPROVED. '{model_name}' v{version} promoted to champion."
-        logger.info(f"[deployer] {outcome}")
-    else:
-        reason = approval.get("reason", "No reason provided.")
-        outcome = f"REJECTED. '{model_name}' v{version} NOT promoted. Reason: {reason}"
-        logger.warning(f"[deployer] {outcome}")
-
-    return Command(
-        update={
-            "messages": [HumanMessage(content=outcome, name="deployer")],
-            "deployment_decision": "approved" if approval.get("approved") else "rejected",
-        },
-        goto="supervisor",
-    )
+def deployer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
+    """Deterministic deployment — Gate 2 has already approved upstream."""
+    result = run_deployer_module(state)
+    return Command(update=result, goto="workflow_controller")
 
 
 # =============================================================================
@@ -438,25 +374,20 @@ def deployer_node(state: AgentState) -> Command[Literal["supervisor"]]:
 # =============================================================================
 
 def _build_graph(checkpointer=None) -> StateGraph:
-    """Build the MLOps StateGraph. Optionally attach a checkpointer for HITL.
-
-    Nodes: supervisor, data_validator, planner, executor, evaluator, deployer.
-    """
+    """Build the refactored MLOps StateGraph."""
     builder = StateGraph(AgentState)
 
-    # Add nodes
-    builder.add_node("supervisor", supervisor_node)
+    builder.add_node("workflow_controller", workflow_controller)
     builder.add_node("data_validator", data_validator_node)
+    builder.add_node("dataset_approval", dataset_approval_node)
     builder.add_node("planner", _planner_node_with_error_handling)
     builder.add_node("executor", executor_node)
-    builder.add_node("evaluator", evaluator_node)
+    builder.add_node("evaluation", evaluation_node)
+    builder.add_node("report_writer", report_writer_node)
+    builder.add_node("deployment_approval", deployment_approval_node)
     builder.add_node("deployer", deployer_node)
 
-    # Entry point
-    builder.add_edge(START, "supervisor")
-
-    # All workers route back to supervisor via Command — no explicit edges needed
-
+    builder.add_edge(START, "workflow_controller")
     return builder.compile(checkpointer=checkpointer)
 
 
@@ -477,7 +408,6 @@ def main() -> None:
         "messages": [
             HumanMessage(content=f"Run the full MLOps pipeline on these raw files: {paths_display}")
         ],
-        "next": "",
         "dataset_paths": dataset_paths,
         "processed_dataset_path": "",
         "dataset_summary": {},
@@ -488,7 +418,7 @@ def main() -> None:
         "trained_model_path": "",
         "training_run_id": "",
         "training_metrics": {},
-        "evaluation_passed": False,
+        "evaluation_passed": None,
         "evaluation_report": {},
         "best_model_uri": "",
         "deployment_decision": "pending",
@@ -496,6 +426,14 @@ def main() -> None:
         "error_message": "",
         "agent_attempt_counts": {},
         "schema_json": "",
+        "dataset_approved": None,
+        "dataset_rejection_comment": "",
+        "deployment_approved": None,
+        "candidate_metrics": {},
+        "champion_metrics": {},
+        "thresholds_applied": {},
+        "evaluation_report_audit": None,
+        "evaluation_report_audit_status": "",
     }
 
     print(f"\n{'='*60}")
