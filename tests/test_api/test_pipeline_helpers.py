@@ -29,7 +29,7 @@ def test_build_initial_state_deployment_pending():
 def test_build_initial_state_validation_false():
     state = build_initial_state(["./data/samples/iris.csv"])
     assert state["validation_passed"] is False
-    assert state["evaluation_passed"] is False
+    assert state["evaluation_passed"] is None
 
 
 def test_build_initial_state_includes_schema_json():
@@ -104,3 +104,17 @@ def test_parse_stream_event_empty_content_no_tool_calls_returns_none():
     chunk = AIMessageChunk(content="")
     result = parse_stream_event((chunk, {"langgraph_node": "data_validator"}))
     assert result is None
+
+
+def test_build_initial_state_has_all_required_controller_fields():
+    from api.services.pipeline_helpers import build_initial_state
+    state = build_initial_state(["a.csv"])
+    assert state["dataset_approved"] is None
+    assert state["deployment_approved"] is None
+    assert state["evaluation_passed"] is None
+    assert state["evaluation_report_audit"] is None
+    assert state["dataset_rejection_comment"] == ""
+    assert state["evaluation_report_audit_status"] == ""
+    assert state["candidate_metrics"] == {}
+    assert state["champion_metrics"] == {}
+    assert state["thresholds_applied"] == {}

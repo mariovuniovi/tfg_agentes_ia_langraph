@@ -35,13 +35,22 @@ def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict
         "trained_model_path": "",
         "training_run_id": "",
         "training_metrics": {},
-        "evaluation_passed": False,
+        "evaluation_passed": None,
         "evaluation_report": {},
         "best_model_uri": "",
         "deployment_decision": "pending",
         "deployment_status": "",
         "error_message": "",
         "agent_attempt_counts": {},
+        # Refactor additions
+        "dataset_approved": None,
+        "dataset_rejection_comment": "",
+        "deployment_approved": None,
+        "candidate_metrics": {},
+        "champion_metrics": {},
+        "thresholds_applied": {},
+        "evaluation_report_audit": None,
+        "evaluation_report_audit_status": "",
     }
 
 
