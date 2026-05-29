@@ -25,6 +25,7 @@ def get_llm(agent: str = "", temperature: float = 0, max_tokens: int = 4000) -> 
         "planner":        settings.openai_model_planner,
         "evaluator":      settings.openai_model_evaluator,
         "deployer":       settings.openai_model_deployer,
+        "report_writer":  settings.openai_model_report_writer,
     }
     model = model_map.get(agent, settings.openai_model)
     label = agent if agent else "default"

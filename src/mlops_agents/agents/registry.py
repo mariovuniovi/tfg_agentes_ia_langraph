@@ -20,4 +20,7 @@ def get_agent(name: str) -> Any:
     if name == "evaluator":
         from mlops_agents.agents.evaluation_agent import build_evaluation_agent
         return build_evaluation_agent()
-    raise ValueError(f"Unknown agent: '{name}'. Valid names: data_validator, evaluator")
+    if name == "report_writer":
+        from mlops_agents.evaluation.report_writer import build_report_writer
+        return build_report_writer()
+    raise ValueError(f"Unknown agent: '{name}'. Valid names: data_validator, evaluator, report_writer")

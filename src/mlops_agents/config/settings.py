@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     openai_model_planner: str = "gpt-5-mini"
     openai_model_evaluator: str = "gpt-5-mini"
     openai_model_deployer: str = "gpt-5.4-nano"
+    openai_model_report_writer: str = "gpt-5-mini"
 
     # MLflow
     mlflow_tracking_uri: str = "sqlite:///./mlflow.db"
