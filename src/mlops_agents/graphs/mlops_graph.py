@@ -147,7 +147,7 @@ def _validate_schema_contract(schema_data: dict) -> None:
                 raise ValueError(f"'series_id_columns' entry '{col}' not found in columns.")
 
 
-def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "data_validator"]]:
+def data_validator_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     import pandas as pd
 
     schema_json: str = state.get("schema_json") or ""
@@ -177,7 +177,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "dat
                 "processed_dataset_path": "",
                 "schema_json": "",
             },
-            goto="supervisor",
+            goto="workflow_controller",
         )
 
     try:
@@ -197,28 +197,22 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "dat
                 "processed_dataset_path": "",
                 "schema_json": schema_json,
             },
-            goto="supervisor",
+            goto="workflow_controller",
         )
-
-    _max_attempts = 3
-    counts = dict(state.get("agent_attempt_counts") or {})
-    attempt = counts.get("data_validator", 1)
 
     # Build agent messages; on retry, prepend prior rejection feedback so the
     # agent knows what the human reviewer objected to and can try a different approach.
     context_msg = _build_data_validator_context(state, schema_json=schema_json, schema_path=schema_path)
     agent_messages: list[HumanMessage] = [context_msg]
-    if attempt > 1:
-        for msg in reversed(state.get("messages") or []):
-            if getattr(msg, "name", "") == "data_validator" and "rejected" in str(msg.content).lower():
-                agent_messages.append(HumanMessage(
-                    content=(
-                        f"Your previous attempt was rejected by a human reviewer. "
-                        f"Their feedback: {msg.content}. "
-                        "Please try a different approach to address this feedback."
-                    )
-                ))
-                break
+    rejection_comment = state.get("dataset_rejection_comment") or ""
+    if rejection_comment:
+        agent_messages.append(HumanMessage(
+            content=(
+                f"Your previous attempt was rejected by a human reviewer. "
+                f"Their feedback: {rejection_comment}. "
+                "Please try a different approach to address this feedback."
+            )
+        ))
 
     agent = get_agent("data_validator")
     result = agent.invoke({"messages": agent_messages})
@@ -237,10 +231,6 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "dat
     validation_passed = bool(validation_result.get("passed", False))
 
     dataset_summary: dict = {}
-    # Validation passed — build preview and surface HITL for human sign-off.
-    # Use df.to_json + json.loads so NaN/Inf become null — plain to_dict() leaves
-    # Python float('nan') which serialises to the bare token NaN, invalid JSON.
-    preview: dict = {"shape": [0, 0], "columns": [], "sample_rows": []}
     if processed_path:
         try:
             df = pd.read_csv(processed_path)
@@ -249,11 +239,6 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "dat
                 "column_names": list(df.columns),
                 "dtypes": df.dtypes.astype(str).to_dict(),
                 "null_counts": df.isnull().sum().to_dict(),
-            }
-            preview = {
-                "shape": list(df.shape),
-                "columns": [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
-                "sample_rows": json.loads(df.head(20).to_json(orient="records")),
             }
         except Exception:
             pass
@@ -282,72 +267,20 @@ def data_validator_node(state: AgentState) -> Command[Literal["supervisor", "dat
 
     if not validation_passed:
         # Validation failed after agent's auto-fix attempt — abort without HITL.
-        # The supervisor will see error_message set and select FINISH.
+        # The workflow_controller will see error_message set and select FINISH.
         error_msg = f"Data validation failed after auto-fix attempt: {final_message}"
         logger.warning("[data_validator] validation failed — aborting without HITL")
         return Command(
             update={**base_update, "error_message": error_msg},
-            goto="supervisor",
+            goto="workflow_controller",
         )
 
-    missing_vals: dict = {}
-    if isinstance(quality_report, dict):
-        missing_vals = quality_report.get("missing_values", {})
-
-    approval = interrupt({
-        "type": "data_validation",
-        "question": "Review the processed dataset before training begins.",
-        "attempt": attempt,
-        "dataset_preview": preview,
-        "validation_summary": {
-            "passed": True,
-            "missing_values": missing_vals,
-            "schema_validated": True,
-        },
-        "imputation_applied": imputation_result,
-    })
-
-    if approval.get("approved", False):
-        logger.info("[data_validator] approved — routing back to supervisor")
-        return Command(update=base_update, goto="supervisor")
-
-    comment = approval.get("comment", "")
-    rejection_text = (
-        f"Dataset rejected by human reviewer. Comment: {comment}"
-        if comment
-        else "Dataset rejected by human reviewer."
-    )
-    counts["data_validator"] = attempt + 1
-    logger.info(f"[data_validator] rejected (attempt {attempt}/{_max_attempts}) — comment: {comment!r}")
-
-    if attempt < _max_attempts:
-        # Route back to data_validator for another attempt; rejection feedback
-        # is stored in messages so the next run can inject it into agent context.
-        return Command(
-            update={
-                "messages": [
-                    HumanMessage(content=final_message, name="data_validator"),
-                    HumanMessage(content=rejection_text, name="data_validator"),
-                ],
-                "agent_attempt_counts": counts,
-                "validation_passed": False,
-                "error_message": "",
-            },
-            goto="data_validator",
-        )
-
-    # Max attempts exhausted — abort.
     return Command(
         update={
             **base_update,
-            "messages": [
-                HumanMessage(content=final_message, name="data_validator"),
-                HumanMessage(content=rejection_text, name="data_validator"),
-            ],
-            "validation_passed": False,
-            "error_message": f"Dataset rejected after {_max_attempts} attempts. Last comment: {comment}",
+            "dataset_rejection_comment": "",
         },
-        goto="supervisor",
+        goto="workflow_controller",
     )
 
 
