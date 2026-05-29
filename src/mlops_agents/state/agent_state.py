@@ -37,13 +37,29 @@ class AgentState(TypedDict):
     split_metadata_path: str | None
     champion_candidate: dict | None
     experience_record_path: str | None
-    evaluation_passed: bool
+    evaluation_passed: bool | None
     evaluation_report: dict
     best_model_uri: str
 
     # Deployment
     deployment_decision: str  # "approved" | "rejected" | "pending"
     deployment_status: str
+
+    # Gate 1 — dataset approval
+    dataset_approved: bool | None
+    dataset_rejection_comment: str
+
+    # Gate 2 — deployment approval
+    deployment_approved: bool | None
+
+    # Deterministic evaluation outputs
+    candidate_metrics: dict
+    champion_metrics: dict
+    thresholds_applied: dict
+
+    # Audit LLM output
+    evaluation_report_audit: dict | None
+    evaluation_report_audit_status: str   # "ok" | "retry_ok" | "stub"
 
     # Error tracking
     error_message: str

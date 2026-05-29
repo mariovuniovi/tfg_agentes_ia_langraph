@@ -134,3 +134,16 @@ def test_forecasting_empty_series_id_columns_passes():
     # Single-series forecasting: series_id_columns may be []
     schema = _forecasting_schema(series_id_columns=[])
     SchemaContract.model_validate(schema)
+
+
+def test_agent_state_has_refactor_fields():
+    from mlops_agents.state.agent_state import AgentState
+    annotations = AgentState.__annotations__
+    assert "dataset_approved" in annotations
+    assert "dataset_rejection_comment" in annotations
+    assert "deployment_approved" in annotations
+    assert "evaluation_report_audit" in annotations
+    assert "evaluation_report_audit_status" in annotations
+    assert "candidate_metrics" in annotations
+    assert "champion_metrics" in annotations
+    assert "thresholds_applied" in annotations
