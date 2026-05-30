@@ -103,6 +103,14 @@ export function buildTimeline(events: PipelineEvent[]): TimelineRow[] {
         rows.push({ ts: t, text: 'Audit report generated', agent: 'report_writer' })
         break
       }
+      case 'deployment_complete': {
+        const uri = (e.data as { best_model_uri?: string }).best_model_uri ?? ''
+        // Extract "models:/mlops-agent-model/3" → "mlops-agent-model v3"
+        const m = uri.match(/models:\/([^/]+)\/(\d+)/)
+        const human = m ? `${m[1]} v${m[2]}` : 'model'
+        rows.push({ ts: t, text: `Deployment complete · ${human} (champion alias set)`, agent: 'deployer' })
+        break
+      }
       case 'run_complete': {
         const err = (e.data as { error?: string }).error
         rows.push({ ts: t, text: err ? `Run failed: ${err.slice(0, 80)}` : 'Run complete', agent: e.agent })

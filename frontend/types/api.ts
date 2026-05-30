@@ -10,6 +10,7 @@ export type PipelineEventType =
   | 'hitl_request'
   | 'audit_report'
   | 'training_complete'
+  | 'deployment_complete'
   | 'run_complete'
 
 export interface PipelineEvent {

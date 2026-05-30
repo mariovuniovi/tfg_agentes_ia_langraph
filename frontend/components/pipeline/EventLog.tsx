@@ -18,6 +18,7 @@ const TYPE_COLORS: Record<PipelineEventType, string> = {
   hitl_request: 'font-semibold text-amber-700',
   audit_report: 'text-violet-600',
   training_complete: 'text-emerald-600',
+  deployment_complete: 'font-semibold text-emerald-600',
   run_complete: 'font-semibold text-emerald-600',
 }
 

@@ -215,6 +215,21 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                         entry.events.append(planner_ctx_event)
                         await entry.queue.put(planner_ctx_event)
 
+                if "deployer" in data and isinstance(data["deployer"], dict):
+                    dp = data["deployer"]
+                    if dp.get("deployment_status") == "deployed":
+                        deploy_event: dict = {
+                            "type": "deployment_complete",
+                            "agent": "deployer",
+                            "timestamp_ms": time.time() * 1000,
+                            "data": {
+                                "best_model_uri":     dp.get("best_model_uri", ""),
+                                "deployment_status":  "deployed",
+                            },
+                        }
+                        entry.events.append(deploy_event)
+                        await entry.queue.put(deploy_event)
+
                 if "executor" in data and isinstance(data["executor"], dict):
                     ex = data["executor"]
                     if ex.get("training_run_id") or ex.get("training_metrics") or ex.get("champion_candidate"):

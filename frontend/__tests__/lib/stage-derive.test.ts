@@ -118,4 +118,14 @@ describe('deriveStages', () => {
     const { stages } = deriveStages(events, 'complete')
     expect(stages.deploy_approval).toBe('completed')
   })
+
+  it('marks deploy completed when deployment_complete event arrives', () => {
+    const events = [
+      ev('routing', 'controller', { next: 'deployer' }),
+      ev('deployment_complete', 'deployer', { best_model_uri: 'models:/my-model/3' }),
+      ev('run_complete', 'controller'),
+    ]
+    const { stages } = deriveStages(events, 'complete')
+    expect(stages.deploy).toBe('completed')
+  })
 })

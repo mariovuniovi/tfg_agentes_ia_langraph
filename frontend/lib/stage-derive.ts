@@ -102,6 +102,14 @@ export function deriveStages(
       stages.deploy_approval = 'completed'
       lastDeployDecision = decision === 'approve' ? 'approve' : 'reject'
     }
+    if (e.type === 'routing' && next === 'deployer') {
+      stages.deploy = 'running'
+      currentStage = 'deploy'
+    }
+    if ((e.type as string) === 'deployment_complete') {
+      stages.deploy = 'completed'
+      if (stages.deploy_approval === 'waiting_human') stages.deploy_approval = 'completed'
+    }
     if (e.type === 'run_complete') {
       const errorMsg = (e.data as { error?: string }).error
       if (errorMsg && currentStage) {
