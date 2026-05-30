@@ -69,3 +69,15 @@ export async function uploadFiles(files: File[]): Promise<{ paths: string[] }> {
 export async function fetchHealth(): Promise<HealthResponse> {
   return json(await fetch(`${BASE}/health`))
 }
+
+export interface RunSummary {
+  run_id: string
+  status: 'running' | 'awaiting_approval' | 'complete' | 'failed'
+  started_at_ms: number
+}
+
+export async function fetchRunsList(limit = 20): Promise<RunSummary[]> {
+  const r = await fetch(`${BASE}/runs?limit=${limit}`)
+  if (!r.ok) throw new Error('runs list')
+  return r.json()
+}
