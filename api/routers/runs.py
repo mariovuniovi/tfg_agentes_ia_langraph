@@ -1,7 +1,9 @@
 """Runs router: pipeline execution, WebSocket streaming, HITL approval."""
 from uuid import uuid4
 
+import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 
 import api.services.run_store as run_store
 from api.models.run import HITLDecision, RunCreate, RunStatus
@@ -69,3 +71,48 @@ async def pipeline_ws(websocket: WebSocket, run_id: str):
                 break
     except WebSocketDisconnect:
         pass
+
+
+@router.get("/runs/{run_id}/dataset-preview")
+def dataset_preview(run_id: str, limit: int = 50, offset: int = 0):
+    entry = run_store.get_entry(run_id)
+    if entry is None:
+        raise HTTPException(404, "run not found")
+    path = entry.processed_dataset_path
+    if not path:
+        raise HTTPException(409, "no processed dataset yet")
+    df = pd.read_csv(path)
+    total = len(df)
+    rows = df.iloc[offset : offset + limit].to_dict(orient="records")
+    columns = [
+        {
+            "name": c,
+            "dtype": str(df[c].dtype),
+            "non_null_count": int(df[c].notna().sum()),
+            "sample_value": (lambda v: v.item() if hasattr(v, "item") else v)(
+                df[c].dropna().iloc[0]
+            ) if not df[c].dropna().empty else None,
+        }
+        for c in df.columns
+    ]
+    return {"columns": columns, "rows": rows, "total_rows": total}
+
+
+@router.get("/runs/{run_id}/dataset-download")
+def dataset_download(run_id: str):
+    entry = run_store.get_entry(run_id)
+    if entry is None:
+        raise HTTPException(404, "run not found")
+    path = entry.processed_dataset_path
+    if not path:
+        raise HTTPException(409, "no processed dataset yet")
+
+    def iter_file():
+        with open(path, "rb") as f:
+            yield from f
+
+    return StreamingResponse(
+        iter_file(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="run-{run_id}.csv"'},
+    )
