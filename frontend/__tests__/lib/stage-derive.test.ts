@@ -109,4 +109,13 @@ describe('deriveStages', () => {
     ]
     expect(deriveStages(events, 'complete').stages.deploy).toBe('skipped')
   })
+
+  it('marks waiting_human stages as completed when run_complete arrives without error', () => {
+    const events = [
+      ev('hitl_request', 'deployer', { type: 'deployer' }),
+      ev('run_complete', 'controller'),
+    ]
+    const { stages } = deriveStages(events, 'complete')
+    expect(stages.deploy_approval).toBe('completed')
+  })
 })

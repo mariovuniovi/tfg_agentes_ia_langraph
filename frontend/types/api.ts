@@ -9,6 +9,7 @@ export type PipelineEventType =
   | 'planner_context'
   | 'hitl_request'
   | 'audit_report'
+  | 'training_complete'
   | 'run_complete'
 
 export interface PipelineEvent {

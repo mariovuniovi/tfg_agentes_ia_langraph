@@ -496,6 +496,44 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
   )
 }
 
+function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string } }) {
+  const champ = data.champion_candidate as { model_key?: string; primary_metric?: string; primary_score?: number }
+  const metricEntries = Object.entries(data.training_metrics ?? {})
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-indigo-600 px-3 py-0.5 text-xs font-semibold text-white">
+          {champ?.model_key ?? 'champion'}
+        </span>
+        {champ?.primary_metric && (
+          <span className="text-xs text-zinc-500">
+            {champ.primary_metric}: <span className="font-mono text-zinc-800">{Number(champ.primary_score).toFixed(4)}</span>
+          </span>
+        )}
+        {data.training_run_id && (
+          <span className="ml-auto font-mono text-[11px] text-zinc-400">{data.training_run_id.slice(0, 8)}…</span>
+        )}
+      </div>
+      {metricEntries.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Champion metrics</p>
+          <div className="grid grid-cols-2 gap-2">
+            {metricEntries.map(([k, v]) => (
+              <div key={k} className="rounded border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs">
+                <div className="text-zinc-500">{k}</div>
+                <div className="font-mono text-zinc-800">{typeof v === 'number' ? v.toFixed(4) : String(v)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {data.trained_model_path && (
+        <p className="text-[11px] text-zinc-400">Artifact: <span className="font-mono">{data.trained_model_path}</span></p>
+      )}
+    </div>
+  )
+}
+
 export function ResultsDashboard() {
   const events = useRunStore((s) => s.events)
   const status = useRunStore((s) => s.status)
@@ -546,6 +584,11 @@ export function ResultsDashboard() {
     return ev ? (ev.data as unknown as AuditReportEventData) : null
   }, [events])
 
+  const trainingData = useMemo(() => {
+    const ev = events.findLast((e) => e.type === 'training_complete')
+    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string }) : null
+  }, [events])
+
   const dataset = toolResults['load_dataset'] as DatasetSummary | undefined
   const merged = toolResults['merge_datasets'] as MergedSummary | undefined
   const missing = toolResults['check_missing_values'] as MissingSummary | undefined
@@ -560,7 +603,7 @@ export function ResultsDashboard() {
   const isMerging = mergeWasStarted && !merged
 
   const hasDataset = !!dataset || !!merged || isMerging
-  const hasModel = !!trained || !!tuned
+  const hasModel = !!(trained || tuned || trainingData)
   const hasPlanner = !!plannerCtx
   const running = status === 'running' || status === 'awaiting_approval'
   const active = running || hasDataset || hasModel
@@ -572,8 +615,8 @@ export function ResultsDashboard() {
 
   useEffect(() => {
     if (pinnedTab) return
-    if (trained || tuned) setTab('model')
-  }, [trained, tuned, pinnedTab])
+    if (trained || tuned || trainingData) setTab('model')
+  }, [trained, tuned, trainingData, pinnedTab])
 
   useEffect(() => {
     if (pinnedTab) return
@@ -640,7 +683,11 @@ export function ResultsDashboard() {
           </PlannerErrorBoundary>
         )}
         {tab === 'model' && (
-          <ModelPanel trained={trained} tuned={tuned} running={running} />
+          <>
+            {trained || tuned ? <ModelPanel trained={trained} tuned={tuned} running={running} /> : null}
+            {trainingData && !trained && !tuned ? <TrainingCompletePanel data={trainingData} /> : null}
+            {!trained && !tuned && !trainingData && <p className="text-xs text-zinc-400">No model results yet.</p>}
+          </>
         )}
         {tab === 'audit' && auditData && <AuditReportPanel data={auditData} />}
         {tab === 'audit' && !auditData && <p className="text-xs text-zinc-400">Audit not yet generated.</p>}

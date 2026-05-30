@@ -110,6 +110,17 @@ export function deriveStages(
     }
   }
 
+  // run_complete without error means any still-waiting_human gate was actually approved
+  const lastEvent = events[events.length - 1]
+  const completedWithoutError = lastEvent
+    && lastEvent.type === 'run_complete'
+    && !(lastEvent.data as { error?: string }).error
+  if (completedWithoutError) {
+    for (const k of STAGE_ORDER) {
+      if (stages[k] === 'waiting_human') stages[k] = 'completed'
+    }
+  }
+
   let runOutcome: RunOutcome = 'running'
   if (runStatus === 'failed') {
     runOutcome = 'failed'

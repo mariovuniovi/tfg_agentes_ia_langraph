@@ -17,6 +17,7 @@ const TYPE_COLORS: Record<PipelineEventType, string> = {
   planner_context: 'text-violet-600',
   hitl_request: 'font-semibold text-amber-700',
   audit_report: 'text-violet-600',
+  training_complete: 'text-emerald-600',
   run_complete: 'font-semibold text-emerald-600',
 }
 
