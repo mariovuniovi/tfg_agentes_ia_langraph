@@ -21,7 +21,7 @@ export function DeploymentBarChart({ metrics }: { metrics: Record<string, number
       <div className="mb-1 flex justify-end">
         <button
           onClick={() => downloadCSV(metrics)}
-          className="rounded px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50"
+          className="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
         >
           Export CSV
         </button>
@@ -32,7 +32,7 @@ export function DeploymentBarChart({ metrics }: { metrics: Record<string, number
           <XAxis type="number" tick={{ fontSize: 10 }} />
           <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={100} />
           <Tooltip />
-          <Bar dataKey="value" fill="#1e3a5f">
+          <Bar dataKey="value" fill="#4f46e5">
             <LabelList dataKey="value" position="right" style={{ fontSize: 10 }} formatter={(v) => (typeof v === 'number' ? v.toFixed(3) : String(v ?? ''))} />
           </Bar>
         </BarChart>

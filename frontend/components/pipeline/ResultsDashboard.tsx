@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { useRunStore } from '@/stores/run-store'
 import type { DataValidationInterrupt } from '@/types/api'
 import { useApprove } from '@/hooks/use-approve'
@@ -58,10 +58,10 @@ function parseClassReport(report: Record<string, unknown>): ClassRow[] {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded bg-slate-50 p-3 text-center">
-      <div className="text-xl font-semibold text-navy-900">{value}</div>
-      <div className="text-xs text-slate-500">{label}</div>
-      {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
+    <div className="rounded bg-zinc-50 p-3 text-center">
+      <div className="text-xl font-semibold text-zinc-900">{value}</div>
+      <div className="text-xs text-zinc-500">{label}</div>
+      {sub && <div className="mt-0.5 text-xs text-zinc-400">{sub}</div>}
     </div>
   )
 }
@@ -69,9 +69,9 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 function PulseRow() {
   return (
     <div className="animate-pulse space-y-2">
-      <div className="h-3 w-3/4 rounded bg-slate-200" />
-      <div className="h-3 w-1/2 rounded bg-slate-200" />
-      <div className="h-3 w-2/3 rounded bg-slate-200" />
+      <div className="h-3 w-3/4 rounded bg-zinc-200" />
+      <div className="h-3 w-1/2 rounded bg-zinc-200" />
+      <div className="h-3 w-2/3 rounded bg-zinc-200" />
     </div>
   )
 }
@@ -95,14 +95,14 @@ function DatasetPanel({
 }) {
   if (merging && !merged) {
     return (
-      <div className="flex items-center gap-2 text-xs text-slate-400">
-        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+      <div className="flex items-center gap-2 text-xs text-zinc-400">
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-500" />
         Merging datasets…
       </div>
     )
   }
   if (!dataset && !merged && running) return <PulseRow />
-  if (!dataset && !merged) return <p className="text-xs text-slate-400">No dataset results yet.</p>
+  if (!dataset && !merged) return <p className="text-xs text-zinc-400">No dataset results yet.</p>
 
   const rows = dataset?.row_count ?? merged?.row_count ?? 0
   const cols = dataset ? dataset.column_names : merged?.columns ?? []
@@ -113,10 +113,10 @@ function DatasetPanel({
     <div className="space-y-4">
       {/* Shape pill */}
       <div className="flex items-center gap-2">
-        <span className="rounded-full bg-navy px-3 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-indigo-600 px-3 py-0.5 text-xs font-semibold text-white">
           {rows.toLocaleString()} rows
         </span>
-        <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-semibold text-slate-600">
+        <span className="rounded-full bg-zinc-100 px-3 py-0.5 text-xs font-semibold text-zinc-600">
           {cols.length} columns
         </span>
         {validation && (
@@ -134,16 +134,16 @@ function DatasetPanel({
 
       {/* Column list */}
       <div>
-        <p className="mb-1.5 text-xs font-medium text-slate-500">Columns</p>
+        <p className="mb-1.5 text-xs font-medium text-zinc-500">Columns</p>
         <div className="flex flex-wrap gap-1">
           {cols.map((col) => (
             <span
               key={col}
-              className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700"
+              className="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-700"
             >
               {col}
               {dtypes[col] && (
-                <span className="text-slate-400">{dtypes[col].replace('object', 'str').replace('int64', 'int').replace('float64', 'float')}</span>
+                <span className="text-zinc-400">{dtypes[col].replace('object', 'str').replace('int64', 'int').replace('float64', 'float')}</span>
               )}
             </span>
           ))}
@@ -153,20 +153,20 @@ function DatasetPanel({
       {/* Missing values */}
       {missing && missing.columns_with_missing > 0 && (
         <div>
-          <p className="mb-1.5 text-xs font-medium text-slate-500">
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">
             Missing values — {missing.columns_with_missing} column{missing.columns_with_missing !== 1 ? 's' : ''} affected
           </p>
           <div className="space-y-1">
             {Object.entries(missing.per_column).map(([col, { pct }]) => (
               <div key={col} className="flex items-center gap-2">
-                <span className="w-24 truncate text-xs text-slate-600">{col}</span>
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+                <span className="w-24 truncate text-xs text-zinc-600">{col}</span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200">
                   <div
                     className={`h-full rounded-full ${pct > 20 ? 'bg-red-400' : 'bg-amber-400'}`}
                     style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
-                <span className="w-10 text-right text-xs text-slate-400">{pct}%</span>
+                <span className="w-10 text-right text-xs text-zinc-400">{pct}%</span>
               </div>
             ))}
           </div>
@@ -179,13 +179,13 @@ function DatasetPanel({
       {/* Sample rows — hidden when merged data is present (raw file is not the processed result) */}
       {head.length > 0 && !hideRawSample && (
         <div>
-          <p className="mb-1.5 text-xs font-medium text-slate-500">Sample (3 rows)</p>
-          <div className="overflow-x-auto rounded border border-slate-200">
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Sample (3 rows)</p>
+          <div className="overflow-x-auto rounded border border-zinc-200">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-50">
+                <tr className="bg-zinc-50">
                   {cols.map((col) => (
-                    <th key={col} className="border-b border-slate-200 px-2 py-1 text-left font-medium text-slate-500">
+                    <th key={col} className="border-b border-zinc-200 px-2 py-1 text-left font-medium text-zinc-500">
                       {col}
                     </th>
                   ))}
@@ -193,9 +193,9 @@ function DatasetPanel({
               </thead>
               <tbody>
                 {head.map((row, i) => (
-                  <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <tr key={i} className="border-b border-zinc-100 last:border-0">
                     {cols.map((col) => (
-                      <td key={col} className="px-2 py-1 text-slate-600">
+                      <td key={col} className="px-2 py-1 text-zinc-600">
                         {String(row[col] ?? '—')}
                       </td>
                     ))}
@@ -234,7 +234,7 @@ function ModelPanel({
   running: boolean
 }) {
   if (!trained && !tuned && running) return <PulseRow />
-  if (!trained && !tuned) return <p className="text-xs text-slate-400">No model results yet.</p>
+  if (!trained && !tuned) return <p className="text-xs text-zinc-400">No model results yet.</p>
 
   const modelType = trained?.model_type ?? tuned?.model_type ?? ''
   const classRows = trained ? parseClassReport(trained.classification_report as Record<string, unknown>) : []
@@ -243,11 +243,11 @@ function ModelPanel({
     <div className="space-y-4">
       {/* Model type badge */}
       <div className="flex items-center gap-2">
-        <span className="rounded-full bg-navy px-3 py-0.5 text-xs font-semibold text-white">
+        <span className="rounded-full bg-indigo-600 px-3 py-0.5 text-xs font-semibold text-white">
           {modelType.replace(/_/g, ' ')}
         </span>
         {tuned && (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-zinc-400">
             {tuned.n_trials} Optuna trials
           </span>
         )}
@@ -269,11 +269,11 @@ function ModelPanel({
       {/* Best hyperparams */}
       {tuned && (
         <div>
-          <p className="mb-1.5 text-xs font-medium text-slate-500">Best hyperparameters</p>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Best hyperparameters</p>
           <div className="flex flex-wrap gap-1">
             {Object.entries(tuned.best_params).map(([k, v]) => (
-              <span key={k} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700">
-                <span className="text-slate-400">{k}:</span> {String(v)}
+              <span key={k} className="rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-700">
+                <span className="text-zinc-400">{k}:</span> {String(v)}
               </span>
             ))}
           </div>
@@ -283,26 +283,26 @@ function ModelPanel({
       {/* Classification report */}
       {classRows.length > 0 && (
         <div>
-          <p className="mb-1.5 text-xs font-medium text-slate-500">Per-class metrics</p>
-          <div className="overflow-x-auto rounded border border-slate-200">
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Per-class metrics</p>
+          <div className="overflow-x-auto rounded border border-zinc-200">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-50">
-                  <th className="border-b border-slate-200 px-2 py-1 text-left font-medium text-slate-500">Class</th>
-                  <th className="border-b border-slate-200 px-2 py-1 text-right font-medium text-slate-500">Prec</th>
-                  <th className="border-b border-slate-200 px-2 py-1 text-right font-medium text-slate-500">Recall</th>
-                  <th className="border-b border-slate-200 px-2 py-1 text-right font-medium text-slate-500">F1</th>
-                  <th className="border-b border-slate-200 px-2 py-1 text-right font-medium text-slate-500">N</th>
+                <tr className="bg-zinc-50">
+                  <th className="border-b border-zinc-200 px-2 py-1 text-left font-medium text-zinc-500">Class</th>
+                  <th className="border-b border-zinc-200 px-2 py-1 text-right font-medium text-zinc-500">Prec</th>
+                  <th className="border-b border-zinc-200 px-2 py-1 text-right font-medium text-zinc-500">Recall</th>
+                  <th className="border-b border-zinc-200 px-2 py-1 text-right font-medium text-zinc-500">F1</th>
+                  <th className="border-b border-zinc-200 px-2 py-1 text-right font-medium text-zinc-500">N</th>
                 </tr>
               </thead>
               <tbody>
                 {classRows.map((r) => (
-                  <tr key={r.label} className="border-b border-slate-100 last:border-0">
-                    <td className="px-2 py-1 font-medium text-slate-700">{r.label}</td>
-                    <td className="px-2 py-1 text-right text-slate-600">{r.precision.toFixed(2)}</td>
-                    <td className="px-2 py-1 text-right text-slate-600">{r.recall.toFixed(2)}</td>
-                    <td className="px-2 py-1 text-right font-medium text-navy-900">{r.f1.toFixed(2)}</td>
-                    <td className="px-2 py-1 text-right text-slate-400">{r.support}</td>
+                  <tr key={r.label} className="border-b border-zinc-100 last:border-0">
+                    <td className="px-2 py-1 font-medium text-zinc-700">{r.label}</td>
+                    <td className="px-2 py-1 text-right text-zinc-600">{r.precision.toFixed(2)}</td>
+                    <td className="px-2 py-1 text-right text-zinc-600">{r.recall.toFixed(2)}</td>
+                    <td className="px-2 py-1 text-right font-medium text-zinc-900">{r.f1.toFixed(2)}</td>
+                    <td className="px-2 py-1 text-right text-zinc-400">{r.support}</td>
                   </tr>
                 ))}
               </tbody>
@@ -338,26 +338,26 @@ function DatasetReviewPanel({
         <span className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
           awaiting approval
         </span>
-        <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="ml-auto flex items-center gap-1.5 text-xs text-zinc-400">
           Attempt {attempt} of {maxAttempts}
           {Array.from({ length: maxAttempts }).map((_, i) => (
             <span
               key={i}
               className={`inline-block h-2 w-2 rounded-full ${
-                i < attempt ? 'bg-amber-400' : 'bg-slate-200'
+                i < attempt ? 'bg-amber-400' : 'bg-zinc-200'
               }`}
             />
           ))}
         </span>
       </div>
-      <p className="mb-3 text-xs text-slate-500">
+      <p className="mb-3 text-xs text-zinc-500">
         Approve to proceed to training, or reject with a comment so the data agent can fix
         the issue and reprocess.
       </p>
 
       {sampleRows.length > 0 && (
         <div className="mb-3">
-          <p className="mb-1 text-xs font-medium text-slate-500">
+          <p className="mb-1 text-xs font-medium text-zinc-500">
             Processed data preview ({preview.shape[0]} rows × {preview.shape[1]} cols)
           </p>
           <div className="overflow-x-auto rounded border border-blue-100">
@@ -365,9 +365,9 @@ function DatasetReviewPanel({
               <thead>
                 <tr className="bg-blue-100">
                   {sampleCols.map((c) => (
-                    <th key={c.name} className="border-b border-blue-200 px-2 py-1 text-left font-medium text-slate-600">
+                    <th key={c.name} className="border-b border-blue-200 px-2 py-1 text-left font-medium text-zinc-600">
                       {c.name}
-                      <span className="ml-1 text-slate-400">{c.dtype}</span>
+                      <span className="ml-1 text-zinc-400">{c.dtype}</span>
                     </th>
                   ))}
                 </tr>
@@ -376,7 +376,7 @@ function DatasetReviewPanel({
                 {sampleRows.slice(0, 5).map((row, i) => (
                   <tr key={i} className="border-b border-blue-100 last:border-0">
                     {sampleCols.map((c) => (
-                      <td key={c.name} className={`px-2 py-1 ${row[c.name] == null ? 'text-red-400 italic' : 'text-slate-700'}`}>
+                      <td key={c.name} className={`px-2 py-1 ${row[c.name] == null ? 'text-red-400 italic' : 'text-zinc-700'}`}>
                         {row[c.name] == null ? 'null' : String(row[c.name])}
                       </td>
                     ))}
@@ -388,14 +388,14 @@ function DatasetReviewPanel({
         </div>
       )}
 
-      <label className="mb-1 block text-xs font-medium text-slate-500">
+      <label className="mb-1 block text-xs font-medium text-zinc-500">
         Comment (optional)
       </label>
       <textarea
         ref={commentRef}
         rows={2}
         placeholder="e.g. rename column X, drop rows where value < 0…"
-        className="mb-3 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+        className="mb-3 w-full rounded border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-700 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
       />
       <div className="flex gap-2">
         <button
@@ -427,6 +427,7 @@ interface ExperienceSummary {
   problem_type: string
   best_model: string
   validation_score: number
+  metric_name?: string
 }
 
 interface MatchedRule {
@@ -453,9 +454,31 @@ interface PlannerContextData {
   warnings: string[]
 }
 
+class PlannerErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[PlannerPanel] render error:', error, info)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-xs text-red-700">
+          <p className="font-semibold">Planner panel failed to render</p>
+          <p className="mt-1 font-mono opacity-70">{this.state.error.message}</p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; running: boolean }) {
   if (!ctx && running) return <PulseRow />
-  if (!ctx) return <p className="text-xs text-slate-400">Planner has not run yet.</p>
+  if (!ctx) return <p className="text-xs text-zinc-400">Planner has not run yet.</p>
 
   const citedExpIds = new Set(ctx.evidence_used.filter(e => e.evidence_type === 'experience').map(e => e.experience_id))
   const citedRuleIds = new Set(ctx.evidence_used.filter(e => e.evidence_type === 'rule').map(e => e.rule_id))
@@ -465,15 +488,15 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
       {/* Planning analysis */}
       {ctx.planning_analysis && (
         <div>
-          <p className="mb-1.5 text-xs font-semibold text-slate-600">Planning Analysis</p>
-          <p className="text-xs leading-relaxed text-slate-600">{ctx.planning_analysis}</p>
+          <p className="mb-1.5 text-xs font-semibold text-zinc-600">Planning Analysis</p>
+          <p className="text-xs leading-relaxed text-zinc-600">{ctx.planning_analysis}</p>
         </div>
       )}
 
       {/* Candidate models */}
       {ctx.plan_summary?.candidate_models?.length > 0 && (
         <div>
-          <p className="mb-1.5 text-xs font-semibold text-slate-600">Selected Candidates</p>
+          <p className="mb-1.5 text-xs font-semibold text-zinc-600">Selected Candidates</p>
           <div className="flex flex-wrap gap-1">
             {ctx.plan_summary.candidate_models.map((m) => (
               <span key={m} className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">{m}</span>
@@ -491,25 +514,25 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
 
       {/* Similar experiences */}
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-slate-600">
-          Similar Past Runs <span className="font-normal text-slate-400">({ctx.retrieved_experiences.length} retrieved)</span>
+        <p className="mb-1.5 text-xs font-semibold text-zinc-600">
+          Similar Past Runs <span className="font-normal text-zinc-400">({ctx.retrieved_experiences.length} retrieved)</span>
         </p>
         {ctx.retrieved_experiences.length === 0
-          ? <p className="text-xs text-slate-400">No similar experiences in the pool.</p>
+          ? <p className="text-xs text-zinc-400">No similar experiences in the pool.</p>
           : (
             <div className="space-y-1.5">
               {ctx.retrieved_experiences.map((exp) => {
                 const cited = citedExpIds.has(exp.experience_id)
                 return (
-                  <div key={exp.experience_id} className={`rounded border px-3 py-2 text-xs ${cited ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
+                  <div key={exp.experience_id} className={`rounded border px-3 py-2 text-xs ${cited ? 'border-violet-200 bg-violet-50' : 'border-zinc-100 bg-zinc-50'}`}>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-700">{exp.dataset_name}</span>
-                      <span className="text-slate-400">{exp.problem_type}</span>
+                      <span className="font-medium text-zinc-700">{exp.dataset_name}</span>
+                      <span className="text-zinc-400">{exp.problem_type}</span>
                       {cited && <span className="ml-auto rounded-full bg-violet-100 px-2 py-0.5 text-violet-700">cited</span>}
                     </div>
-                    <div className="mt-0.5 text-slate-500">
-                      Best model: <span className="font-medium text-slate-700">{exp.best_model}</span>
-                      {' · '}score: <span className="font-medium text-slate-700">{exp.validation_score.toFixed(4)}</span>
+                    <div className="mt-0.5 text-zinc-500">
+                      Best model: <span className="font-medium text-zinc-700">{exp.best_model}</span>
+                      {' · '}<span className="uppercase">{exp.metric_name ?? 'score'}</span>: <span className="font-medium text-zinc-700">{(exp.validation_score ?? 0).toFixed(4)}</span>
                     </div>
                     {cited && ctx.evidence_used.find(e => e.experience_id === exp.experience_id)?.relevance_note && (
                       <div className="mt-1 italic text-violet-600">
@@ -526,22 +549,22 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
 
       {/* Matched rules */}
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-slate-600">
-          ML Rules Matched <span className="font-normal text-slate-400">({ctx.matched_rules.length} rules)</span>
+        <p className="mb-1.5 text-xs font-semibold text-zinc-600">
+          ML Rules Matched <span className="font-normal text-zinc-400">({ctx.matched_rules.length} rules)</span>
         </p>
         {ctx.matched_rules.length === 0
-          ? <p className="text-xs text-slate-400">No rules matched.</p>
+          ? <p className="text-xs text-zinc-400">No rules matched.</p>
           : (
             <div className="space-y-1.5">
               {ctx.matched_rules.map((rule) => {
                 const cited = citedRuleIds.has(rule.rule_id)
                 return (
-                  <div key={rule.rule_id} className={`rounded border px-3 py-2 text-xs ${cited ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
+                  <div key={rule.rule_id} className={`rounded border px-3 py-2 text-xs ${cited ? 'border-violet-200 bg-violet-50' : 'border-zinc-100 bg-zinc-50'}`}>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-slate-400">{rule.rule_id}</span>
+                      <span className="font-mono text-zinc-400">{rule.rule_id}</span>
                       {cited && <span className="ml-auto rounded-full bg-violet-100 px-2 py-0.5 text-violet-700">cited</span>}
                     </div>
-                    <p className="mt-0.5 text-slate-600">{rule.summary}</p>
+                    <p className="mt-0.5 text-zinc-600">{rule.summary}</p>
                     {rule.prefer && rule.prefer.length > 0 && (
                       <p className="mt-0.5 text-emerald-700">↑ prefer: {rule.prefer.join(', ')}</p>
                     )}
@@ -549,7 +572,7 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
                       <p className="mt-0.5 text-red-600">↓ avoid: {rule.avoid_or_deprioritize.join(', ')}</p>
                     )}
                     {rule.recommend && (
-                      <p className="mt-0.5 text-slate-500 italic">{rule.recommend}</p>
+                      <p className="mt-0.5 text-zinc-500 italic">{rule.recommend}</p>
                     )}
                   </div>
                 )
@@ -633,8 +656,8 @@ export function ResultsDashboard() {
   if (!active) return null
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
-      <div className="flex border-b border-slate-200">
+    <div className="rounded-lg border border-zinc-200 bg-white">
+      <div className="flex border-b border-zinc-200">
         {([
           { key: 'dataset', label: 'Dataset', ready: hasDataset },
           { key: 'planner', label: 'Planner', ready: hasPlanner },
@@ -646,13 +669,13 @@ export function ResultsDashboard() {
             onClick={() => setTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors ${
               tab === key
-                ? 'border-b-2 border-navy text-navy-900'
-                : 'text-slate-400 hover:text-slate-600'
+                ? 'border-b-2 border-indigo-600 text-zinc-900'
+                : 'text-zinc-400 hover:text-zinc-600'
             }`}
           >
             {label}
             {ready && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
-            {!ready && running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-300" />}
+            {!ready && running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />}
           </button>
         ))}
       </div>
@@ -678,7 +701,9 @@ export function ResultsDashboard() {
           </>
         )}
         {tab === 'planner' && (
-          <PlannerPanel ctx={plannerCtx} running={running} />
+          <PlannerErrorBoundary>
+            <PlannerPanel ctx={plannerCtx} running={running} />
+          </PlannerErrorBoundary>
         )}
         {tab === 'model' && (
           <ModelPanel trained={trained} tuned={tuned} running={running} />

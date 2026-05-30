@@ -26,7 +26,7 @@ export function RunSidebar({ selectedRunId, onSelectRun }: Props) {
       <select
         value={activeExpId ?? ''}
         onChange={(e) => setExpId(e.target.value)}
-        className="rounded border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy"
+        className="rounded border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
       >
         {experiments?.map((exp) => (
           <option key={exp.experiment_id} value={exp.experiment_id}>
@@ -41,8 +41,8 @@ export function RunSidebar({ selectedRunId, onSelectRun }: Props) {
             onClick={() => onSelectRun(run)}
             className={`w-full rounded px-3 py-2 text-left text-xs transition-colors ${
               selectedRunId === run.run_id
-                ? 'bg-amber-600 text-white'
-                : 'bg-white text-slate-700 hover:bg-slate-100'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-zinc-700 hover:bg-zinc-100'
             }`}
           >
             <div className="font-mono">{run.run_name || run.run_id.slice(0, 8)}</div>
@@ -51,7 +51,7 @@ export function RunSidebar({ selectedRunId, onSelectRun }: Props) {
             </div>
           </button>
         ))}
-        {runs?.length === 0 && <p className="text-xs text-slate-400">No runs found</p>}
+        {runs?.length === 0 && <p className="text-xs text-zinc-400">No runs found</p>}
       </div>
     </div>
   )

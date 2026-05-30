@@ -10,10 +10,10 @@ export function LatestReport() {
     retry: false,
   })
 
-  if (isLoading) return <p className="text-sm text-slate-400">Loading...</p>
+  if (isLoading) return <p className="text-sm text-zinc-400">Loading...</p>
   if (isError || !data) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-zinc-400">
         No pipeline run completed yet. Run the pipeline to generate a drift report.
       </p>
     )
@@ -27,13 +27,13 @@ export function LatestReport() {
         }`}>
           {data.dataset_drift ? 'Drift detected' : 'No drift'}
         </span>
-        <span className="text-2xl font-semibold text-navy-900">
+        <span className="text-2xl font-semibold text-zinc-900">
           {(data.drift_share * 100).toFixed(1)}%
         </span>
-        <span className="text-sm text-slate-400">columns with drift</span>
+        <span className="text-sm text-zinc-400">columns with drift</span>
       </div>
       <DriftTable columns={data.columns} />
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-zinc-400">
         Generated at {new Date(data.generated_at).toLocaleString()}
       </p>
     </div>

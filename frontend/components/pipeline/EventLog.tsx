@@ -4,13 +4,13 @@ import { useRunStore } from '@/stores/run-store'
 import type { PipelineEvent, PipelineEventType } from '@/types/api'
 
 const TYPE_COLORS: Record<PipelineEventType, string> = {
-  run_info: 'text-slate-400',
+  run_info: 'text-zinc-400',
   routing: 'text-blue-600',
-  tool_call: 'text-slate-500',
-  tool_result: 'text-slate-400',
+  tool_call: 'text-zinc-500',
+  tool_result: 'text-zinc-400',
   agent_reasoning: 'text-indigo-500',
   planner_context: 'text-violet-600',
-  hitl_request: 'font-semibold text-amber-600',
+  hitl_request: 'font-semibold text-amber-700',
   run_complete: 'font-semibold text-green-600',
 }
 
@@ -97,18 +97,18 @@ export function EventLog() {
   }, [rows.length])
 
   return (
-    <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs">
+    <div className="h-full overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs">
       {rows.length === 0 && (
-        <p className="text-slate-400">Waiting for pipeline events...</p>
+        <p className="text-zinc-400">Waiting for pipeline events...</p>
       )}
       {rows.map(({ event, accumulatedContent, key }) => (
         <div key={key} className="mb-1 flex gap-2">
-          <span className="shrink-0 whitespace-nowrap text-slate-300">
+          <span className="shrink-0 whitespace-nowrap text-zinc-300">
             {new Date(event.timestamp_ms).toISOString().slice(11, 23)}
           </span>
           <span className={`shrink-0 whitespace-nowrap ${TYPE_COLORS[event.type]}`}>{event.type}</span>
-          <span className="shrink-0 whitespace-nowrap text-slate-500">{event.agent}</span>
-          <span className="min-w-0 break-words text-slate-600">
+          <span className="shrink-0 whitespace-nowrap text-zinc-500">{event.agent}</span>
+          <span className="min-w-0 break-words text-zinc-600">
             {formatContent(event, accumulatedContent || undefined)}
           </span>
         </div>

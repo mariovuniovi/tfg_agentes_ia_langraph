@@ -11,10 +11,10 @@ export function HITLGate({ runId }: { runId: string | null }) {
   if ((interruptValue as { type?: string })?.type === 'data_validation') return null
 
   return (
-    <div className="rounded-lg border border-amber-600 bg-amber-50 p-4">
-      <p className="mb-2 font-semibold text-amber-800">⚠ Deployment Gate</p>
+    <div className="rounded-lg border border-amber-500 bg-amber-50 p-4">
+      <p className="mb-2 font-semibold text-amber-700">⚠ Deployment Gate</p>
       {interruptValue && (
-        <pre className="mb-3 overflow-auto rounded bg-amber-100 p-2 font-mono text-xs text-amber-900">
+        <pre className="mb-3 overflow-auto rounded bg-amber-100 p-2 font-mono text-xs text-amber-700">
           {JSON.stringify(interruptValue, null, 2)}
         </pre>
       )}
@@ -22,14 +22,14 @@ export function HITLGate({ runId }: { runId: string | null }) {
         <button
           onClick={() => approve('approve')}
           disabled={isPending}
-          className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          className="rounded bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
         >
           Approve
         </button>
         <button
           onClick={() => approve('reject')}
           disabled={isPending}
-          className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
         >
           Reject
         </button>

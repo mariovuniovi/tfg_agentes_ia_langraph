@@ -43,7 +43,7 @@ export function AdHocForm() {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="flex w-full items-center justify-center gap-2 rounded bg-navy px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+        className="flex w-full items-center justify-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
       >
         ↑ Upload CSV files
       </button>
@@ -64,14 +64,14 @@ export function AdHocForm() {
           {files.map((f, i) => (
             <li
               key={`${f.name}-${f.lastModified}`}
-              className="flex items-center gap-2 rounded bg-slate-100 px-3 py-2 text-sm text-slate-700"
+              className="flex items-center gap-2 rounded bg-zinc-100 px-3 py-2 text-sm text-zinc-700"
             >
               <span className="truncate flex-1">{f.name}</span>
-              <span className="shrink-0 text-xs text-slate-400">{formatBytes(f.size)}</span>
+              <span className="shrink-0 text-xs text-zinc-400">{formatBytes(f.size)}</span>
               <button
                 type="button"
                 onClick={() => removeFile(i)}
-                className="shrink-0 text-slate-300 hover:text-red-500"
+                className="shrink-0 text-zinc-300 hover:text-red-500"
                 aria-label={`Remove ${f.name}`}
               >
                 ×
@@ -83,22 +83,22 @@ export function AdHocForm() {
 
       {files.length >= 2 && (
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 text-sm text-zinc-600">
             Reference:
             <select
               value={refIdx}
               onChange={(e) => setRefIdx(Number(e.target.value))}
-              className="rounded border border-slate-300 px-2 py-1 text-sm"
+              className="rounded border border-zinc-200 px-2 py-1 text-sm"
             >
               {files.map((f, i) => <option key={i} value={i}>{f.name}</option>)}
             </select>
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 text-sm text-zinc-600">
             Current:
             <select
               value={curIdx}
               onChange={(e) => setCurIdx(Number(e.target.value))}
-              className="rounded border border-slate-300 px-2 py-1 text-sm"
+              className="rounded border border-zinc-200 px-2 py-1 text-sm"
             >
               {files.map((f, i) => <option key={i} value={i}>{f.name}</option>)}
             </select>
@@ -106,7 +106,7 @@ export function AdHocForm() {
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
-            className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {mutation.isPending ? 'Running...' : 'Run Drift'}
           </button>
@@ -114,7 +114,7 @@ export function AdHocForm() {
       )}
 
       {result && (
-        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
           <div className="flex items-center gap-4">
             <span className={`rounded-full px-3 py-1 text-sm font-medium ${
               result.dataset_drift ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
@@ -122,7 +122,7 @@ export function AdHocForm() {
               {result.dataset_drift ? 'Drift detected' : 'No drift'}
             </span>
             <span className="text-xl font-semibold">{(result.drift_share * 100).toFixed(1)}%</span>
-            <span className="text-sm text-slate-400">columns with drift</span>
+            <span className="text-sm text-zinc-400">columns with drift</span>
           </div>
           <DriftTable columns={result.columns} />
         </div>

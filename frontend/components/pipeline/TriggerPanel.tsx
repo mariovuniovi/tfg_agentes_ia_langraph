@@ -63,16 +63,16 @@ export function TriggerPanel() {
   const canRun = files.length > 0 && !!schemaJson && !loading && status !== 'running'
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-4">
-      <h2 className="text-sm font-semibold text-navy-900">Start Pipeline Run</h2>
+    <div className="rounded-lg border border-zinc-200 bg-white p-4 space-y-4">
+      <h2 className="text-sm font-semibold text-zinc-900">Start Pipeline Run</h2>
 
       {/* Schema upload */}
       <div>
-        <p className="mb-1.5 text-xs font-medium text-slate-500 uppercase tracking-wide">Schema</p>
+        <p className="mb-1.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Schema</p>
         <button
           type="button"
           onClick={() => schemaInputRef.current?.click()}
-          className="flex w-full items-center justify-center gap-2 rounded border border-dashed border-slate-300 px-4 py-2 text-sm text-slate-600 hover:border-navy hover:text-navy"
+          className="flex w-full items-center justify-center gap-2 rounded border border-dashed border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:border-indigo-600 hover:text-indigo-700"
         >
           ↑ Upload schema JSON
         </button>
@@ -98,17 +98,17 @@ export function TriggerPanel() {
           </div>
         )}
         {!schemaJson && (
-          <p className="mt-1 text-xs text-slate-400">Required before running the pipeline</p>
+          <p className="mt-1 text-xs text-zinc-400">Required before running the pipeline</p>
         )}
       </div>
 
       {/* CSV upload */}
       <div>
-        <p className="mb-1.5 text-xs font-medium text-slate-500 uppercase tracking-wide">Dataset</p>
+        <p className="mb-1.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">Dataset</p>
         <button
           type="button"
           onClick={() => csvInputRef.current?.click()}
-          className="flex w-full items-center justify-center gap-2 rounded bg-navy px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          className="flex w-full items-center justify-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
         >
           ↑ Upload CSV files
         </button>
@@ -134,14 +134,14 @@ export function TriggerPanel() {
             {files.map((f, i) => (
               <li
                 key={`${f.name}-${f.lastModified}`}
-                className="flex items-center gap-2 rounded bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                className="flex items-center gap-2 rounded bg-zinc-100 px-3 py-2 text-sm text-zinc-700"
               >
                 <span className="truncate flex-1">{f.name}</span>
-                <span className="shrink-0 text-xs text-slate-400">{formatBytes(f.size)}</span>
+                <span className="shrink-0 text-xs text-zinc-400">{formatBytes(f.size)}</span>
                 <button
                   type="button"
                   onClick={() => removeFile(i)}
-                  className="shrink-0 text-slate-300 hover:text-red-500"
+                  className="shrink-0 text-zinc-300 hover:text-red-500"
                   aria-label={`Remove ${f.name}`}
                 >
                   ×
@@ -157,7 +157,7 @@ export function TriggerPanel() {
           onClick={handleRun}
           disabled={!canRun}
           title={!schemaJson ? 'Upload a schema JSON first' : !files.length ? 'Upload at least one CSV file' : undefined}
-          className="rounded bg-navy px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Starting...' : '▶ Run Pipeline'}
         </button>
