@@ -14,6 +14,7 @@ class RunEntry:
     hitl_comment: str = ""
     events: list[dict] = field(default_factory=list)
     interrupt_value: dict[str, Any] = field(default_factory=dict)
+    processed_dataset_path: str | None = None
     last_drift_report: dict | None = None
 
 
