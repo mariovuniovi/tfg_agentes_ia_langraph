@@ -75,15 +75,29 @@ def dataset_approval_node(state: dict[str, Any]) -> Command:
 
 
 def deployment_approval_node(state: dict[str, Any]) -> Command:
+    from mlops_agents.evaluation.champion import resolve_champion_model_name
+    champion = resolve_champion_model_name(state)
+
     approval = interrupt({
         "type": "deployer",
         "question": "Approve deployment of this model based on the audit report?",
-        "evaluation_report": state.get("evaluation_report", {}),
+        "evaluation_report":       state.get("evaluation_report", {}),
         "evaluation_report_audit": state.get("evaluation_report_audit", {}),
+        "candidate_metrics":       state.get("candidate_metrics", {}),
+        "champion_metrics":        state.get("champion_metrics", {}),
+        "thresholds_applied":      state.get("thresholds_applied", {}),
+        "training_plan":           state.get("training_plan", {}),
+        "candidate_run_id":        state.get("training_run_id", ""),
+        "deployment_action": {
+            "verb":    "register_and_promote",
+            "model":   champion,
+            "alias":   "champion",
+            "summary": "This approval will register the candidate run as a new model version and assign it the champion alias.",
+        },
     })
     approved = bool(approval.get("approved", False))
     reason = approval.get("reason", "")
-    logger.info(f"[gate2] deployment_approved={approved} reason={reason!r}")
+    logger.info(f"[gate2] deployment_approved={approved} reason={reason!r} model={champion!r}")
     return Command(
         goto="workflow_controller",
         update={"deployment_approved": approved},
