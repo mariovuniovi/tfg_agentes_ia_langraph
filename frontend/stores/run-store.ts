@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { PipelineEvent, RunStatus } from '@/types/api'
 
+export interface RunInputs {
+  schemaName: string
+  problemType: string
+  files: Array<{ name: string; size: number }>
+}
+
 interface RunState {
   runId: string | null
   status: RunStatus | 'idle'
@@ -9,6 +15,7 @@ interface RunState {
   hitlPending: boolean
   stagedFiles: File[]
   schemaJson: string
+  runInputs: RunInputs | null
   setRunId: (id: string) => void
   appendEvent: (event: PipelineEvent) => void
   setHITL: (value: Record<string, unknown>) => void
@@ -16,6 +23,7 @@ interface RunState {
   setStatus: (status: RunStatus | 'idle') => void
   setStagedFiles: (files: File[]) => void
   setSchemaJson: (json: string) => void
+  setRunInputs: (inputs: RunInputs | null) => void
   reset: () => void
 }
 
@@ -27,6 +35,7 @@ const initial = {
   hitlPending: false,
   stagedFiles: [] as File[],
   schemaJson: '',
+  runInputs: null,
 }
 
 export const useRunStore = create<RunState>((set) => ({
@@ -38,5 +47,6 @@ export const useRunStore = create<RunState>((set) => ({
   setStatus: (status) => set({ status }),
   setStagedFiles: (files) => set({ stagedFiles: files }),
   setSchemaJson: (json) => set({ schemaJson: json }),
+  setRunInputs: (inputs) => set({ runInputs: inputs }),
   reset: () => set(initial),
 }))
