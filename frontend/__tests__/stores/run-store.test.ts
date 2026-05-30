@@ -34,10 +34,13 @@ describe('useRunStore', () => {
     expect(s.status).toBe('awaiting_approval')
   })
 
-  it('clearHITL clears hitlPending', () => {
+  it('clearHITL clears hitlPending and resumes running status', () => {
     useRunStore.getState().setHITL({ model: 'v1' })
     useRunStore.getState().clearHITL()
-    expect(useRunStore.getState().hitlPending).toBe(false)
+    const s = useRunStore.getState()
+    expect(s.hitlPending).toBe(false)
+    expect(s.interruptValue).toBeNull()
+    expect(s.status).toBe('running')
   })
 
   it('setStatus updates status', () => {

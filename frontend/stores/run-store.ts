@@ -34,7 +34,7 @@ export const useRunStore = create<RunState>((set) => ({
   setRunId: (id) => set({ runId: id, status: 'running' }),
   appendEvent: (event) => set((s) => ({ events: [...s.events, event] })),
   setHITL: (value) => set({ hitlPending: true, interruptValue: value, status: 'awaiting_approval' }),
-  clearHITL: () => set({ hitlPending: false }),
+  clearHITL: () => set({ hitlPending: false, interruptValue: null, status: 'running' }),
   setStatus: (status) => set({ status }),
   setStagedFiles: (files) => set({ stagedFiles: files }),
   setSchemaJson: (json) => set({ schemaJson: json }),
