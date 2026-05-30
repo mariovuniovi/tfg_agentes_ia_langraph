@@ -31,14 +31,20 @@ export interface HITLDecision {
 
 export interface DataValidationInterrupt {
   type: 'data_validation'
-  question: string
-  attempt: number
+  attempt?: number
+  question?: string
   dataset_preview: {
+    path: string
     shape: [number, number]
-    columns: { name: string; dtype: string }[]
+    row_count: number
+    column_count: number
+    columns: Array<{ name: string; dtype: string }>
     sample_rows: Record<string, unknown>[]
+    head: Record<string, unknown>[]
+    tail: Record<string, unknown>[]
   }
-  validation_summary: {
+  validation_report?: Record<string, unknown>
+  validation_summary?: {
     passed: boolean
     missing_values: Record<string, number>
     schema_validated: boolean
