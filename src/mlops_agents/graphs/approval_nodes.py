@@ -86,8 +86,5 @@ def deployment_approval_node(state: dict[str, Any]) -> Command:
     logger.info(f"[gate2] deployment_approved={approved} reason={reason!r}")
     return Command(
         goto="workflow_controller",
-        update={
-            "deployment_approved": approved,
-            "deployment_decision": "approved" if approved else "rejected",
-        },
+        update={"deployment_approved": approved},
     )

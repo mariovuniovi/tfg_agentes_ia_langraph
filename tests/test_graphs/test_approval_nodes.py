@@ -76,7 +76,7 @@ def test_deployment_approval_rejected():
         })
 
     assert cmd.update["deployment_approved"] is False
-    assert cmd.update["deployment_decision"] == "rejected"
+    assert "deployment_decision" not in cmd.update
 
 
 def test_deployment_approval_emits_deployer_payload_type():

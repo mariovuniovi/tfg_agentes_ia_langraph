@@ -168,6 +168,6 @@ def test_ends_after_deployment_complete():
         evaluation_passed=True,
         evaluation_report_audit={"summary": "ok"},
         deployment_approved=True,
-        deployment_decision="approved",
+        deployment_decision="deployed",
     ))
     assert cmd.goto == END

@@ -32,5 +32,6 @@ def run_deployer(state: dict[str, Any]) -> dict[str, Any]:
     logger.info(f"[deployer] promoted {model_name} v{version} from run {run_id}")
     return {
         "deployment_status": "deployed",
+        "deployment_decision": "deployed",
         "best_model_uri": f"models:/{model_name}/{version}",
     }
