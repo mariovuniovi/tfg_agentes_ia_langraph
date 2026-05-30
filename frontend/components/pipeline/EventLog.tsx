@@ -97,7 +97,7 @@ export function EventLog() {
   }, [rows.length])
 
   return (
-    <div className="h-full overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs">
+    <div className="h-[calc(100vh-220px)] overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs">
       {rows.length === 0 && (
         <p className="text-zinc-400">Waiting for pipeline events...</p>
       )}
