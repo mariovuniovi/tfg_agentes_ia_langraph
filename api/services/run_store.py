@@ -17,11 +17,9 @@ class RunEntry:
     interrupt_value: dict[str, Any] = field(default_factory=dict)
     processed_dataset_path: str | None = None
     started_at_ms: int = 0
-    last_drift_report: dict | None = None
 
 
 _store: dict[str, RunEntry] = {}
-_latest_drift_report: dict | None = None
 
 
 def create_entry(run_id: str, graph_config: dict) -> RunEntry:
@@ -45,12 +43,3 @@ def list_entries(limit: int = 20) -> list[RunEntry]:
 
 def get_entry(run_id: str) -> RunEntry | None:
     return _store.get(run_id)
-
-
-def set_latest_drift_report(report: dict) -> None:
-    global _latest_drift_report
-    _latest_drift_report = report
-
-
-def get_latest_drift_report() -> dict | None:
-    return _latest_drift_report

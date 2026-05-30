@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import runs, experiments, monitoring, uploads
+from api.routers import runs, experiments, uploads
 
 app = FastAPI(title="MLOps Backend API", version="0.1.0")
 
@@ -16,7 +16,6 @@ app.add_middleware(
 
 app.include_router(runs.router)
 app.include_router(experiments.router)
-app.include_router(monitoring.router)
 app.include_router(uploads.router)
 
 

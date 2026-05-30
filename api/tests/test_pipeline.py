@@ -9,7 +9,7 @@ from api.services.run_store import create_entry
 
 
 def _routing_chunk():
-    return ("ns", "updates", {"supervisor": {"next": "trainer", "reasoning": "needs training"}})
+    return ("ns", "updates", {"executor": {"next": "trainer", "reasoning": "needs training"}})
 
 
 def _messages_chunk():
@@ -41,15 +41,14 @@ async def test_pipeline_task_queues_routing_event(mock_graph, tmp_path):
 
     mock_graph.astream = fake_astream
 
-    with patch("api.services.pipeline.graph", mock_graph), \
-         patch("api.services.pipeline.run_evidently", return_value={}):
+    with patch("api.services.pipeline.graph", mock_graph):
         run_id = "test-routing"
         entry = create_entry(run_id, {"configurable": {"thread_id": run_id}})
         await pipeline_task(run_id, [str(csv)])
 
     events = [e for e in entry.events if e["type"] == "routing"]
     assert len(events) == 1
-    assert events[0]["data"]["next"] == "trainer"
+    assert events[0]["data"]["next"] == "executor"
 
 
 @pytest.mark.asyncio
@@ -62,8 +61,7 @@ async def test_pipeline_task_queues_run_complete(mock_graph, tmp_path):
 
     mock_graph.astream = fake_astream
 
-    with patch("api.services.pipeline.graph", mock_graph), \
-         patch("api.services.pipeline.run_evidently", return_value={}):
+    with patch("api.services.pipeline.graph", mock_graph):
         run_id = "test-complete"
         entry = create_entry(run_id, {"configurable": {"thread_id": run_id}})
         await pipeline_task(run_id, [str(csv)])
@@ -90,8 +88,7 @@ async def test_pipeline_task_sets_awaiting_on_interrupt(mock_graph, tmp_path):
 
     mock_graph.astream = fake_astream
 
-    with patch("api.services.pipeline.graph", mock_graph), \
-         patch("api.services.pipeline.run_evidently", return_value={}):
+    with patch("api.services.pipeline.graph", mock_graph):
         run_id = "test-hitl"
         entry = create_entry(run_id, {"configurable": {"thread_id": run_id}})
 

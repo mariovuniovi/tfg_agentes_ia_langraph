@@ -1,5 +1,5 @@
 import type {
-  DriftReport, ExperimentOut, HealthResponse,
+  ExperimentOut, HealthResponse,
   HITLDecision, RunOut, RunStatusResponse,
 } from '@/types/api'
 
@@ -42,22 +42,6 @@ export async function fetchExperiments(): Promise<ExperimentOut[]> {
 
 export async function fetchExperimentRuns(expId: string): Promise<RunOut[]> {
   return json(await fetch(`${BASE}/experiments/${expId}/runs`))
-}
-
-export async function fetchLatestDrift(): Promise<DriftReport> {
-  return json(await fetch(`${BASE}/monitoring/latest`))
-}
-
-export async function runAdHocDrift(
-  files: File[],
-  referenceIndex: number,
-  currentIndex: number,
-): Promise<DriftReport> {
-  const form = new FormData()
-  files.forEach(f => form.append('files', f))
-  form.append('reference_index', String(referenceIndex))
-  form.append('current_index', String(currentIndex))
-  return json(await fetch(`${BASE}/monitoring/drift`, { method: 'POST', body: form }))
 }
 
 export async function uploadFiles(files: File[]): Promise<{ paths: string[] }> {

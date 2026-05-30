@@ -114,20 +114,6 @@ export interface RunOut {
   metric_series: MetricSeries[]
 }
 
-export interface ColumnDriftResult {
-  column: string
-  drift_detected: boolean
-  score: number
-  method: string
-}
-
-export interface DriftReport {
-  dataset_drift: boolean
-  drift_share: number
-  columns: ColumnDriftResult[]
-  generated_at: string
-}
-
 export interface HealthResponse {
   status: 'ok'
   mlflow: boolean

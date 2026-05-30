@@ -5,7 +5,6 @@ from typing import Any
 
 _STREAM_TIMEOUT = 300.0  # seconds before a hung LLM call is declared a failure
 
-import pandas as pd
 from langgraph.types import Command
 
 from api.services import run_store
@@ -74,44 +73,6 @@ def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
         "planning_analysis": rec.get("planning_analysis", ""),
         "plan_summary": rec.get("plan_summary", {}),
         "warnings": rec.get("risks_or_warnings", []),
-    }
-
-
-def run_evidently(reference_df: pd.DataFrame, current_df: pd.DataFrame) -> dict:
-    """Run Evidently DataDriftPreset and return a DriftReport-shaped dict."""
-    from datetime import datetime, timezone
-
-    from evidently import Report
-    from evidently.presets import DataDriftPreset
-
-    report = Report([DataDriftPreset()])
-    result = report.run(reference_df, current_df)
-    raw = result.dump_dict()
-
-    metrics = raw.get("metrics", [])
-    dataset_metric = next((m for m in metrics if m.get("metric") == "DatasetDriftMetric"), {})
-    column_metrics = [m for m in metrics if m.get("metric") == "ColumnDriftMetric"]
-
-    drift_res = dataset_metric.get("result", {})
-    columns = [
-        {
-            "column": m["result"].get("column_name", ""),
-            "drift_detected": m["result"].get("drift_detected", False),
-            "score": m["result"].get("drift_score", 0.0),
-            "method": m["result"].get("stattest_name", ""),
-        }
-        for m in column_metrics
-        if "result" in m
-    ]
-
-    drifted = sum(1 for c in columns if c["drift_detected"])
-    drift_share = drifted / len(columns) if columns else 0.0
-
-    return {
-        "dataset_drift": drift_res.get("dataset_drift", False),
-        "drift_share": drift_share,
-        "columns": columns,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -330,9 +291,6 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                 _stream(Command(resume=resume)), timeout=_STREAM_TIMEOUT
             )
 
-        # Automatic drift detection is not performed here because the graph
-        # state does not expose two distinct DataFrames (reference vs current).
-        # Use POST /monitoring/drift for ad-hoc drift analysis.
         complete_event: dict = {
             "type": "run_complete",
             "agent": "controller",

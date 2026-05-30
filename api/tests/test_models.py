@@ -1,8 +1,6 @@
 """Tests for Pydantic API models."""
-from datetime import datetime
 from api.models.run import RunCreate, RunStatus, PipelineEventModel, HITLDecision
 from api.models.experiment import MetricSeries, RunOut, ExperimentOut
-from api.models.monitoring import ColumnDriftResult, DriftReport
 
 
 def test_run_create_requires_dataset_paths():
@@ -58,13 +56,3 @@ def test_metric_series_line_styles():
     assert ms.line_style == "solid"
 
 
-def test_drift_report_model():
-    col = ColumnDriftResult(column="feature_1", drift_detected=True, score=0.3, method="psi")
-    dr = DriftReport(
-        dataset_drift=True,
-        drift_share=0.5,
-        columns=[col],
-        generated_at=datetime.utcnow(),
-    )
-    assert dr.drift_share == 0.5
-    assert dr.columns[0].column == "feature_1"
