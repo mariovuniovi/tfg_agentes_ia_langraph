@@ -123,6 +123,14 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
 
     from mlops_agents.config.settings import settings
 
+    # Read problem_type from the schema JSON the caller posted
+    import json as _json
+    pt = ""
+    try:
+        pt = _json.loads(schema_json or "{}").get("problem_type", "")
+    except Exception:
+        pt = ""
+
     info_event: dict = {
         "type": "run_info",
         "agent": "system",
@@ -132,7 +140,8 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                 "data_validator": settings.openai_model_data_validator,
                 "planner":        settings.openai_model_planner,
                 "report_writer":  settings.openai_model_report_writer,
-            }
+            },
+            "problem_type": pt,
         },
     }
     entry.events.append(info_event)
@@ -204,7 +213,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                     if node_name in worker_nodes:
                         event = {
                             "type": "routing",
-                            "agent": "supervisor",  # UI label, preserved for FE
+                            "agent": "controller",  # UI label, preserved for FE
                             "timestamp_ms": time.time() * 1000,
                             "data": {"next": node_name, "reasoning": ""},
                         }
@@ -230,7 +239,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
     async def _emit_error(msg: str) -> None:
         ev: dict = {
             "type": "run_complete",
-            "agent": "supervisor",
+            "agent": "controller",
             "timestamp_ms": time.time() * 1000,
             "data": {"error": msg},
         }
@@ -258,7 +267,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
         # Use POST /monitoring/drift for ad-hoc drift analysis.
         complete_event: dict = {
             "type": "run_complete",
-            "agent": "supervisor",
+            "agent": "controller",
             "timestamp_ms": time.time() * 1000,
             "data": {},
         }
