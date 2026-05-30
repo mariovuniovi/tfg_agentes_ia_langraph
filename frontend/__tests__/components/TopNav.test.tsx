@@ -17,11 +17,12 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 )
 
 describe('TopNav', () => {
-  it('renders all three tabs', async () => {
+  it('renders all four tabs', async () => {
     const { TopNav } = await import('@/components/TopNav')
     render(<TopNav />, { wrapper })
     expect(screen.getByText('Pipeline')).toBeInTheDocument()
     expect(screen.getByText('Experiments')).toBeInTheDocument()
+    expect(screen.getByText('Observability')).toBeInTheDocument()
     expect(screen.getByText('Monitoring')).toBeInTheDocument()
   })
 
@@ -29,6 +30,6 @@ describe('TopNav', () => {
     const { TopNav } = await import('@/components/TopNav')
     render(<TopNav />, { wrapper })
     const active = screen.getByText('Pipeline').closest('a')
-    expect(active?.className).toContain('bg-navy')
+    expect(active?.className).toContain('bg-indigo-50')
   })
 })

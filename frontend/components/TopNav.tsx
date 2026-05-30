@@ -5,9 +5,10 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchHealth } from '@/lib/api'
 
 const TABS = [
-  { label: 'Pipeline', href: '/pipeline' },
-  { label: 'Experiments', href: '/experiments' },
-  { label: 'Monitoring', href: '/monitoring' },
+  { label: 'Pipeline',      href: '/pipeline' },
+  { label: 'Experiments',   href: '/experiments' },
+  { label: 'Observability', href: '/observability' },
+  { label: 'Monitoring',    href: '/monitoring' },
 ]
 
 export function TopNav() {
@@ -22,17 +23,17 @@ export function TopNav() {
   const unhealthy = health && (!health.mlflow || !health.graph)
 
   return (
-    <nav className="flex items-center gap-1 bg-navy px-4 py-2">
+    <nav className="flex items-center gap-1 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2">
       {TABS.map(({ label, href }) => {
         const active = pathname.startsWith(href)
         return (
           <Link
             key={href}
             href={href}
-            className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
               active
-                ? 'bg-navy text-white ring-1 ring-white/30'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                ? 'bg-indigo-50 text-indigo-700'
+                : 'text-[var(--color-fg-muted)] hover:bg-zinc-100 hover:text-[var(--color-fg)]'
             }`}
           >
             {label}
@@ -40,7 +41,7 @@ export function TopNav() {
         )
       })}
       {unhealthy && (
-        <span className="ml-auto rounded-full bg-red-500 px-3 py-1 text-xs font-medium text-white">
+        <span className="ml-auto rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-200">
           Backend unhealthy
         </span>
       )}
