@@ -4,11 +4,13 @@ import { usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { fetchHealth } from '@/lib/api'
 
+// Monitoring (live drift) deliberately excluded: the prototype focuses on the
+// offline MLOps workflow; continuous serving + drift detection are out of scope
+// and listed as future work in the thesis.
 const TABS = [
   { label: 'Pipeline',      href: '/pipeline' },
   { label: 'Experiments',   href: '/experiments' },
   { label: 'Observability', href: '/observability' },
-  { label: 'Monitoring',    href: '/monitoring' },
 ]
 
 export function TopNav() {

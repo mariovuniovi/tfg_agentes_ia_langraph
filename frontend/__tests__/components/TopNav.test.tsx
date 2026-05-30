@@ -17,13 +17,13 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 )
 
 describe('TopNav', () => {
-  it('renders all four tabs', async () => {
+  it('renders the three primary tabs (Monitoring deliberately excluded)', async () => {
     const { TopNav } = await import('@/components/TopNav')
     render(<TopNav />, { wrapper })
     expect(screen.getByText('Pipeline')).toBeInTheDocument()
     expect(screen.getByText('Experiments')).toBeInTheDocument()
     expect(screen.getByText('Observability')).toBeInTheDocument()
-    expect(screen.getByText('Monitoring')).toBeInTheDocument()
+    expect(screen.queryByText('Monitoring')).not.toBeInTheDocument()
   })
 
   it('marks active tab based on pathname', async () => {
