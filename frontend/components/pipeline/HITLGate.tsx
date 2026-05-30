@@ -1,6 +1,8 @@
 'use client'
 import { useRunStore } from '@/stores/run-store'
 import { useApprove } from '@/hooks/use-approve'
+import { DeploymentApprovalCard } from '@/components/pipeline/DeploymentApprovalCard'
+import type { DeployerInterrupt } from '@/types/api'
 
 export function HITLGate({ runId }: { runId: string | null }) {
   const hitlPending = useRunStore((s) => s.hitlPending)
@@ -8,32 +10,14 @@ export function HITLGate({ runId }: { runId: string | null }) {
   const { approve, isPending } = useApprove(runId)
 
   if (!hitlPending) return null
-  if ((interruptValue as { type?: string })?.type === 'data_validation') return null
+  if ((interruptValue as { type?: string })?.type !== 'deployer') return null
 
   return (
-    <div className="rounded-lg border border-amber-500 bg-amber-50 p-4">
-      <p className="mb-2 font-semibold text-amber-700">⚠ Deployment Gate</p>
-      {interruptValue && (
-        <pre className="mb-3 overflow-auto rounded bg-amber-100 p-2 font-mono text-xs text-amber-700">
-          {JSON.stringify(interruptValue, null, 2)}
-        </pre>
-      )}
-      <div className="flex gap-2">
-        <button
-          onClick={() => approve('approve')}
-          disabled={isPending}
-          className="rounded bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-        >
-          Approve
-        </button>
-        <button
-          onClick={() => approve('reject')}
-          disabled={isPending}
-          className="rounded border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-        >
-          Reject
-        </button>
-      </div>
-    </div>
+    <DeploymentApprovalCard
+      runId={runId}
+      interrupt={interruptValue as unknown as DeployerInterrupt}
+      onApprove={(decision) => approve(decision)}
+      isPending={isPending}
+    />
   )
 }

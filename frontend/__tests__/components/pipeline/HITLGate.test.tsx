@@ -19,10 +19,22 @@ describe('HITLGate', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders Approve and Reject when hitlPending is true', () => {
-    useRunStore.getState().setHITL({ model: 'v1', accuracy: 0.96 })
+  it('renders nothing when interrupt type is not deployer', () => {
+    useRunStore.getState().setHITL({ type: 'data_validation', model: 'v1' })
+    const { container } = render(<HITLGate runId="abc" />, { wrapper })
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('renders DeploymentApprovalCard when type is deployer', () => {
+    useRunStore.getState().setHITL({
+      type: 'deployer',
+      candidate_run_id: 'run-abc123',
+      deployment_action: null,
+      evaluation_report_audit: null,
+    })
     render(<HITLGate runId="abc" />, { wrapper })
-    expect(screen.getByText('Approve')).toBeInTheDocument()
-    expect(screen.getByText('Reject')).toBeInTheDocument()
+    expect(screen.getByText(/awaiting human/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /approve deployment/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /reject deployment/i })).toBeInTheDocument()
   })
 })

@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { useRunStore } from '@/stores/run-store'
-import type { DataValidationInterrupt } from '@/types/api'
+import type { DataValidationInterrupt, AuditReportEventData } from '@/types/api'
 import { useApprove } from '@/hooks/use-approve'
 import { DatasetApprovalCard } from '@/components/pipeline/DatasetApprovalCard'
+import { AuditReportPanel } from '@/components/pipeline/AuditReportPanel'
 
 interface DatasetSummary {
   row_count: number
@@ -501,18 +502,25 @@ export function ResultsDashboard() {
   const runId = useRunStore((s) => s.runId)
   const hitlPending = useRunStore((s) => s.hitlPending)
   const interruptValue = useRunStore((s) => s.interruptValue)
-  const [tab, setTab] = useState<'dataset' | 'model' | 'planner'>('dataset')
+  const [tab, setTab] = useState<'dataset' | 'model' | 'planner' | 'audit'>('dataset')
+  const [pinnedTab, setPinnedTab] = useState(false)
   const reviewPanelRef = useRef<HTMLDivElement>(null)
   const { approve, isPending } = useApprove(runId)
 
   const isDataValidationHITL = hitlPending && (interruptValue as { type?: string })?.type === 'data_validation'
 
+  function selectTab(key: typeof tab) {
+    setTab(key)
+    setPinnedTab(true)
+  }
+
   useEffect(() => {
+    if (pinnedTab) return
     if (isDataValidationHITL) {
       setTab('dataset')
       setTimeout(() => reviewPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
     }
-  }, [isDataValidationHITL])
+  }, [isDataValidationHITL, pinnedTab])
 
   const toolResults = useMemo(() => {
     const results: Record<string, unknown> = {}
@@ -531,6 +539,11 @@ export function ResultsDashboard() {
   const plannerCtx = useMemo(() => {
     const ev = events.findLast((e) => e.type === 'planner_context')
     return ev ? (ev.data as unknown as PlannerContextData) : null
+  }, [events])
+
+  const auditData = useMemo(() => {
+    const ev = events.findLast((e) => e.type === 'audit_report')
+    return ev ? (ev.data as unknown as AuditReportEventData) : null
   }, [events])
 
   const dataset = toolResults['load_dataset'] as DatasetSummary | undefined
@@ -552,6 +565,25 @@ export function ResultsDashboard() {
   const running = status === 'running' || status === 'awaiting_approval'
   const active = running || hasDataset || hasModel
 
+  useEffect(() => {
+    if (pinnedTab) return
+    if (plannerCtx) setTab('planner')
+  }, [plannerCtx, pinnedTab])
+
+  useEffect(() => {
+    if (pinnedTab) return
+    if (trained || tuned) setTab('model')
+  }, [trained, tuned, pinnedTab])
+
+  useEffect(() => {
+    if (pinnedTab) return
+    if (auditData) setTab('audit')
+  }, [auditData, pinnedTab])
+
+  useEffect(() => {
+    setPinnedTab(false)
+  }, [runId])
+
   if (!active) return null
 
   return (
@@ -561,11 +593,12 @@ export function ResultsDashboard() {
           { key: 'dataset', label: 'Dataset', ready: hasDataset },
           { key: 'planner', label: 'Planner', ready: hasPlanner },
           { key: 'model', label: 'Model', ready: hasModel },
+          { key: 'audit', label: 'Audit', ready: !!auditData },
         ] as const).map(({ key, label, ready }) => (
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => selectTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-colors ${
               tab === key
                 ? 'border-b-2 border-indigo-600 text-zinc-900'
@@ -609,6 +642,8 @@ export function ResultsDashboard() {
         {tab === 'model' && (
           <ModelPanel trained={trained} tuned={tuned} running={running} />
         )}
+        {tab === 'audit' && auditData && <AuditReportPanel data={auditData} />}
+        {tab === 'audit' && !auditData && <p className="text-xs text-zinc-400">Audit not yet generated.</p>}
       </div>
     </div>
   )
