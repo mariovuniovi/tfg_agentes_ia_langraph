@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, Component, type ReactNode, type E
 import { useRunStore } from '@/stores/run-store'
 import type { DataValidationInterrupt } from '@/types/api'
 import { useApprove } from '@/hooks/use-approve'
+import { DatasetApprovalCard } from '@/components/pipeline/DatasetApprovalCard'
 
 interface DatasetSummary {
   row_count: number
@@ -314,109 +315,6 @@ function ModelPanel({
   )
 }
 
-function DatasetReviewPanel({
-  runId,
-  interruptValue,
-  panelRef,
-}: {
-  runId: string | null
-  interruptValue: DataValidationInterrupt
-  panelRef?: React.RefObject<HTMLDivElement | null>
-}) {
-  const commentRef = useRef<HTMLTextAreaElement>(null)
-  const { approve, isPending } = useApprove(runId)
-  const maxAttempts = 3
-  const attempt = interruptValue.attempt ?? 1
-  const preview = interruptValue.dataset_preview
-  const sampleRows = preview?.sample_rows ?? []
-  const sampleCols = preview?.columns ?? []
-
-  return (
-    <div ref={panelRef} className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-sm font-semibold text-blue-900">Dataset Review</span>
-        <span className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-          awaiting approval
-        </span>
-        <span className="ml-auto flex items-center gap-1.5 text-xs text-zinc-400">
-          Attempt {attempt} of {maxAttempts}
-          {Array.from({ length: maxAttempts }).map((_, i) => (
-            <span
-              key={i}
-              className={`inline-block h-2 w-2 rounded-full ${
-                i < attempt ? 'bg-amber-400' : 'bg-zinc-200'
-              }`}
-            />
-          ))}
-        </span>
-      </div>
-      <p className="mb-3 text-xs text-zinc-500">
-        Approve to proceed to training, or reject with a comment so the data agent can fix
-        the issue and reprocess.
-      </p>
-
-      {sampleRows.length > 0 && (
-        <div className="mb-3">
-          <p className="mb-1 text-xs font-medium text-zinc-500">
-            Processed data preview ({preview.shape[0]} rows × {preview.shape[1]} cols)
-          </p>
-          <div className="overflow-x-auto rounded border border-blue-100">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-blue-100">
-                  {sampleCols.map((c) => (
-                    <th key={c.name} className="border-b border-blue-200 px-2 py-1 text-left font-medium text-zinc-600">
-                      {c.name}
-                      <span className="ml-1 text-zinc-400">{c.dtype}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sampleRows.slice(0, 5).map((row, i) => (
-                  <tr key={i} className="border-b border-blue-100 last:border-0">
-                    {sampleCols.map((c) => (
-                      <td key={c.name} className={`px-2 py-1 ${row[c.name] == null ? 'text-red-400 italic' : 'text-zinc-700'}`}>
-                        {row[c.name] == null ? 'null' : String(row[c.name])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <label className="mb-1 block text-xs font-medium text-zinc-500">
-        Comment (optional)
-      </label>
-      <textarea
-        ref={commentRef}
-        rows={2}
-        placeholder="e.g. rename column X, drop rows where value < 0…"
-        className="mb-3 w-full rounded border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-700 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
-      />
-      <div className="flex gap-2">
-        <button
-          onClick={() => approve('approve', '')}
-          disabled={isPending}
-          className="rounded bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
-          ✓ Approve dataset
-        </button>
-        <button
-          onClick={() => approve('reject', commentRef.current?.value ?? '')}
-          disabled={isPending}
-          className="rounded border border-red-200 bg-red-50 px-4 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
-        >
-          ✗ Reject &amp; retry
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Planner evidence types
 // ---------------------------------------------------------------------------
@@ -605,6 +503,7 @@ export function ResultsDashboard() {
   const interruptValue = useRunStore((s) => s.interruptValue)
   const [tab, setTab] = useState<'dataset' | 'model' | 'planner'>('dataset')
   const reviewPanelRef = useRef<HTMLDivElement>(null)
+  const { approve, isPending } = useApprove(runId)
 
   const isDataValidationHITL = hitlPending && (interruptValue as { type?: string })?.type === 'data_validation'
 
@@ -692,10 +591,12 @@ export function ResultsDashboard() {
               merging={isMerging}
             />
             {isDataValidationHITL && (
-              <DatasetReviewPanel
+              <DatasetApprovalCard
                 runId={runId}
-                interruptValue={interruptValue as unknown as DataValidationInterrupt}
-                panelRef={reviewPanelRef}
+                interrupt={interruptValue as unknown as DataValidationInterrupt}
+                onApprove={(decision, comment) => approve(decision, comment)}
+                isPending={isPending}
+                maxAttempts={3}
               />
             )}
           </>
