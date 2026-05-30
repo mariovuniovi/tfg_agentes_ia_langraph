@@ -1,17 +1,31 @@
 @import "tailwindcss";
 
-@theme {
-  --color-navy: #1e3a5f;
-  --color-navy-700: #1d4ed8;
-  --color-navy-900: #1e3a5f;
-  --color-amber: #D97706;
-  --color-amber-600: #D97706;
-  --font-sans: 'Fira Sans', sans-serif;
-  --font-mono: 'Fira Code', monospace;
+@theme inline {
+  /* Semantic colors */
+  --color-bg:            theme(colors.zinc.50);
+  --color-surface:       #ffffff;
+  --color-surface-2:     theme(colors.zinc.50);
+  --color-border:        theme(colors.zinc.200);
+  --color-border-strong: theme(colors.zinc.300);
+  --color-fg:            theme(colors.zinc.900);
+  --color-fg-muted:      theme(colors.zinc.500);
+  --color-fg-subtle:     theme(colors.zinc.400);
+  --color-accent:        theme(colors.indigo.600);
+  --color-success:       theme(colors.emerald.600);
+  --color-warning:       theme(colors.amber.500);
+  --color-danger:        theme(colors.red.600);
+  --color-info:          theme(colors.sky.600);
+  --color-llm:           theme(colors.violet.600);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 }
 
 body {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-bg);
+  color: var(--color-fg);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
 }
