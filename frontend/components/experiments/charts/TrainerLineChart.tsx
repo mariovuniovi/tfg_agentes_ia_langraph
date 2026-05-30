@@ -6,7 +6,7 @@ const STROKE_DASH: Record<LineStyle, string> = { solid: '0', dashed: '6 3', dott
 const COLORS = ['#1e3a5f', '#D97706', '#16a34a', '#7c3aed']
 
 export function TrainerLineChart({ series }: { series: MetricSeries[] }) {
-  if (!series.length) return <p className="text-xs text-slate-400">No training metrics</p>
+  if (!series.length) return <p className="text-xs text-zinc-400">No training metrics</p>
 
   const maxLen = Math.max(...series.map((s) => s.steps.length))
   const data = Array.from({ length: maxLen }, (_, i) => {
