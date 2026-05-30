@@ -182,6 +182,17 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                     entry.status = "awaiting_approval"
                     entry.interrupt_value = interrupt_val
                     hitl_agent = interrupt_val.get("type", "deployer")
+
+                    if hitl_agent == "data_validation":
+                        preview = (
+                            interrupt_val.get("dataset_preview")
+                            or interrupt_val.get("preview")
+                            or {}
+                        )
+                        path = preview.get("path")
+                        if isinstance(path, str) and path:
+                            entry.processed_dataset_path = path
+
                     hitl_event: dict = {
                         "type": "hitl_request",
                         "agent": hitl_agent,
