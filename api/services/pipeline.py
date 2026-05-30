@@ -215,6 +215,31 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                         entry.events.append(planner_ctx_event)
                         await entry.queue.put(planner_ctx_event)
 
+                if "report_writer" in data and isinstance(data["report_writer"], dict):
+                    rw = data["report_writer"]
+                    audit = rw.get("evaluation_report_audit")
+                    if isinstance(audit, dict) and audit:
+                        from mlops_agents.evaluation.champion import resolve_champion_model_name
+                        # evaluation_passed lives INSIDE the audit dict
+                        # (report_writer.py copies it through from prior state)
+                        evaluation_passed = bool(audit.get("evaluation_passed", True))
+                        champion = resolve_champion_model_name({**rw})
+                        audit_event: dict = {
+                            "type": "audit_report",
+                            "agent": "report_writer",
+                            "timestamp_ms": time.time() * 1000,
+                            "data": {
+                                "audit":              audit,
+                                "champion_model":     audit.get("champion_model") or champion,
+                                "evaluation_passed":  evaluation_passed,
+                                "candidate_metrics":  rw.get("candidate_metrics", {}),
+                                "champion_metrics":   rw.get("champion_metrics", {}),
+                                "thresholds_applied": rw.get("thresholds_applied", {}),
+                            },
+                        }
+                        entry.events.append(audit_event)
+                        await entry.queue.put(audit_event)
+
                 worker_nodes = {
                     "data_validator", "dataset_approval", "planner",
                     "executor", "evaluation", "report_writer",
