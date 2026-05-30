@@ -22,6 +22,18 @@ async def start_run(body: RunCreate, background_tasks: BackgroundTasks):
     return {"run_id": run_id}
 
 
+@router.get("/runs")
+def list_runs(limit: int = 20):
+    out = []
+    for e in run_store.list_entries(limit=limit):
+        out.append({
+            "run_id": e.run_id,
+            "status": e.status,
+            "started_at_ms": getattr(e, "started_at_ms", 0),
+        })
+    return out
+
+
 @router.get("/runs/{run_id}", response_model=RunStatus)
 async def get_run_status(run_id: str):
     entry = run_store.get_entry(run_id)
