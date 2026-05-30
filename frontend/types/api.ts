@@ -8,6 +8,7 @@ export type PipelineEventType =
   | 'agent_reasoning'
   | 'planner_context'
   | 'hitl_request'
+  | 'audit_report'
   | 'run_complete'
 
 export interface PipelineEvent {
@@ -48,6 +49,42 @@ export interface DataValidationInterrupt {
     passed: boolean
     missing_values: Record<string, number>
     schema_validated: boolean
+  }
+}
+
+export interface AuditReportEventData {
+  audit: {
+    summary?: string
+    champion_model?: string
+    why_champion_won?: string
+    planner_alignment?: string
+    deviations_from_planner_expectations?: string[]
+    evidence_consistency_warnings?: string[]
+    risks_and_warnings?: string[]
+    promotion_decision_explanation?: string
+    human_review_notes?: string[]
+  }
+  champion_model: string
+  evaluation_passed: boolean
+  candidate_metrics: Record<string, unknown>
+  champion_metrics: Record<string, unknown>
+  thresholds_applied: Record<string, unknown>
+}
+
+export interface DeployerInterrupt {
+  type: 'deployer'
+  evaluation_report?: Record<string, unknown>
+  evaluation_report_audit?: AuditReportEventData['audit']
+  candidate_metrics?: Record<string, unknown>
+  champion_metrics?: Record<string, unknown>
+  thresholds_applied?: Record<string, unknown>
+  training_plan?: Record<string, unknown>
+  candidate_run_id?: string
+  deployment_action?: {
+    verb: string
+    model: string
+    alias: string
+    summary: string
   }
 }
 
