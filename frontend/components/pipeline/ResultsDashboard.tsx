@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { useRunStore } from '@/stores/run-store'
-import type { DataValidationInterrupt, AuditReportEventData } from '@/types/api'
+import type { DataValidationInterrupt, AuditReportEventData, ExperienceSummary, MatchedRule, PlannerContextData, EvidenceReference } from '@/types/api'
 import { useApprove } from '@/hooks/use-approve'
 import { DatasetApprovalCard } from '@/components/pipeline/DatasetApprovalCard'
 import { AuditReportPanel } from '@/components/pipeline/AuditReportPanel'
@@ -317,40 +317,15 @@ function ModelPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Planner evidence types
+// Planner evidence types (ExperienceSummary, MatchedRule, PlannerContextData imported from @/types/api)
 // ---------------------------------------------------------------------------
 
-interface ExperienceSummary {
-  experience_id: string
-  dataset_name: string
-  problem_type: string
-  best_model: string
-  validation_score: number
-  metric_name?: string
-}
-
-interface MatchedRule {
-  rule_id: string
-  prefer?: string[]
-  avoid_or_deprioritize?: string[]
-  recommend?: string
-  summary: string
-}
-
+// Legacy v1 shape still used by PlannerPanel — Phase 8 will migrate to EvidenceReference
 interface EvidenceRef {
   evidence_type: 'experience' | 'rule'
   experience_id?: string
   rule_id?: string
   relevance_note: string
-}
-
-interface PlannerContextData {
-  retrieved_experiences: ExperienceSummary[]
-  matched_rules: MatchedRule[]
-  evidence_used: EvidenceRef[]
-  planning_analysis: string
-  plan_summary: { candidate_models: string[]; models_not_recommended: string[] }
-  warnings: string[]
 }
 
 class PlannerErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -379,8 +354,10 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
   if (!ctx && running) return <PulseRow />
   if (!ctx) return <p className="text-xs text-zinc-400">Planner has not run yet.</p>
 
-  const citedExpIds = new Set(ctx.evidence_used.filter(e => e.evidence_type === 'experience').map(e => e.experience_id))
-  const citedRuleIds = new Set(ctx.evidence_used.filter(e => e.evidence_type === 'rule').map(e => e.rule_id))
+  // evidence_used is EvidenceReference[] (v2); cast to v1 shape for legacy rendering — Phase 8 will migrate
+  const evidenceV1 = (ctx.evidence_used as unknown as EvidenceRef[])
+  const citedExpIds = new Set(evidenceV1.filter(e => e.evidence_type === 'experience').map(e => e.experience_id))
+  const citedRuleIds = new Set(evidenceV1.filter(e => e.evidence_type === 'rule').map(e => e.rule_id))
 
   return (
     <div className="space-y-5">
@@ -433,9 +410,9 @@ function PlannerPanel({ ctx, running }: { ctx: PlannerContextData | null; runnin
                       Best model: <span className="font-medium text-zinc-700">{exp.best_model}</span>
                       {' · '}<span className="uppercase">{exp.metric_name ?? 'score'}</span>: <span className="font-medium text-zinc-700">{(exp.validation_score ?? 0).toFixed(4)}</span>
                     </div>
-                    {cited && ctx.evidence_used.find(e => e.experience_id === exp.experience_id)?.relevance_note && (
+                    {cited && evidenceV1.find(e => e.experience_id === exp.experience_id)?.relevance_note && (
                       <div className="mt-1 italic text-violet-600">
-                        {ctx.evidence_used.find(e => e.experience_id === exp.experience_id)!.relevance_note}
+                        {evidenceV1.find(e => e.experience_id === exp.experience_id)!.relevance_note}
                       </div>
                     )}
                   </div>

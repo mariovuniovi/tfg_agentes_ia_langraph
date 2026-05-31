@@ -119,3 +119,89 @@ export interface HealthResponse {
   mlflow: boolean
   graph: boolean
 }
+
+// ---------------------------------------------------------------------------
+// Planner v2 contracts
+// ---------------------------------------------------------------------------
+
+export interface EvidenceReference {
+  source: 'dataset_profile' | 'task_metadata' | 'registry' | 'experience' | 'rule'
+  source_id?: string | null
+  relevance_note?: string
+}
+
+export interface CandidateRationale {
+  model_key: string
+  priority: number
+  reason: string
+  evidence_refs: EvidenceReference[]
+  risks: string[]
+}
+
+export interface RejectedModelRationale {
+  model_key: string
+  reason: string
+  evidence_refs: EvidenceReference[]
+  reconsider_if?: string | null
+}
+
+export interface DecisionBasis {
+  primary_evidence: EvidenceReference[]
+  secondary_evidence: EvidenceReference[]
+  final_strategy: string
+}
+
+export interface EvidenceConflict {
+  summary: string
+  affected_models: string[]
+  conflicting_evidence_refs: EvidenceReference[]
+  resolution: string
+}
+
+export interface SoftConflict {
+  type: string
+  models: string[]
+  summary: string
+}
+
+export interface MatchedRule {
+  rule_id: string
+  prefer?: string[]
+  avoid_or_deprioritize?: string[]
+  recommend?: string
+  summary: string
+}
+
+export interface ExperienceSummary {
+  experience_id: string
+  similarity_score: number
+  relevance_tier: 'high' | 'medium' | 'low'
+  matched_buckets: string[]
+  mismatched_buckets: string[]
+  target_scale_note: string | null
+  dataset_name: string
+  problem_type: string
+  best_model: string
+  validation_score: number
+  metric_name?: string
+}
+
+export interface PlannerContextData {
+  retrieved_experiences: ExperienceSummary[]
+  matched_rules: MatchedRule[]
+  evidence_used: EvidenceReference[]
+  planning_analysis: string
+  plan_summary: {
+    candidate_rationales: CandidateRationale[]
+    rejected_model_rationales: RejectedModelRationale[]
+    candidate_models: string[]          // legacy
+    models_not_recommended: string[]    // legacy
+  }
+  warnings: string[]
+  decision_basis: DecisionBasis
+  evidence_conflicts: EvidenceConflict[]
+  soft_conflicts: SoftConflict[]
+  cited_experience_ids: string[]
+  cited_rule_ids: string[]
+  planner_status: 'ok' | 'retry_ok' | 'failed'
+}
