@@ -1,6 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -12,7 +13,7 @@ _DATE_SUFFIX_RE = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 def _load() -> dict[str, dict[str, float]]:
     # Cached for the lifetime of the process — restart required after editing model_pricing.yaml
     with open(_PRICING_FILE) as f:
-        return yaml.safe_load(f)
+        return cast(dict[str, dict[str, float]], yaml.safe_load(f))
 
 
 def _normalize(model: str) -> str:
