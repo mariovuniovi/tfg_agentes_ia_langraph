@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   aggregateToolUsage, aggregateLlmNodeActivity,
   inferToolOwner, getConcreteToolName, buildToolDetailsViewModel,
-  type LlmActivityRow,
+  aggregateTokenUsage, tokensByNode,
+  type LlmActivityRow, type TokenUsageSummary,
 } from '@/lib/events-aggregate'
 import type { PipelineEvent } from '@/types/api'
 
@@ -209,5 +210,119 @@ describe('buildToolDetailsViewModel', () => {
     // Should still find planner section via inference fallback
     const planSection = vm.agents.find((s) => s.name === 'planner')
     expect(planSection!.tools[0].toolName).toBe('list_available_models')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// aggregateTokenUsage
+// ---------------------------------------------------------------------------
+
+describe('aggregateTokenUsage', () => {
+  it('returns empty summary when no token_usage events', () => {
+    const summary = aggregateTokenUsage([])
+    expect(summary.rows).toHaveLength(0)
+    expect(summary.totalCostUsd).toBe(0)
+    expect(summary.totalInputTokens).toBe(0)
+    expect(summary.totalOutputTokens).toBe(0)
+  })
+
+  it('creates one row for a single token_usage event', () => {
+    const events = [
+      ev('token_usage', 'planner', {
+        node: 'planner', model: 'gpt-5.4-mini',
+        input_tokens: 1000, output_tokens: 200, total_tokens: 1200,
+        estimated_cost_usd: 0.00165,
+      }),
+    ]
+    const summary = aggregateTokenUsage(events)
+    expect(summary.rows).toHaveLength(1)
+    expect(summary.rows[0]).toMatchObject({
+      node: 'planner', model: 'gpt-5.4-mini', calls: 1,
+      inputTokens: 1000, outputTokens: 200, totalTokens: 1200,
+      estimatedCostUsd: 0.00165,
+    })
+    expect(summary.totalCostUsd).toBeCloseTo(0.00165)
+    expect(summary.totalInputTokens).toBe(1000)
+    expect(summary.totalOutputTokens).toBe(200)
+  })
+
+  it('accumulates multiple calls for the same node+model', () => {
+    const events = [
+      ev('token_usage', 'planner', { node: 'planner', model: 'gpt-5.4-mini', input_tokens: 1000, output_tokens: 200, total_tokens: 1200, estimated_cost_usd: 0.001 }),
+      ev('token_usage', 'planner', { node: 'planner', model: 'gpt-5.4-mini', input_tokens: 2000, output_tokens: 400, total_tokens: 2400, estimated_cost_usd: 0.002 }),
+    ]
+    const summary = aggregateTokenUsage(events)
+    expect(summary.rows).toHaveLength(1)
+    expect(summary.rows[0].calls).toBe(2)
+    expect(summary.rows[0].inputTokens).toBe(3000)
+    expect(summary.rows[0].outputTokens).toBe(600)
+    expect(summary.rows[0].totalTokens).toBe(3600)
+    expect(summary.totalCostUsd).toBeCloseTo(0.003)
+  })
+
+  it('creates separate rows for different nodes', () => {
+    const events = [
+      ev('token_usage', 'planner', { node: 'planner', model: 'gpt-5.4-mini', input_tokens: 1000, output_tokens: 200, total_tokens: 1200, estimated_cost_usd: 0.001 }),
+      ev('token_usage', 'report_writer', { node: 'report_writer', model: 'gpt-5.4-nano', input_tokens: 500, output_tokens: 100, total_tokens: 600, estimated_cost_usd: 0.0002 }),
+    ]
+    const summary = aggregateTokenUsage(events)
+    expect(summary.rows).toHaveLength(2)
+    expect(summary.totalCostUsd).toBeCloseTo(0.0012)
+  })
+
+  it('creates separate rows for same node but different models', () => {
+    const events = [
+      ev('token_usage', 'planner', { node: 'planner', model: 'gpt-5.4-mini', input_tokens: 1000, output_tokens: 200, total_tokens: 1200, estimated_cost_usd: 0.001 }),
+      ev('token_usage', 'planner', { node: 'planner', model: 'gpt-5.4', input_tokens: 500, output_tokens: 100, total_tokens: 600, estimated_cost_usd: 0.009 }),
+    ]
+    const summary = aggregateTokenUsage(events)
+    expect(summary.rows).toHaveLength(2)
+  })
+
+  it('ignores non-token_usage events', () => {
+    const events = [
+      ev('routing', 'controller', { next: 'planner' }),
+      ev('tool_result', 'data_validator', { tool_name: 'load_dataset', duration_ms: 100 }),
+      ev('token_usage', 'planner', { node: 'planner', model: 'gpt-5.4-mini', input_tokens: 500, output_tokens: 100, total_tokens: 600, estimated_cost_usd: 0.001 }),
+    ]
+    const summary = aggregateTokenUsage(events)
+    expect(summary.rows).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// tokensByNode
+// ---------------------------------------------------------------------------
+
+describe('tokensByNode', () => {
+  it('returns empty map for empty summary', () => {
+    const m = tokensByNode({ rows: [], totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0 })
+    expect(m.size).toBe(0)
+  })
+
+  it('collapses multiple models for the same node into one entry', () => {
+    const summary: TokenUsageSummary = {
+      rows: [
+        { node: 'planner', model: 'gpt-5.4-mini', calls: 1, inputTokens: 1000, outputTokens: 200, totalTokens: 1200, estimatedCostUsd: 0.001 },
+        { node: 'planner', model: 'gpt-5.4', calls: 1, inputTokens: 500, outputTokens: 100, totalTokens: 600, estimatedCostUsd: 0.009 },
+      ],
+      totalCostUsd: 0.01, totalInputTokens: 1500, totalOutputTokens: 300,
+    }
+    const m = tokensByNode(summary)
+    expect(m.get('planner')).toEqual({ inputTokens: 1500, outputTokens: 300 })
+  })
+
+  it('keeps separate nodes separate', () => {
+    const summary: TokenUsageSummary = {
+      rows: [
+        { node: 'planner', model: 'gpt-5.4-mini', calls: 1, inputTokens: 1000, outputTokens: 200, totalTokens: 1200, estimatedCostUsd: 0.001 },
+        { node: 'report_writer', model: 'gpt-5.4-nano', calls: 1, inputTokens: 500, outputTokens: 100, totalTokens: 600, estimatedCostUsd: 0.0002 },
+      ],
+      totalCostUsd: 0.0012, totalInputTokens: 1500, totalOutputTokens: 300,
+    }
+    const m = tokensByNode(summary)
+    expect(m.size).toBe(2)
+    expect(m.get('planner')).toEqual({ inputTokens: 1000, outputTokens: 200 })
+    expect(m.get('report_writer')).toEqual({ inputTokens: 500, outputTokens: 100 })
   })
 })

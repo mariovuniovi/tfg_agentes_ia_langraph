@@ -79,6 +79,80 @@ export interface LlmActivityRow {
   total_ms: number
 }
 
+export interface TokenUsageEventData {
+  node: string
+  model: string
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  cached_input_tokens?: number
+  estimated_cost_usd: number
+  source?: 'langchain_stream_usage_metadata'
+}
+
+export interface TokenUsageRow {
+  node: string
+  model: string
+  calls: number
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  estimatedCostUsd: number
+}
+
+export interface TokenUsageSummary {
+  rows: TokenUsageRow[]
+  totalCostUsd: number
+  totalInputTokens: number
+  totalOutputTokens: number
+}
+
+export function aggregateTokenUsage(events: PipelineEvent[]): TokenUsageSummary {
+  const map = new Map<string, TokenUsageRow>()
+  for (const e of events) {
+    if (e.type !== 'token_usage') continue
+    const d = e.data as TokenUsageEventData
+    const key = `${d.node}::${d.model}`
+    const prev = map.get(key)
+    if (prev) {
+      prev.calls += 1
+      prev.inputTokens += d.input_tokens
+      prev.outputTokens += d.output_tokens
+      prev.totalTokens += d.total_tokens
+      prev.estimatedCostUsd += d.estimated_cost_usd
+    } else {
+      map.set(key, {
+        node: d.node, model: d.model, calls: 1,
+        inputTokens: d.input_tokens, outputTokens: d.output_tokens,
+        totalTokens: d.total_tokens, estimatedCostUsd: d.estimated_cost_usd,
+      })
+    }
+  }
+  const rows = Array.from(map.values())
+  return {
+    rows,
+    totalCostUsd: rows.reduce((s, r) => s + r.estimatedCostUsd, 0),
+    totalInputTokens: rows.reduce((s, r) => s + r.inputTokens, 0),
+    totalOutputTokens: rows.reduce((s, r) => s + r.outputTokens, 0),
+  }
+}
+
+export function tokensByNode(
+  summary: TokenUsageSummary,
+): Map<string, { inputTokens: number; outputTokens: number }> {
+  const m = new Map<string, { inputTokens: number; outputTokens: number }>()
+  for (const r of summary.rows) {
+    const prev = m.get(r.node)
+    if (prev) {
+      prev.inputTokens += r.inputTokens
+      prev.outputTokens += r.outputTokens
+    } else {
+      m.set(r.node, { inputTokens: r.inputTokens, outputTokens: r.outputTokens })
+    }
+  }
+  return m
+}
+
 export type HitlStatus = 'approved' | 'rejected' | 'waiting' | 'none'
 
 export interface HitlGateRow {

@@ -11,6 +11,7 @@ export type PipelineEventType =
   | 'audit_report'
   | 'training_complete'
   | 'deployment_complete'
+  | 'token_usage'
   | 'run_complete'
 
 export interface PipelineEvent {
