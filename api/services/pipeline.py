@@ -14,6 +14,7 @@ from api.services.pipeline_helpers import (
     reset_tool_start_times,
 )
 from mlops_agents.graphs.mlops_graph import graph
+from mlops_agents.agents.taxonomy import NODE_CATEGORIES
 
 
 def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
@@ -126,6 +127,11 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                 "report_writer":  settings.openai_model_report_writer,
             },
             "problem_type": pt,
+            "node_categories": {
+                "agents":        NODE_CATEGORIES["agents"],
+                "llm_nodes":     NODE_CATEGORIES["llm_nodes"],
+                "deterministic": NODE_CATEGORIES["deterministic"],
+            },
         },
     }
     entry.events.append(info_event)
