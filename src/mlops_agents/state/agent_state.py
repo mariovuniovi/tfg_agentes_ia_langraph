@@ -90,3 +90,5 @@ class AgentState(TypedDict):
     planner_status: str | None              # "ok" | "retry_ok" | "failed"
     planner_retry_used: bool | None         # True if second attempt was needed
     _planner_output_record: dict | None     # private state key used by executor to get planner's output record
+    planner_tool_trace: dict                # tool invocations and results during planning
+    planner_validation_context: dict        # validation constraints and context for planning
