@@ -6,7 +6,22 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from mlops_agents.contracts.training import TrainingPlan
+from mlops_agents.contracts.training import (
+    CandidateSpec,
+    RejectedModelSpec,
+    TrainingPlan,
+)
+
+# Re-export for consumers that import from planner
+__all__ = [
+    "CandidateSpec",
+    "RejectedModelSpec",
+    "EvidenceReference",
+    "CandidateResultCompact",
+    "ExperienceSummary",
+    "PlannerContext",
+    "PlannerOutput",
+]
 
 PlannerStatus = Literal["ok", "retry_ok", "failed"]
 
@@ -22,7 +37,8 @@ class EvidenceReference(BaseModel):
         "registry",
     ]
     source_id: str | None = None
-    summary: str
+    summary: str = ""
+    relevance_note: str | None = None
 
 
 class CandidateResultCompact(BaseModel):

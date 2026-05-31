@@ -13,7 +13,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-
 ExogStrategy = Literal["known_future", "naive_carry", "ets", "auto_arima", "drop"]
 UnknownFutureStrategy = Literal["naive_carry", "ets", "auto_arima", "drop"]
 
@@ -59,18 +58,46 @@ class SearchParamOverride(BaseModel):
         return self
 
 
-class TrainingPlanCandidate(BaseModel):
-    priority: int
+class CandidateSpec(BaseModel):
+    """A model candidate in a training plan.
+
+    priority: int = Field(ge=1) — must be >= 1 and unique across candidates.
+    reason/evidence_refs default to "" / [] for backward compatibility with existing
+    constructors that predate SP5 planner.
+    # TODO: Task 5.2 (planner_node) will validate min_length on the planner's output
+    # specifically, so strict enforcement is deferred until the planner produces plans.
+    """
+
+    priority: int = Field(ge=1)
     model_key: str
     initial_hyperparameters: dict[str, Any] = Field(default_factory=dict)
     search_space_override: dict[str, SearchParamOverride] | None = None
     requested_trials: int | None = None
     reason: str = ""
+    evidence_refs: list[Any] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
 
 
-class RejectedModel(BaseModel):
+# Backward-compat alias — existing code using TrainingPlanCandidate keeps working
+TrainingPlanCandidate = CandidateSpec
+
+
+class RejectedModelSpec(BaseModel):
+    """A model excluded from the training plan.
+
+    evidence_refs defaults to [] for backward compatibility; reconsider_if is optional.
+    # TODO: Task 5.2 (planner_node) will validate min_length on the planner's output
+    # specifically, so strict enforcement is deferred until the planner produces plans.
+    """
+
     model_key: str
     reason: str
+    evidence_refs: list[Any] = Field(default_factory=list)
+    reconsider_if: str | None = None
+
+
+# Backward-compat alias
+RejectedModel = RejectedModelSpec
 
 
 class TrialBudget(BaseModel):
@@ -83,8 +110,8 @@ class TrialBudget(BaseModel):
 class TrainingPlan(BaseModel):
     problem_type: Literal["classification", "regression", "forecasting"]
     metric_to_optimize: str | None = None
-    candidates: list[TrainingPlanCandidate]
-    models_not_recommended: list[RejectedModel] = Field(default_factory=list)
+    candidates: list[CandidateSpec]
+    models_not_recommended: list[RejectedModelSpec] = Field(default_factory=list)
     trial_budget: TrialBudget = Field(default_factory=TrialBudget)
     forecasting_settings: ForecastingSettings | None = None
 
