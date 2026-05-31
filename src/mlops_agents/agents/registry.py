@@ -15,8 +15,10 @@ def get_agent(name: str) -> Any:
         from mlops_agents.agents.data_agent import build_data_agent
         return build_data_agent()
     if name == "planner":
-        from mlops_agents.agents.planner import build_planner_agent
-        return build_planner_agent()
+        raise ValueError(
+            "Planner is now built per-run inside planner_node via build_planner_agent(tools). "
+            "It is not a pre-built cached agent. Use planning.node.planner_node instead."
+        )
     if name == "report_writer":
         from mlops_agents.evaluation.report_writer import build_report_writer
         return build_report_writer()

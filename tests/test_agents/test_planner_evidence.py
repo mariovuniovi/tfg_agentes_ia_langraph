@@ -1,102 +1,31 @@
+"""Evidence-reference validation tests moved to test_planning/test_validation.py.
+
+The old _check_evidence_references and _check_plan_exhaustiveness were in
+agents/planner.py. They now live in mlops_agents.planning.validation with
+updated signatures. Full coverage is in tests/test_planning/test_validation.py.
+
+This file is kept as a smoke-test to confirm the new imports resolve correctly.
+"""
 import pytest
-from mlops_agents.agents.planner import (
-    PlannerError,
-    _check_evidence_references,
+from mlops_agents.planning.validation import (
+    PlannerValidationError,
     _check_plan_exhaustiveness,
+    _check_evidence_references_hybrid,
 )
-from mlops_agents.contracts.planner import (
-    EvidenceReference,
-    PlannerContext,
-    ExperienceSummary,
-)
-from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate, RejectedModel
-)
+from mlops_agents.planning.node import PlannerError
+from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, RejectedModel
 
 
-def _minimal_ctx() -> PlannerContext:
-    return PlannerContext(
-        current_dataset_profile={},
-        task_metadata={},
-        available_models=["ridge", "lightgbm_regressor"],
-        similar_experiences=[
-            ExperienceSummary(
-                experience_id="task_001",
-                similarity_score=0.8,
-                relevance_tier="high",
-                dataset_summary="medium regression",
-                models_trained=["ridge", "lightgbm_regressor"],
-                best_model="lightgbm_regressor",
-                validation_score=0.12,
-            )
-        ],
-        matched_rules=[{"rule_id": "rule_001", "summary": "prefer boosting"}],
-    )
+def test_planning_validation_imports_resolve():
+    """Smoke-test: new validation module exports are importable."""
+    assert PlannerValidationError is not None
+    assert _check_plan_exhaustiveness is not None
+    assert _check_evidence_references_hybrid is not None
 
 
-def test_valid_experience_reference_passes():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="experience", source_id="task_001", summary="used")]
-    _check_evidence_references(refs, ctx)  # must not raise
-
-
-def test_valid_rule_reference_passes():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="rule", source_id="rule_001", summary="applied")]
-    _check_evidence_references(refs, ctx)
-
-
-def test_valid_registry_reference_passes():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="registry", source_id="ridge", summary="baseline")]
-    _check_evidence_references(refs, ctx)
-
-
-def test_dataset_profile_null_source_id_passes():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="dataset_profile", source_id=None, summary="medium")]
-    _check_evidence_references(refs, ctx)
-
-
-def test_task_metadata_null_source_id_passes():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="task_metadata", source_id=None, summary="forecasting")]
-    _check_evidence_references(refs, ctx)
-
-
-def test_dataset_profile_non_null_source_id_raises():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="dataset_profile", source_id="something", summary="x")]
-    with pytest.raises(PlannerError, match="source_id=None"):
-        _check_evidence_references(refs, ctx)
-
-
-def test_task_metadata_non_null_source_id_raises():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="task_metadata", source_id="something", summary="x")]
-    with pytest.raises(PlannerError, match="source_id=None"):
-        _check_evidence_references(refs, ctx)
-
-
-def test_experience_unknown_source_id_raises():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="experience", source_id="fake_999", summary="x")]
-    with pytest.raises(PlannerError, match="fake_999"):
-        _check_evidence_references(refs, ctx)
-
-
-def test_rule_unknown_source_id_raises():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="rule", source_id="fake_rule", summary="x")]
-    with pytest.raises(PlannerError, match="fake_rule"):
-        _check_evidence_references(refs, ctx)
-
-
-def test_registry_unknown_source_id_raises():
-    ctx = _minimal_ctx()
-    refs = [EvidenceReference(source="registry", source_id="fake_model", summary="x")]
-    with pytest.raises(PlannerError, match="fake_model"):
-        _check_evidence_references(refs, ctx)
+def test_planner_error_importable_from_planning_node():
+    """PlannerError is in planning.node (and re-exported via agents/planner shim)."""
+    assert PlannerError is not None
 
 
 def test_exhaustiveness_passes_when_all_accounted():
@@ -114,5 +43,5 @@ def test_exhaustiveness_raises_when_model_missing():
         candidates=[TrainingPlanCandidate(priority=1, model_key="ridge", reason="baseline")],
         models_not_recommended=[],
     )
-    with pytest.raises(PlannerError, match="lightgbm_regressor"):
+    with pytest.raises(PlannerValidationError, match="lightgbm_regressor"):
         _check_plan_exhaustiveness(plan, ["ridge", "lightgbm_regressor"])

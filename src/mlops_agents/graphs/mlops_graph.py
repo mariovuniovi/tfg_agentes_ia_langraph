@@ -20,7 +20,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.types import Command
 
-from mlops_agents.agents.planner import PlannerError, planner_node
+from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
