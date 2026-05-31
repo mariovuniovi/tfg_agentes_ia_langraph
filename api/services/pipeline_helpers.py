@@ -5,6 +5,8 @@ from typing import TypedDict
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
 
+from mlops_agents.observability.pricing import estimate_cost
+
 _tool_start_times: dict[str, float] = {}
 
 
@@ -74,12 +76,36 @@ def parse_stream_event(chunk: tuple) -> PipelineEvent | None:
                 timestamp_ms=now_ms,
                 data={"tool_name": tool_name, "arguments": tool_calls[0].get("args", {})},
             )
-        if message_chunk.content:
+        elif message_chunk.content:
             return PipelineEvent(
                 type="agent_reasoning",
                 agent=agent,
                 timestamp_ms=now_ms,
                 data={"content": message_chunk.content},
+            )
+        elif message_chunk.usage_metadata:
+            usage = message_chunk.usage_metadata
+            model_name: str = (
+                (message_chunk.response_metadata or {}).get("model_name", "")
+                or agent
+            )
+            input_t: int = usage.get("input_tokens", 0)
+            output_t: int = usage.get("output_tokens", 0)
+            cached_t: int = (usage.get("input_token_details") or {}).get("cache_read", 0)
+            return PipelineEvent(
+                type="token_usage",
+                agent=agent,
+                timestamp_ms=now_ms,
+                data={
+                    "node": agent,
+                    "model": model_name,
+                    "input_tokens": input_t,
+                    "output_tokens": output_t,
+                    "total_tokens": usage.get("total_tokens", input_t + output_t),
+                    "cached_input_tokens": cached_t if cached_t else None,
+                    "estimated_cost_usd": estimate_cost(model_name, input_t, output_t, cached_t),
+                    "source": "langchain_stream_usage_metadata",
+                },
             )
         return None
 
