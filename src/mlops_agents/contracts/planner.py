@@ -22,7 +22,27 @@ class EvidenceReference(BaseModel):
         "registry",
     ]
     source_id: str | None = None
-    summary: str
+    summary: str = ""
+    relevance_note: str | None = None
+
+
+class CandidateSpec(BaseModel):
+    """Planner's recommendation for a candidate model to train."""
+
+    model_key: str
+    priority: int = Field(ge=1)
+    reason: str = Field(min_length=1)
+    evidence_refs: list[EvidenceReference] = Field(min_length=1)
+    risks: list[str] = Field(default_factory=list)
+
+
+class RejectedModelSpec(BaseModel):
+    """Planner's recommendation to skip a model."""
+
+    model_key: str
+    reason: str = Field(min_length=1)
+    evidence_refs: list[EvidenceReference] = Field(min_length=1)
+    reconsider_if: str | None = None
 
 
 class CandidateResultCompact(BaseModel):
@@ -42,6 +62,7 @@ class ExperienceSummary(BaseModel):
     models_trained: list[str]
     best_model: str
     validation_score: float
+    metric_name: str | None = None
     candidate_results: list[CandidateResultCompact] = Field(default_factory=list)
     notes: str = ""
 
