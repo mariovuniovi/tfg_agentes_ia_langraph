@@ -15,12 +15,8 @@ dependencies = [
     "langchain-core>=1.0",
     "langchain-openai>=0.3.17",
 
-    # MCP (Model Context Protocol)
-    "mcp[cli]>=1.2",
-    "langchain-mcp-adapters>=0.2.2",
-
     # Dashboard & MLOps
-    "mlflow>=2.18",
+    "mlflow>=3.10",
     "evidently>=0.5",
 
     # ML & Data
@@ -44,6 +40,9 @@ dependencies = [
     "httpx>=0.28",
     "loguru>=0.7",
 
+    # Observability
+    "pyyaml>=6.0",
+
     # API backend
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -60,6 +59,7 @@ dev = [
     "ruff>=0.9",
     "mypy>=1.13",
     "pre-commit>=4.0",
+    "types-PyYAML>=6.0",
 ]
 
 [build-system]
@@ -133,8 +133,6 @@ module = [
     "langchain_core.*",
     "langchain_openai.*",
     "langgraph.*",
-    "langchain_mcp_adapters.*",
-    "mcp.*",
     "loguru.*",
     "optuna.*",
     "sklearn.*",
