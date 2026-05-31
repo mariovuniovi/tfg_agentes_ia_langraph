@@ -174,3 +174,106 @@ def _check_evidence_references_hybrid(
                 raise PlannerValidationError(
                     f"rule ref {ref.source_id!r} was never retrieved by the agent"
                 )
+
+
+def _detect_conflicts(
+    ctx: PlannerValidationContext,
+    trace: ToolTrace,
+    plan: TrainingPlan,
+    output: PlannerOutput,
+) -> list[dict]:
+    """Deterministic HARD conflict detection. Returns list of flagged conflicts."""
+    hard: list[dict] = []
+    candidate_keys = {c.model_key for c in plan.candidates}
+    rejected_keys = {r.model_key for r in plan.models_not_recommended}
+
+    cited_experience_ids = {
+        ref.source_id for ref in _collect_all_refs(output)
+        if ref.source == "experience" and ref.source_id
+    }
+    cited_winners = {
+        e.best_model for e in ctx.similar_experiences
+        if e.experience_id in cited_experience_ids and e.best_model
+    }
+    omitted_cited = cited_winners - candidate_keys
+    if omitted_cited:
+        hard.append({
+            "type": "cited_experience_winner_not_selected",
+            "models": sorted(omitted_cited),
+            "severity": "hard",
+        })
+
+    cited_rule_ids = {
+        ref.source_id for ref in _collect_all_refs(output)
+        if ref.source == "rule" and ref.source_id
+    }
+    for rid in cited_rule_ids:
+        rule = ctx.rules_by_id.get(rid)
+        if not rule:
+            continue
+        avoid_in_cands = set(rule.get("avoid_or_deprioritize", []) or []) & candidate_keys
+        prefer_in_rej = set(rule.get("prefer", []) or []) & rejected_keys
+        if avoid_in_cands:
+            hard.append({
+                "type": "cited_rule_avoid_violated", "rule_id": rid,
+                "models": sorted(avoid_in_cands), "severity": "hard",
+            })
+        if prefer_in_rej:
+            hard.append({
+                "type": "cited_rule_prefer_rejected", "rule_id": rid,
+                "models": sorted(prefer_in_rej), "severity": "hard",
+            })
+    return hard
+
+
+def detect_soft_conflicts(
+    ctx: PlannerValidationContext,
+    trace: ToolTrace,
+    plan: TrainingPlan,
+    output: PlannerOutput,
+) -> list[dict]:
+    """Non-blocking conflicts surfaced as info in the UI. Excludes anything already in hard."""
+    soft: list[dict] = []
+    candidate_keys = {c.model_key for c in plan.candidates}
+
+    retrieved_winners = {
+        e.best_model for e in ctx.similar_experiences
+        if e.experience_id in trace.retrieved_experience_ids and e.best_model
+    }
+    cited_experience_ids = {
+        ref.source_id for ref in _collect_all_refs(output)
+        if ref.source == "experience" and ref.source_id
+    }
+    cited_winners = {
+        e.best_model for e in ctx.similar_experiences
+        if e.experience_id in cited_experience_ids and e.best_model
+    }
+    soft_omitted = (retrieved_winners - cited_winners) - candidate_keys
+    if soft_omitted:
+        soft.append({
+            "type": "retrieved_experience_winner_not_selected",
+            "models": sorted(soft_omitted),
+            "summary": (
+                f"{len(soft_omitted)} model(s) won in retrieved experiences but were not "
+                f"cited or selected: {sorted(soft_omitted)}."
+            ),
+        })
+    return soft
+
+
+def _check_conflict_resolution_present_if_flagged(
+    output: PlannerOutput,
+    ctx: PlannerValidationContext,
+    trace: ToolTrace,
+) -> None:
+    flagged = _detect_conflicts(ctx, trace, output.plan, output)
+    if flagged and not output.evidence_conflicts:
+        raise PlannerValidationError(
+            f"deterministic conflict detector flagged {len(flagged)} conflict(s) but "
+            f"evidence_conflicts is empty. Flagged: {flagged}"
+        )
+    for c in output.evidence_conflicts:
+        if not c.resolution.strip():
+            raise PlannerValidationError(
+                f"evidence_conflict for {c.affected_models} has empty resolution"
+            )
