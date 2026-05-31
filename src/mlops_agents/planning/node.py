@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import Command
 
@@ -82,9 +83,9 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
             _check_evidence_references_hybrid(output, validation_ctx, trace)
             _check_conflict_resolution_present_if_flagged(output, validation_ctx, trace)
             break  # success
-        except (PlannerValidationError, ValueError) as exc:
+        except (PlannerValidationError, OutputParserException, ValueError) as exc:
             last_error = str(exc)
-            logger.warning(f"[planner] attempt {attempt + 1} failed: {last_error}")
+            logger.warning(f"[planner] attempt {attempt + 1} failed ({type(exc).__name__}): {last_error[:200]}")
             if attempt == 1:
                 raise PlannerError(f"Planner failed after retry: {last_error}") from exc
 
