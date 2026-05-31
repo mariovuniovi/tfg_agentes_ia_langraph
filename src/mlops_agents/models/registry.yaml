@@ -23,6 +23,8 @@
     needs_scaling: true
   use_when: [tabular_classification, small_dataset, interpretability_required]
   avoid_when: [severely_imbalanced, highly_nonlinear]
+  supports_exogenous: false
+  supports_missing: false
   notes: |
     Strong, fast baseline. Sensitive to scale. Tends to underperform on
     severely imbalanced or highly nonlinear data.
@@ -48,6 +50,8 @@
   requires:
     supports_missing: false
   use_when: [tabular_classification, robust_baseline_needed]
+  supports_exogenous: false
+  supports_missing: false
   notes: |
     Good general-purpose tree ensemble. No scaling needed. Less competitive
     than gradient boosting on large datasets.
@@ -77,6 +81,8 @@
     min_rows: 500
   use_when: [tabular_classification, medium_or_large_dataset, high_performance_required]
   avoid_when: [very_small_dataset, strict_interpretability_required]
+  supports_exogenous: false
+  supports_missing: true
 
 - model_key: xgboost_classifier
   problem_type: classification
@@ -105,6 +111,8 @@
     supports_missing: true
     min_rows: 500
   use_when: [tabular_classification, medium_or_large_dataset]
+  supports_exogenous: false
+  supports_missing: true
 
 - model_key: catboost_classifier
   problem_type: classification
@@ -131,6 +139,8 @@
     supports_categorical: true
     min_rows: 500
   use_when: [tabular_classification, many_categorical_features]
+  supports_exogenous: false
+  supports_missing: false
 
 # -----------------------------------------------------------------------------
 # Regression
@@ -151,6 +161,8 @@
   requires:
     needs_scaling: true
   use_when: [tabular_regression, small_dataset, interpretability_required]
+  supports_exogenous: false
+  supports_missing: false
 
 - model_key: random_forest_regressor
   problem_type: regression
@@ -170,6 +182,8 @@
     min_samples_split: 2
     random_state: 42
     n_jobs: -1
+  supports_exogenous: false
+  supports_missing: false
 
 - model_key: lightgbm_regressor
   problem_type: regression
@@ -193,6 +207,8 @@
     verbosity: -1
   requires:
     min_rows: 500
+  supports_exogenous: false
+  supports_missing: true
 
 - model_key: xgboost_regressor
   problem_type: regression
@@ -217,6 +233,8 @@
     verbosity: 0
   requires:
     min_rows: 500
+  supports_exogenous: false
+  supports_missing: true
 
 - model_key: catboost_regressor
   problem_type: regression
@@ -241,6 +259,8 @@
   requires:
     supports_categorical: true
     min_rows: 500
+  supports_exogenous: false
+  supports_missing: false
 
 # -----------------------------------------------------------------------------
 # Forecasting — statistical (statsforecast)
@@ -256,6 +276,8 @@
     params: {}
   default_params: {}
   use_when: [forecasting, very_short_history, baseline_needed]
+  supports_exogenous: false
+  supports_missing: false
 
 - model_key: seasonal_naive
   problem_type: forecasting
@@ -270,6 +292,8 @@
   default_params:
     season_length: 12
   use_when: [forecasting, strong_seasonality, short_history]
+  supports_exogenous: false
+  supports_missing: false
 
 - model_key: ets
   problem_type: forecasting
@@ -284,6 +308,8 @@
   default_params:
     season_length: 12
   use_when: [forecasting, smooth_seasonality, trend_present]
+  supports_exogenous: false
+  supports_missing: false
 
 - model_key: auto_arima
   problem_type: forecasting
@@ -298,6 +324,8 @@
   default_params:
     season_length: 12
   use_when: [forecasting, autocorrelation_pattern, medium_history]
+  supports_exogenous: true
+  supports_missing: false
 
 # -----------------------------------------------------------------------------
 # Forecasting — supervised (skforecast lag-based)
@@ -323,6 +351,8 @@
   requires:
     needs_lag_features: true
   use_when: [forecasting, medium_or_large_history, exogenous_available]
+  supports_exogenous: true
+  supports_missing: false
 
 - model_key: extra_trees_forecaster
   problem_type: forecasting
@@ -344,6 +374,8 @@
     n_jobs: -1
   requires:
     needs_lag_features: true
+  supports_exogenous: true
+  supports_missing: false
 
 - model_key: gbm_forecaster
   problem_type: forecasting
@@ -366,6 +398,8 @@
     random_state: 42
   requires:
     needs_lag_features: true
+  supports_exogenous: true
+  supports_missing: false
 
 - model_key: lightgbm_forecaster
   problem_type: forecasting
@@ -391,6 +425,8 @@
     needs_lag_features: true
     min_rows: 100
   use_when: [forecasting, long_history, exogenous_available]
+  supports_exogenous: true
+  supports_missing: true
 
 - model_key: xgboost_forecaster
   problem_type: forecasting
@@ -416,6 +452,8 @@
   requires:
     needs_lag_features: true
     min_rows: 100
+  supports_exogenous: true
+  supports_missing: false
 
 - model_key: svr_forecaster
   problem_type: forecasting
@@ -439,3 +477,5 @@
     needs_lag_features: true
     needs_scaling: true
   use_when: [forecasting, small_or_medium_dataset, smooth_nonlinear_patterns]
+  supports_exogenous: true
+  supports_missing: false

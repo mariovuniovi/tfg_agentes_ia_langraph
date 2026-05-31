@@ -46,6 +46,39 @@ class ModelSpec(BaseModel):
     use_when: list[str] = Field(default_factory=list)
     avoid_when: list[str] = Field(default_factory=list)
     notes: str = ""
+    supports_exogenous: bool = False
+    supports_missing: bool = False
+
+    def summary_dict(self) -> dict[str, Any]:
+        """Headline fields for `list_available_models` planner tool."""
+        return {
+            "model_key": self.model_key,
+            "problem_type": self.problem_type,
+            "family": self.family,
+            "complexity_rank": self.complexity_rank,
+            "supports_exogenous": self.supports_exogenous,
+            "supports_missing": self.supports_missing,
+            "use_when": list(self.use_when),
+            "avoid_when": list(self.avoid_when),
+        }
+
+    def details_dict(self) -> dict[str, Any]:
+        """Full info for `inspect_model_details` planner tool."""
+        return {
+            "model_key": self.model_key,
+            "problem_type": self.problem_type,
+            "family": self.family,
+            "complexity_rank": self.complexity_rank,
+            "library": self.library,
+            "supports_exogenous": self.supports_exogenous,
+            "supports_missing": self.supports_missing,
+            "search_space": self.search_space.name,
+            "default_params": dict(self.default_params),
+            "requires": dict(self.requires),
+            "use_when": list(self.use_when),
+            "avoid_when": list(self.avoid_when),
+            "notes": self.notes,
+        }
 
     @field_validator("factory")
     @classmethod
