@@ -82,3 +82,6 @@ class RetrievalView(BaseModel):
     similarity_ratio: float
     matched_fields: list[str]
     metric_to_optimize: str | None = None
+    matched_buckets: list[str] = Field(default_factory=list)
+    mismatched_buckets: list[str] = Field(default_factory=list)
+    target_scale_note: str | None = None

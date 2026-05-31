@@ -97,6 +97,7 @@ class TestExperienceSummary:
         es = ExperienceSummary(
             experience_id="task_001",
             similarity_score=0.84,
+            relevance_tier="high",
             dataset_summary="medium regression dataset",
             models_trained=["ridge", "lightgbm_regressor"],
             best_model="lightgbm_regressor",
@@ -118,6 +119,7 @@ class TestExperienceSummary:
         es = ExperienceSummary(
             experience_id="task_002",
             similarity_score=0.75,
+            relevance_tier="high",
             dataset_summary="small dataset",
             models_trained=["ridge", "linear_svr"],
             best_model="ridge",
@@ -132,6 +134,7 @@ class TestExperienceSummary:
         es = ExperienceSummary(
             experience_id="task_003",
             similarity_score=0.6,
+            relevance_tier="medium",
             dataset_summary="large dataset",
             models_trained=["xgboost_regressor"],
             best_model="xgboost_regressor",
@@ -161,6 +164,7 @@ class TestPlannerContext:
         exp = ExperienceSummary(
             experience_id="task_001",
             similarity_score=0.9,
+            relevance_tier="high",
             dataset_summary="similar dataset",
             models_trained=["lightgbm_regressor"],
             best_model="lightgbm_regressor",

@@ -75,9 +75,7 @@ class ExperienceSummary(BaseModel):
 
     experience_id: str
     similarity_score: float
-    # NOTE: temporary default "low" — Task 2.3 removes this default after
-    # _to_experience_summary is updated to always populate relevance_tier explicitly.
-    relevance_tier: Literal["high", "medium", "low"] = "low"  # default REMOVED in Task 2.3
+    relevance_tier: Literal["high", "medium", "low"]
     matched_buckets: list[str] = Field(default_factory=list)
     mismatched_buckets: list[str] = Field(default_factory=list)
     target_scale_note: str | None = None

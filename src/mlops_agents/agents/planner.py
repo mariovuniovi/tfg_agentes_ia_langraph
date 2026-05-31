@@ -10,15 +10,13 @@ from pydantic import ValidationError
 
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.planner import (
-    CandidateResultCompact,
     EvidenceReference,
-    ExperienceSummary,
     PlannerContext,
     PlannerOutput,
 )
 from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.experience.pool import ExperiencePool
-from mlops_agents.experience.schema import RetrievalView
+from mlops_agents.experience.retrieval import to_experience_summary
 from mlops_agents.knowledge.reader import match_rules
 from mlops_agents.models.loader import get_models_for
 from mlops_agents.prompts import get_prompt
@@ -41,34 +39,6 @@ class PlannerError(Exception):
     """Raised when the planner fails validation after all retry attempts."""
 
 
-def _to_experience_summary(view: RetrievalView) -> ExperienceSummary:
-    """Convert a RetrievalView to the compact ExperienceSummary sent to the LLM."""
-    sel_key = view.selected_solution.model_key
-    scored = [c for c in view.models_tested if c.best_score is not None]
-    failed = [c for c in view.models_tested if c.best_score is None]
-
-    # Champion first, then remaining by score descending
-    scored.sort(key=lambda c: (c.model_key != sel_key, -(c.best_score or 0.0)))
-    compact = [
-        CandidateResultCompact(model_key=c.model_key, rank=i + 1, metric_value=c.best_score)
-        for i, c in enumerate(scored)
-    ]
-    for f in failed:
-        compact.append(CandidateResultCompact(
-            model_key=f.model_key, rank=len(compact) + 1, metric_value=None
-        ))
-
-    return ExperienceSummary(
-        experience_id=view.task_id,
-        similarity_score=view.similarity_ratio,
-        dataset_summary=view.experience_summary or "",
-        models_trained=[c.model_key for c in view.models_tested],
-        best_model=sel_key,
-        validation_score=view.selected_solution.validation_score,
-        metric_name=view.metric_to_optimize,
-        candidate_results=compact,
-    )
-
 
 def build_planner_context(
     profile: dict[str, Any],
@@ -80,7 +50,7 @@ def build_planner_context(
     """Assemble PlannerContext deterministically — no LLM calls."""
     available_models = [m.model_key for m in get_models_for(problem_type)]
     views = pool.find_similar(profile, problem_type, k)
-    similar_experiences = [_to_experience_summary(v) for v in views]
+    similar_experiences = [to_experience_summary(v) for v in views]
     rule_input = {**profile, **task_metadata, "problem_type": problem_type}
     matched = match_rules(rule_input)
     matched_rules_dicts: list[dict[str, Any]] = [
@@ -151,7 +121,7 @@ def _check_plan_exhaustiveness(
 _planner_prompt = get_prompt("planner").template
 
 
-def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
+def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Model Planning Agent node — assembles context, calls LLM, validates plan."""
     processed_path = Path(state["processed_dataset_path"])
     problem_type: str = state.get("problem_type", "")
@@ -218,7 +188,7 @@ def planner_node(state: AgentState) -> Command[Literal["supervisor"]]:
     )
 
     return Command(
-        goto="supervisor",
+        goto="workflow_controller",
         update={
             "planner_analysis": output.planning_analysis,
             "planner_evidence_used": [e.model_dump() for e in output.evidence_used],

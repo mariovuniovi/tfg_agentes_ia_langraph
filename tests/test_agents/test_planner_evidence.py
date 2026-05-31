@@ -23,6 +23,7 @@ def _minimal_ctx() -> PlannerContext:
             ExperienceSummary(
                 experience_id="task_001",
                 similarity_score=0.8,
+                relevance_tier="high",
                 dataset_summary="medium regression",
                 models_trained=["ridge", "lightgbm_regressor"],
                 best_model="lightgbm_regressor",

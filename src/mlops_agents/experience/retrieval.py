@@ -41,8 +41,15 @@ def _parse_ts(iso: str | None) -> float:
         return 0.0
 
 
-def _build_view(row: Any, cand_rows: list, score: int, ratio: float, matched: list) -> RetrievalView | None:
-    profile = json.loads(row["dataset_profile_json"])
+def _build_view(
+    row: Any,
+    cand_rows: list,
+    score: int,
+    ratio: float,
+    matched: list,
+    profile: dict | None = None,
+) -> RetrievalView | None:
+    exp_profile = json.loads(row["dataset_profile_json"])
     candidates = [
         CandidateResultView(model_key=r["model_key"], status=r["status"],
                             best_score=r["best_score"], complexity_rank=r["complexity_rank"],
@@ -58,12 +65,32 @@ def _build_view(row: Any, cand_rows: list, score: int, ratio: float, matched: li
         complexity_rank=next((c.complexity_rank for c in candidates
                               if c.model_key == row["selected_model_key"]), 0) or 0,
     )
+    # Derive matched/mismatched buckets by comparing _bucket keys directly in both profiles
+    profile_bucket_keys = {k for k in (profile or {}) if k.endswith("_bucket")}
+    exp_bucket_keys = {k for k in exp_profile if k.endswith("_bucket")}
+    common_bucket_keys = profile_bucket_keys & exp_bucket_keys
+    matched_buckets = sorted(
+        k for k in common_bucket_keys if (profile or {}).get(k) == exp_profile.get(k)
+    )
+    mismatched = sorted(common_bucket_keys - set(matched_buckets))
+
+    # target_scale_note from profile vs experience profile
+    note = None
+    if profile is not None:
+        note = compare_target_scales(
+            profile_target_std=profile.get("target_std"),
+            experience_target_std=exp_profile.get("target_std"),
+        )
+
     return RetrievalView(
         task_id=row["task_id"], dataset_name=row["dataset_name"],
-        dataset_profile=profile, models_tested=candidates, selected_solution=sol,
+        dataset_profile=exp_profile, models_tested=candidates, selected_solution=sol,
         experience_summary=row["experience_summary"],
         similarity_score=score, similarity_ratio=ratio, matched_fields=matched,
         metric_to_optimize=row["metric_to_optimize"],
+        matched_buckets=matched_buckets,
+        mismatched_buckets=mismatched,
+        target_scale_note=note,
     )
 
 
@@ -86,6 +113,38 @@ def compare_target_scales(
         f"candidate target std ({profile_target_std:.3g}) is ~{ratio:.0f}× {direction} "
         f"than experience target std ({experience_target_std:.3g}); raw metric values "
         f"may not be directly comparable"
+    )
+
+
+def to_experience_summary(view: RetrievalView) -> "ExperienceSummary":
+    """Convert a RetrievalView to the compact ExperienceSummary sent to the LLM."""
+    from mlops_agents.contracts.planner import CandidateResultCompact, ExperienceSummary
+
+    sel_key = view.selected_solution.model_key
+    scored = [c for c in view.models_tested if c.best_score is not None]
+    failed = [c for c in view.models_tested if c.best_score is None]
+    scored.sort(key=lambda c: (c.model_key != sel_key, -(c.best_score or 0.0)))
+    compact = [
+        CandidateResultCompact(model_key=c.model_key, rank=i + 1, metric_value=c.best_score)
+        for i, c in enumerate(scored)
+    ]
+    for f in failed:
+        compact.append(CandidateResultCompact(
+            model_key=f.model_key, rank=len(compact) + 1, metric_value=None,
+        ))
+    return ExperienceSummary(
+        experience_id=view.task_id,
+        similarity_score=view.similarity_ratio,
+        relevance_tier=derive_relevance_tier(view.similarity_ratio),
+        matched_buckets=view.matched_buckets,
+        mismatched_buckets=view.mismatched_buckets,
+        target_scale_note=view.target_scale_note,
+        dataset_summary=view.experience_summary or "",
+        models_trained=[c.model_key for c in view.models_tested],
+        best_model=sel_key,
+        validation_score=view.selected_solution.validation_score,
+        metric_name=view.metric_to_optimize,
+        candidate_results=compact,
     )
 
 
@@ -114,7 +173,7 @@ def find_similar_impl(pool: "ExperiencePool", profile: dict[str, Any], problem_t
             cand_rows = conn.execute(
                 "SELECT * FROM candidate_results WHERE task_id = ?", (row["task_id"],)
             ).fetchall()
-        v = _build_view(row, cand_rows, score, ratio, matched)
+        v = _build_view(row, cand_rows, score, ratio, matched, profile=profile)
         if v is not None:
             views.append(v)
     return views
