@@ -16,6 +16,8 @@ from mlops_agents.contracts.training import (
 __all__ = [
     "CandidateSpec",
     "RejectedModelSpec",
+    "DecisionBasis",
+    "EvidenceConflict",
     "EvidenceReference",
     "CandidateResultCompact",
     "ExperienceSummary",
@@ -49,15 +51,39 @@ class CandidateResultCompact(BaseModel):
     metric_value: float | None = None
 
 
+class DecisionBasis(BaseModel):
+    """Structured rationale for the planner's overall strategy."""
+
+    primary_evidence: list[EvidenceReference] = Field(min_length=1)
+    secondary_evidence: list[EvidenceReference] = Field(default_factory=list)
+    final_strategy: str = Field(min_length=1)
+
+
+class EvidenceConflict(BaseModel):
+    """A detected conflict between two or more evidence sources."""
+
+    summary: str = Field(min_length=1)
+    affected_models: list[str] = Field(min_length=1)
+    conflicting_evidence_refs: list[EvidenceReference] = Field(min_length=1)
+    resolution: str = Field(min_length=1)
+
+
 class ExperienceSummary(BaseModel):
     """Summary of a similar past task experience."""
 
     experience_id: str
     similarity_score: float
+    # NOTE: temporary default "low" — Task 2.3 removes this default after
+    # _to_experience_summary is updated to always populate relevance_tier explicitly.
+    relevance_tier: Literal["high", "medium", "low"] = "low"  # default REMOVED in Task 2.3
+    matched_buckets: list[str] = Field(default_factory=list)
+    mismatched_buckets: list[str] = Field(default_factory=list)
+    target_scale_note: str | None = None
     dataset_summary: str
     models_trained: list[str]
     best_model: str
     validation_score: float
+    metric_name: str | None = None
     candidate_results: list[CandidateResultCompact] = Field(default_factory=list)
     notes: str = ""
 
@@ -82,6 +108,10 @@ class PlannerOutput(BaseModel):
             "the model's internal reasoning process."
         )
     )
+    # TODO: Task 5.2 will enforce decision_basis as required on planner_node output.
+    # Optional here for backward compat with pre-SP5 PlannerOutput constructors.
+    decision_basis: DecisionBasis | None = None
     evidence_used: list[EvidenceReference] = Field(default_factory=list)
+    evidence_conflicts: list[EvidenceConflict] = Field(default_factory=list)
     risks_or_warnings: list[str] = Field(default_factory=list)
     plan: TrainingPlan

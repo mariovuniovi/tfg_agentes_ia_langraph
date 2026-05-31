@@ -11,7 +11,11 @@ from pydantic import ValidationError
 
 from mlops_agents.contracts.planner import (
     CandidateSpec,
+    DecisionBasis,
+    EvidenceConflict,
     EvidenceReference,
+    ExperienceSummary,
+    PlannerOutput,
     RejectedModelSpec,
 )
 from mlops_agents.contracts.training import TrainingPlan
@@ -162,3 +166,64 @@ def test_training_plan_candidate_alias():
 def test_rejected_model_alias():
     from mlops_agents.contracts.training import RejectedModel, RejectedModelSpec
     assert RejectedModel is RejectedModelSpec
+
+
+# --- DecisionBasis ---
+
+def test_decision_basis_requires_primary_evidence():
+    with pytest.raises(ValidationError):
+        DecisionBasis(primary_evidence=[], secondary_evidence=[], final_strategy="x")
+
+
+def test_decision_basis_requires_non_empty_final_strategy():
+    with pytest.raises(ValidationError):
+        DecisionBasis(primary_evidence=[_ref()], secondary_evidence=[], final_strategy="")
+
+
+# --- EvidenceConflict ---
+
+def test_evidence_conflict_requires_resolution():
+    with pytest.raises(ValidationError):
+        EvidenceConflict(
+            summary="x", affected_models=["lr"],
+            conflicting_evidence_refs=[_ref()], resolution="",
+        )
+
+
+# --- ExperienceSummary extension ---
+
+def test_experience_summary_has_relevance_tier_buckets_scale_note():
+    es = ExperienceSummary(
+        experience_id="e1",
+        similarity_score=0.72,
+        relevance_tier="high",
+        matched_buckets=["forecasting", "weekly"],
+        mismatched_buckets=["target_scale"],
+        target_scale_note="candidate target std ≈10× experience",
+        dataset_summary="s",
+        models_trained=["ets"],
+        best_model="ets",
+        validation_score=0.5,
+        metric_name="rmse",
+        candidate_results=[],
+    )
+    assert es.relevance_tier == "high"
+
+
+# --- PlannerOutput extension ---
+
+def test_planner_output_has_decision_basis_and_evidence_conflicts():
+    out = PlannerOutput(
+        planning_analysis="ok",
+        decision_basis=DecisionBasis(
+            primary_evidence=[_ref()],
+            secondary_evidence=[],
+            final_strategy="prioritize simple models",
+        ),
+        evidence_used=[],
+        evidence_conflicts=[],
+        risks_or_warnings=[],
+        plan=_minimal_training_plan(),
+    )
+    assert out.decision_basis.final_strategy == "prioritize simple models"
+    assert out.evidence_conflicts == []
