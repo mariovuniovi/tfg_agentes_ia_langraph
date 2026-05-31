@@ -65,10 +65,18 @@ export interface AgentSection {
   tools: AgentToolRow[]
 }
 
+/** Used in ToolDetailsViewModel (camelCase — new semantic layer). */
 export interface LlmNodeRow {
   node: string
   activations: number
   totalMs: number
+}
+
+/** Used by aggregateLlmNodeActivity (snake_case — observability page compat). */
+export interface LlmActivityRow {
+  node: string
+  activations: number
+  total_ms: number
 }
 
 export type HitlStatus = 'approved' | 'rejected' | 'waiting' | 'none'
@@ -228,11 +236,9 @@ export function aggregateToolUsage(events: PipelineEvent[]): ToolUsageRow[] {
   return Array.from(map.values())
 }
 
-export { type LlmNodeRow }
-
-export function aggregateLlmNodeActivity(events: PipelineEvent[], llmNodes: string[]): LlmNodeRow[] {
+export function aggregateLlmNodeActivity(events: PipelineEvent[], llmNodes: string[]): LlmActivityRow[] {
   const set = new Set(llmNodes)
-  const map = new Map<string, LlmNodeRow>()
+  const map = new Map<string, LlmActivityRow>()
   let activeNode: string | null = null
   let activeStartMs = 0
   for (const e of events) {

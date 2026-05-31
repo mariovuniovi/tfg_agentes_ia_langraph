@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   aggregateToolUsage, aggregateLlmNodeActivity,
   inferToolOwner, getConcreteToolName, buildToolDetailsViewModel,
+  type LlmActivityRow,
 } from '@/lib/events-aggregate'
 import type { PipelineEvent } from '@/types/api'
 
@@ -45,7 +46,7 @@ describe('aggregateLlmNodeActivity', () => {
       ev('routing', 'controller', { next: 'planner' }, 1000),
       ev('routing', 'controller', { next: 'executor' }, 24400),
     ]
-    const rows = aggregateLlmNodeActivity(events, ['planner'])
+    const rows: LlmActivityRow[] = aggregateLlmNodeActivity(events, ['planner'])
     expect(rows[0]).toMatchObject({ node: 'planner', activations: 1, total_ms: 23400 })
   })
 })
