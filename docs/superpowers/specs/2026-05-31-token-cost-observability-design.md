@@ -82,6 +82,7 @@ _DATE_SUFFIX_RE = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
 @lru_cache(maxsize=1)
 def _load() -> dict[str, dict[str, float]]:
+    # Cached for the lifetime of the process — restart required after editing model_pricing.yaml
     with open(_PRICING_FILE) as f:
         return yaml.safe_load(f)
 
@@ -111,37 +112,55 @@ def estimate_cost(
 
 ### Modified: `api/services/pipeline_helpers.py`
 
-Add a branch inside the `isinstance(message_chunk, AIMessageChunk)` block, before the
-`return None` fallthrough, to detect the final chunk:
+Replace the `isinstance(message_chunk, AIMessageChunk)` block with the full three-branch
+`if / elif / elif` structure. The branches are mutually exclusive: OpenAI's final streaming
+chunk carries usage_metadata with empty content; earlier chunks carry content but no usage_metadata.
 
 ```python
 from mlops_agents.observability.pricing import estimate_cost
 
-# Inside parse_stream_event, after the content branch:
-usage = getattr(message_chunk, "usage_metadata", None)
-if usage:
-    model: str = (
-        (message_chunk.response_metadata or {}).get("model_name", "")
-        or agent
-    )
-    input_t: int = usage.get("input_tokens", 0)
-    output_t: int = usage.get("output_tokens", 0)
-    cached_t: int = usage.get("input_token_details", {}).get("cached_tokens", 0)
-    return PipelineEvent(
-        type="token_usage",
-        agent=agent,
-        timestamp_ms=now_ms,
-        data={
-            "node": agent,
-            "model": model,
-            "input_tokens": input_t,
-            "output_tokens": output_t,
-            "total_tokens": usage.get("total_tokens", input_t + output_t),
-            "cached_input_tokens": cached_t if cached_t else None,
-            "estimated_cost_usd": estimate_cost(model, input_t, output_t, cached_t),
-            "source": "langchain_stream_usage_metadata",
-        },
-    )
+if isinstance(message_chunk, AIMessageChunk):
+    tool_calls = message_chunk.tool_calls
+    if tool_calls:
+        tool_name: str = tool_calls[0]["name"]
+        _tool_start_times[tool_name] = now_ms
+        return PipelineEvent(
+            type="tool_call",
+            agent=agent,
+            timestamp_ms=now_ms,
+            data={"tool_name": tool_name, "arguments": tool_calls[0].get("args", {})},
+        )
+    elif message_chunk.content:
+        return PipelineEvent(
+            type="agent_reasoning",
+            agent=agent,
+            timestamp_ms=now_ms,
+            data={"content": message_chunk.content},
+        )
+    elif message_chunk.usage_metadata:
+        usage = message_chunk.usage_metadata
+        model: str = (
+            (message_chunk.response_metadata or {}).get("model_name", "")
+            or agent
+        )
+        input_t: int = usage.get("input_tokens", 0)
+        output_t: int = usage.get("output_tokens", 0)
+        cached_t: int = (usage.get("input_token_details") or {}).get("cache_read", 0)
+        return PipelineEvent(
+            type="token_usage",
+            agent=agent,
+            timestamp_ms=now_ms,
+            data={
+                "node": agent,
+                "model": model,
+                "input_tokens": input_t,
+                "output_tokens": output_t,
+                "total_tokens": usage.get("total_tokens", input_t + output_t),
+                "cached_input_tokens": cached_t if cached_t else None,
+                "estimated_cost_usd": estimate_cost(model, input_t, output_t, cached_t),
+                "source": "langchain_stream_usage_metadata",
+            },
+        )
 ```
 
 No changes needed in `pipeline.py` — `token_usage` events fall through the existing
@@ -242,7 +261,7 @@ export function tokensByNode(summary: TokenUsageSummary): Map<string, { inputTok
   - If absent: `—`
 - Remove the "Token counts shown when available — none recorded" note entirely
 
-Token format helper: `formatK(n: number): string` → `n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n)`
+Token format helper `formatK` and cost helper `formatCost` both live in `frontend/lib/format.ts` (see below).
 
 ### NEW `frontend/components/observability/TokenCostCard.tsx`
 
@@ -252,7 +271,7 @@ Three-part layout:
 ```
 Token Cost (current run)          Total: $0.01512
 ```
-Total is right-aligned, bold. Shows `$0.00000` when no events yet (not hidden).
+Total is right-aligned, bold. Shows `—` until the first `token_usage` event arrives; switches to `$X.XXXXX` once data is present.
 
 **Table** (shown only when rows exist):
 ```
@@ -261,7 +280,24 @@ data_validator   gpt-5.4-mini      2    3,512     648     4,160   $0.00341
 planner          gpt-5.4-mini      1    8,200   1,100     9,300   $0.01115
 report_writer    gpt-5.4-nano      1      980     290     1,270   $0.00056
 ```
-Numbers formatted with `toLocaleString()`. Cost to 5 decimal places (`$0.00341`).
+Numbers formatted with `toLocaleString()`. Cost formatted with `formatCost(usd)`:
+- `usd === 0` → `$0.00`
+- `usd < 0.01` → `$X.XXXXX` (5 decimal places — preserves precision for micro-costs)
+- `usd >= 0.01` → `$X.XXXX` (4 decimal places)
+
+Both helpers live in `frontend/lib/format.ts`:
+
+```typescript
+export function formatK(n: number): string {
+  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)
+}
+
+export function formatCost(usd: number): string {
+  if (usd === 0) return '$0.00'
+  if (usd < 0.01) return '$' + usd.toFixed(5)
+  return '$' + usd.toFixed(4)
+}
+```
 
 When no rows: `<p>No LLM activity yet.</p>`
 
@@ -283,6 +319,7 @@ Add `<TokenCostCard />` after `<LlmActivityCard />`.
 
 | File | Change |
 |---|---|
+| `pyproject.toml` | MODIFY — add `pyyaml>=6.0` to direct dependencies, `types-PyYAML` to dev group |
 | `src/mlops_agents/observability/__init__.py` | NEW (empty) |
 | `src/mlops_agents/observability/pricing.py` | NEW |
 | `src/mlops_agents/observability/model_pricing.yaml` | NEW |
@@ -292,8 +329,11 @@ Add `<TokenCostCard />` after `<LlmActivityCard />`.
 | `frontend/components/observability/LlmActivityCard.tsx` | MODIFY — fill token column, remove placeholder note |
 | `frontend/components/observability/TokenCostCard.tsx` | NEW |
 | `frontend/app/observability/page.tsx` | MODIFY — add TokenCostCard |
+| `tests/test_observability/test_pricing.py` | NEW — unit tests for pricing.py |
+| `frontend/__tests__/lib/events-aggregate.test.ts` | MODIFY — add aggregateTokenUsage tests |
+| `frontend/lib/format.ts` | NEW — `formatK`, `formatCost` helpers |
 
-Total: 9 files (3 new, 6 modified).
+Total: 13 files (6 new, 7 modified).
 
 ---
 
