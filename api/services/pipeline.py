@@ -66,13 +66,36 @@ def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
             recommend_str = None
         matched_rules.append({**rule, "recommend": recommend_str})
 
+    plan_summary_raw = rec.get("plan_summary", {}) or {}
+    plan_summary = {
+        # legacy string lists — keep for backward UI compat
+        "candidate_models": plan_summary_raw.get("candidate_models", []),
+        "models_not_recommended": plan_summary_raw.get("models_not_recommended", []),
+        # v2 canonical keys — full rationale objects
+        "candidate_rationales": plan_summary_raw.get("candidate_rationales", []),
+        "rejected_model_rationales": plan_summary_raw.get("rejected_model_rationales", []),
+    }
+
+    decision_basis = rec.get("decision_basis") or {
+        "primary_evidence": [],
+        "secondary_evidence": [],
+        "final_strategy": "",
+    }
+
     return {
         "retrieved_experiences": retrieved_experiences,
         "matched_rules": matched_rules,
         "evidence_used": evidence_used,
         "planning_analysis": rec.get("planning_analysis", ""),
-        "plan_summary": rec.get("plan_summary", {}),
+        "plan_summary": plan_summary,
         "warnings": rec.get("risks_or_warnings", []),
+        # v2 fields
+        "decision_basis": decision_basis,
+        "evidence_conflicts": rec.get("evidence_conflicts", []) or [],
+        "soft_conflicts": rec.get("soft_conflicts", []) or [],
+        "cited_experience_ids": rec.get("cited_experience_ids", []) or [],
+        "cited_rule_ids": rec.get("cited_rule_ids", []) or [],
+        "planner_status": rec.get("planner_status", "ok"),
     }
 
 
