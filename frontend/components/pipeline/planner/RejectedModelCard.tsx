@@ -4,6 +4,7 @@ import type { RejectedModelRationale } from '@/types/api'
 
 export function RejectedModelCard({ rejected }: { rejected: RejectedModelRationale }) {
   const [expanded, setExpanded] = useState(false)
+  const evidence = rejected.evidence_refs ?? []
   return (
     <div className="rounded border border-zinc-200 bg-white p-2 text-xs">
       <button type="button" onClick={() => setExpanded((e) => !e)} className="flex w-full items-center gap-2 text-left">
@@ -12,17 +13,19 @@ export function RejectedModelCard({ rejected }: { rejected: RejectedModelRationa
       </button>
       {expanded && (
         <>
-          <p className="mt-1 text-zinc-700">{rejected.reason}</p>
+          <p className="mt-1 text-zinc-700">{rejected.reason || <span className="text-zinc-400 italic">no reason given</span>}</p>
           {rejected.reconsider_if && (
             <p className="mt-1 italic text-zinc-500">Reconsider if: {rejected.reconsider_if}</p>
           )}
-          <div className="mt-2 flex flex-wrap gap-1">
-            {rejected.evidence_refs.map((r, i) => (
-              <span key={i} className="rounded bg-zinc-100 px-2 py-0.5 text-[11px] font-mono text-zinc-700">
-                {r.source_id ? `${r.source}:${r.source_id}` : r.source}
-              </span>
-            ))}
-          </div>
+          {evidence.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {evidence.map((r, i) => (
+                <span key={i} className="rounded bg-zinc-100 px-2 py-0.5 text-[11px] font-mono text-zinc-700">
+                  {r.source_id ? `${r.source}:${r.source_id}` : r.source}
+                </span>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

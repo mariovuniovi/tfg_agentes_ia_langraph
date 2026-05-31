@@ -12,21 +12,25 @@ function EvidenceChip({ ref }: { ref: EvidenceReference }) {
 }
 
 export function DecisionBasisCard({ basis }: { basis: DecisionBasis }) {
+  const primary = basis.primary_evidence ?? []
+  const secondary = basis.secondary_evidence ?? []
   return (
     <Card title="Decision basis">
       <p className="mb-1 text-xs font-medium text-zinc-500">Primary evidence</p>
       <div className="mb-3 flex flex-wrap gap-1">
-        {basis.primary_evidence.map((e, i) => <EvidenceChip key={i} ref={e} />)}
+        {primary.length > 0
+          ? primary.map((e, i) => <EvidenceChip key={i} ref={e} />)
+          : <span className="text-xs text-zinc-400 italic">none</span>}
       </div>
-      {basis.secondary_evidence.length > 0 && (
+      {secondary.length > 0 && (
         <>
           <p className="mb-1 text-xs font-medium text-zinc-500">Secondary evidence</p>
           <div className="mb-3 flex flex-wrap gap-1">
-            {basis.secondary_evidence.map((e, i) => <EvidenceChip key={i} ref={e} />)}
+            {secondary.map((e, i) => <EvidenceChip key={i} ref={e} />)}
           </div>
         </>
       )}
-      <p className="text-xs leading-relaxed text-zinc-700">{basis.final_strategy}</p>
+      <p className="text-xs leading-relaxed text-zinc-700">{basis.final_strategy || <span className="text-zinc-400 italic">no strategy</span>}</p>
     </Card>
   )
 }

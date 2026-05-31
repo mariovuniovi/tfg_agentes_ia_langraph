@@ -14,22 +14,25 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export function PlannerSummaryHeader({ candidates, rejected, status }: Props) {
+  const cands = candidates ?? []
+  const rejs = rejected ?? []
+  const statusKey = status ?? 'ok'
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-semibold text-zinc-700">Selected ({candidates.length}):</span>
-      {candidates.map((c) => (
+      <span className="font-semibold text-zinc-700">Selected ({cands.length}):</span>
+      {cands.map((c) => (
         <span key={c.model_key} className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700">
-          #{c.priority} {c.model_key}
+          #{c.priority ?? '?'} {c.model_key}
         </span>
       ))}
-      <span className="ml-3 font-semibold text-zinc-700">Rejected ({rejected.length}):</span>
-      {rejected.map((r) => (
+      <span className="ml-3 font-semibold text-zinc-700">Rejected ({rejs.length}):</span>
+      {rejs.map((r) => (
         <span key={r.model_key} className="rounded-full bg-red-50 px-2 py-0.5 text-red-600 line-through">
           {r.model_key}
         </span>
       ))}
-      <span className={`ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${STATUS_STYLES[status] ?? STATUS_STYLES.ok}`}>
-        {status.replace('_', ' ')}
+      <span className={`ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${STATUS_STYLES[statusKey] ?? STATUS_STYLES.ok}`}>
+        {statusKey.replace('_', ' ')}
       </span>
     </div>
   )
