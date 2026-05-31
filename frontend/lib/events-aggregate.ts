@@ -111,7 +111,7 @@ export function aggregateTokenUsage(events: PipelineEvent[]): TokenUsageSummary 
   const map = new Map<string, TokenUsageRow>()
   for (const e of events) {
     if (e.type !== 'token_usage') continue
-    const d = e.data as TokenUsageEventData
+    const d = e.data as unknown as TokenUsageEventData
     const key = `${d.node}::${d.model}`
     const prev = map.get(key)
     if (prev) {
