@@ -34,3 +34,8 @@ class DatasetProfile(BaseModel):
     exog_column_kind: str | None = None
     exog_future_availability: Literal["known_future", "unknown_future"] | None = None
     exog_kind: str | None = None
+    # Numeric target stats (regression + forecasting only)
+    target_mean: float | None = None
+    target_std: float | None = None
+    target_min: float | None = None
+    target_max: float | None = None

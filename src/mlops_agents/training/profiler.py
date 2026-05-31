@@ -172,6 +172,17 @@ def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> 
         "n_numerical_features": _bucket_count(n_num),
     }
 
+    target_mean = target_std = target_min = target_max = None
+    if problem_type in ("regression", "forecasting"):
+        target_col = task_metadata.get("target_column")
+        if target_col and target_col in df.columns:
+            target_series = pd.to_numeric(df[target_col], errors="coerce").dropna()
+            if len(target_series) > 0:
+                target_mean = float(target_series.mean())
+                target_std = float(target_series.std()) if len(target_series) > 1 else 0.0
+                target_min = float(target_series.min())
+                target_max = float(target_series.max())
+
     if problem_type == "classification":
         profile["n_classes"] = _bucket_n_classes(df[target].nunique())
         profile["class_balance"] = _bucket_class_balance(df[target].value_counts())
@@ -220,5 +231,10 @@ def build_dataset_profile(dataset_path: Path, task_metadata: dict[str, Any]) -> 
             "trend_detected": (votes_trend / n_voted) >= 0.5,
             "stationarity": (votes_stationary / n_voted) >= 0.5,
         })
+
+    profile["target_mean"] = target_mean
+    profile["target_std"] = target_std
+    profile["target_min"] = target_min
+    profile["target_max"] = target_max
 
     return DatasetProfile(**profile)
