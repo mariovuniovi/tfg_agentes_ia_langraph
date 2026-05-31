@@ -66,5 +66,12 @@ class Settings(BaseSettings):
     retrieval_default_k: int = 5
     retrieval_weights_override: dict = Field(default_factory=dict)
 
+    # Planner (SP5)
+    planner_max_iterations: int = 10
+    planner_max_tool_calls: int = 6
+    planner_max_inspect_calls: int = 3
+    planner_max_retrieved: int = 20
+    planner_timeout_seconds: int = 60  # RESERVED for future wall-clock enforcement; NOT enforced in v2
+
 
 settings = Settings()
