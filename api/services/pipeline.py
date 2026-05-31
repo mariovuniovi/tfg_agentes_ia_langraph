@@ -49,6 +49,12 @@ def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
             # Guard against None so frontend .toFixed(4) never throws
             "validation_score": float(exp.get("validation_score") or 0.0),
             "metric_name": exp.get("metric_name"),
+            # Similarity + tier — required by the frontend ExperienceCard
+            "similarity_score": float(exp.get("similarity_score") or 0.0),
+            "relevance_tier": exp.get("relevance_tier") or "low",
+            "matched_buckets": exp.get("matched_buckets") or [],
+            "mismatched_buckets": exp.get("mismatched_buckets") or [],
+            "target_scale_note": exp.get("target_scale_note"),
         }
         for exp in rec.get("retrieved_experiences", [])
     ]
