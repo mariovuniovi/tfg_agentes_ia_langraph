@@ -13,6 +13,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from mlops_agents.contracts.evidence import EvidenceReference
+
 ExogStrategy = Literal["known_future", "naive_carry", "ets", "auto_arima", "drop"]
 UnknownFutureStrategy = Literal["naive_carry", "ets", "auto_arima", "drop"]
 
@@ -74,7 +76,7 @@ class CandidateSpec(BaseModel):
     search_space_override: dict[str, SearchParamOverride] | None = None
     requested_trials: int | None = None
     reason: str = ""
-    evidence_refs: list[Any] = Field(default_factory=list)
+    evidence_refs: list[EvidenceReference] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
 
 
@@ -92,7 +94,7 @@ class RejectedModelSpec(BaseModel):
 
     model_key: str
     reason: str
-    evidence_refs: list[Any] = Field(default_factory=list)
+    evidence_refs: list[EvidenceReference] = Field(default_factory=list)
     reconsider_if: str | None = None
 
 

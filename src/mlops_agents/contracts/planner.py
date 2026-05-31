@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from mlops_agents.contracts.evidence import EvidenceReference
 from mlops_agents.contracts.training import (
     CandidateSpec,
     RejectedModelSpec,
@@ -28,21 +29,6 @@ __all__ = [
 ]
 
 PlannerStatus = Literal["ok", "retry_ok", "failed"]
-
-
-class EvidenceReference(BaseModel):
-    """Reference to evidence used in planning decision."""
-
-    source: Literal[
-        "dataset_profile",
-        "task_metadata",
-        "experience",
-        "rule",
-        "registry",
-    ]
-    source_id: str | None = None
-    summary: str = ""
-    relevance_note: str | None = None
 
 
 class CandidateResultCompact(BaseModel):
