@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from mlops_agents.experience.schema import CandidateResultView, RetrievalView, SelectedSolutionView
 
 if TYPE_CHECKING:
@@ -18,6 +18,18 @@ RETRIEVAL_WEIGHTS: dict[str, int] = {
 MAX_SCORE_BY_PROBLEM_TYPE: dict[str, int] = {
     "classification": 13, "regression": 11, "forecasting": 29,
 }
+
+
+def derive_relevance_tier(similarity_score: float) -> Literal["high", "medium", "low"]:
+    """Map a similarity score to a coarse relevance tier for UI display.
+
+    Thresholds match spec: high >= 0.7, medium 0.4-0.7, low < 0.4.
+    """
+    if similarity_score >= 0.7:
+        return "high"
+    if similarity_score >= 0.4:
+        return "medium"
+    return "low"
 
 
 def _parse_ts(iso: str | None) -> float:
@@ -51,6 +63,7 @@ def _build_view(row: Any, cand_rows: list, score: int, ratio: float, matched: li
         dataset_profile=profile, models_tested=candidates, selected_solution=sol,
         experience_summary=row["experience_summary"],
         similarity_score=score, similarity_ratio=ratio, matched_fields=matched,
+        metric_to_optimize=row["metric_to_optimize"],
     )
 
 
