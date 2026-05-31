@@ -67,6 +67,28 @@ def _build_view(row: Any, cand_rows: list, score: int, ratio: float, matched: li
     )
 
 
+def compare_target_scales(
+    profile_target_std: float | None,
+    experience_target_std: float | None,
+) -> str | None:
+    """Return a human-readable scale warning when target stds differ by an order
+    of magnitude or more. Returns None when both sides have similar scales or
+    when either side is missing/zero (graceful for legacy ExperienceRecords)."""
+    if profile_target_std is None or experience_target_std is None:
+        return None
+    if profile_target_std <= 0 or experience_target_std <= 0:
+        return None
+    ratio = max(profile_target_std, experience_target_std) / min(profile_target_std, experience_target_std)
+    if ratio < 10:
+        return None
+    direction = "larger" if profile_target_std > experience_target_std else "smaller"
+    return (
+        f"candidate target std ({profile_target_std:.3g}) is ~{ratio:.0f}× {direction} "
+        f"than experience target std ({experience_target_std:.3g}); raw metric values "
+        f"may not be directly comparable"
+    )
+
+
 def find_similar_impl(pool: "ExperiencePool", profile: dict[str, Any], problem_type: str, k: int) -> list[RetrievalView]:
     max_score = MAX_SCORE_BY_PROBLEM_TYPE.get(problem_type, 10)
     with pool._conn() as conn:
