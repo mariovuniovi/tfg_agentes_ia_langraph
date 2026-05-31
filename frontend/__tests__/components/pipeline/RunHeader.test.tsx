@@ -12,7 +12,9 @@ describe('<RunHeader>', () => {
         startedMs={Date.now() - 5000}
         runOutcome="running"
         attemptCount={1}
-        llmModels={['data_validator', 'planner', 'report_writer']}
+        agents={['data_validator', 'planner']}
+        llmNodes={['report_writer']}
+        deterministic={['controller', 'executor', 'evaluation', 'deployer']}
       />,
     )
     expect(screen.getByText(/37c17107/)).toBeInTheDocument()
@@ -29,7 +31,9 @@ describe('<RunHeader>', () => {
         startedMs={Date.now()}
         runOutcome="candidate_rejected"
         attemptCount={1}
-        llmModels={[]}
+        agents={[]}
+        llmNodes={[]}
+        deterministic={[]}
       />,
     )
     const pill = screen.getByTestId('run-status-pill')
@@ -45,7 +49,9 @@ describe('<RunHeader>', () => {
         startedMs={Date.now()}
         runOutcome="running"
         attemptCount={2}
-        llmModels={[]}
+        agents={[]}
+        llmNodes={[]}
+        deterministic={[]}
       />,
     )
     expect(screen.getByText(/attempt 2/i)).toBeInTheDocument()

@@ -22,12 +22,14 @@ interface RunHeaderProps {
   startedMs: number
   runOutcome: 'running' | 'complete' | 'failed' | 'candidate_rejected'
   attemptCount: number
-  llmModels: string[]
+  agents: string[]
+  llmNodes: string[]
+  deterministic: string[]
 }
 
 export function RunHeader({
   runId, problemType, stageLabel, startedMs,
-  runOutcome, attemptCount, llmModels,
+  runOutcome, attemptCount, agents, llmNodes, deterministic,
 }: RunHeaderProps) {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
@@ -57,9 +59,10 @@ export function RunHeader({
           {runOutcome.replace('_', ' ')}
         </span>
       </div>
-      <div className="mt-1 text-[11px] text-[var(--color-fg-subtle)]">
-        <span>LLM: {llmModels.join(' · ') || '—'}</span>
-        <span className="ml-4">Deterministic: controller · executor · evaluation · deployer</span>
+      <div className="mt-1 flex flex-wrap gap-x-4 text-[11px] text-[var(--color-fg-subtle)]">
+        <span>Agents: {agents.join(' · ') || '—'}</span>
+        <span>LLM: {llmNodes.join(' · ') || '—'}</span>
+        <span>Deterministic: {deterministic.join(' · ') || '—'}</span>
       </div>
     </header>
   )

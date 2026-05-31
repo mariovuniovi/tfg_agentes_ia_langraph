@@ -45,9 +45,17 @@ export default function PipelinePage() {
     return (tp?.data as { problem_type?: string } | undefined)?.problem_type ?? ''
   }, [events])
 
-  const llmModels = useMemo(() => {
+  const nodeCategories = useMemo(() => {
     const info = events.find((e) => e.type === 'run_info')
-    return Object.keys((info?.data as { models?: Record<string, string> } | undefined)?.models ?? {})
+    const cats = (info?.data as { node_categories?: { agents: string[]; llm_nodes: string[]; deterministic: string[] } } | undefined)?.node_categories
+    if (cats) return cats
+    // Legacy fallback for old events without node_categories
+    const models = (info?.data as { models?: Record<string, string> } | undefined)?.models ?? {}
+    return {
+      agents: ['data_validator', 'planner'].filter((n) => n in models),
+      llm_nodes: ['report_writer'].filter((n) => n in models),
+      deterministic: ['controller', 'executor', 'evaluation', 'deployer'],
+    }
   }, [events])
 
   const startedMs = events[0]?.timestamp_ms ?? Date.now()
@@ -63,7 +71,9 @@ export default function PipelinePage() {
             startedMs={startedMs}
             runOutcome={runOutcome}
             attemptCount={attempts.data_validator}
-            llmModels={llmModels}
+            agents={nodeCategories.agents}
+            llmNodes={nodeCategories.llm_nodes}
+            deterministic={nodeCategories.deterministic}
           />
           <PipelineStepper stages={stages} />
         </>
