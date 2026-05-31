@@ -5,7 +5,7 @@ import type { StageKey, StageStatus } from '@/lib/stage-derive'
 const STAGES: Array<{ key: StageKey; label: string; type: NodeType }> = [
   { key: 'data_validation',  label: 'Data Validation',  type: 'agent' },
   { key: 'dataset_approval', label: 'Dataset Approval', type: 'hitl' },
-  { key: 'model_planning',   label: 'Model Planning',   type: 'llm' },
+  { key: 'model_planning',   label: 'Model Planning',   type: 'agent' },
   { key: 'training',         label: 'Training',         type: 'deterministic' },
   { key: 'evaluation',       label: 'Evaluation',       type: 'deterministic' },
   { key: 'audit_report',     label: 'Audit Report',     type: 'llm' },
