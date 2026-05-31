@@ -1,5 +1,211 @@
 import type { PipelineEvent } from '@/types/api'
 
+// ---------------------------------------------------------------------------
+// Tool-owner inference — frontend fallback when backend doesn't emit `node`
+// ---------------------------------------------------------------------------
+
+const DATA_VALIDATOR_TOOLS = new Set([
+  'load_dataset', 'parse_datetime_column', 'merge_datasets', 'apply_column_mapping',
+  'detect_temporal_gaps', 'check_missing_values', 'impute_missing_values',
+  'validate_against_schema', 'check_data_quality',
+])
+
+const PLANNER_TOOLS = new Set([
+  'list_available_models', 'retrieve_similar_experiences', 'retrieve_ml_knowledge',
+  'inspect_model_details',
+])
+
+export function inferToolOwner(toolName: string): 'data_validator' | 'planner' | 'unknown' {
+  if (DATA_VALIDATOR_TOOLS.has(toolName)) return 'data_validator'
+  if (PLANNER_TOOLS.has(toolName)) return 'planner'
+  return 'unknown'
+}
+
+/** Returns the concrete tool name, or null for unnamed internal events. */
+export function getConcreteToolName(event: PipelineEvent): string | null {
+  const d = event.data as Record<string, unknown>
+  const name = d?.tool_name ?? d?.name ?? null
+  return typeof name === 'string' && name.trim() !== '' ? name.trim() : null
+}
+
+/** Returns node_categories from run_info, with sensible fallbacks for legacy runs. */
+export function getNodeCategories(events: PipelineEvent[]): {
+  agents: string[]; llm_nodes: string[]; deterministic: string[]; hitl: string[]
+} {
+  const runInfo = events.find((e) => e.type === 'run_info')
+  const cats = (runInfo?.data as { node_categories?: Record<string, string[]> } | undefined)?.node_categories
+  if (cats) {
+    return {
+      agents:        cats.agents        ?? ['data_validator', 'planner'],
+      llm_nodes:     cats.llm_nodes     ?? ['report_writer'],
+      deterministic: cats.deterministic ?? ['controller', 'executor', 'evaluation', 'deployer'],
+      hitl:          cats.hitl          ?? ['dataset_approval', 'deployment_approval'],
+    }
+  }
+  return {
+    agents:        ['data_validator', 'planner'],
+    llm_nodes:     ['report_writer'],
+    deterministic: ['controller', 'executor', 'evaluation', 'deployer'],
+    hitl:          ['dataset_approval', 'deployment_approval'],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Semantic Tool Details ViewModel
+// ---------------------------------------------------------------------------
+
+export interface AgentToolRow {
+  toolName: string
+  calls: number
+  totalMs: number
+}
+
+export interface AgentSection {
+  name: string
+  tools: AgentToolRow[]
+}
+
+export interface LlmNodeRow {
+  node: string
+  activations: number
+  totalMs: number
+}
+
+export type HitlStatus = 'approved' | 'rejected' | 'waiting' | 'none'
+
+export interface HitlGateRow {
+  gate: string        // canonical name: dataset_approval / deployment_approval
+  status: HitlStatus
+}
+
+export interface DeterministicRow {
+  node: string
+}
+
+export interface ToolDetailsViewModel {
+  agents: AgentSection[]
+  llmNodes: LlmNodeRow[]
+  humanGates: HitlGateRow[]
+  deterministic: DeterministicRow[]
+}
+
+const HITL_TYPE_TO_GATE: Record<string, string> = {
+  data_validation: 'dataset_approval',
+  dataset_approval: 'dataset_approval',
+  deployment: 'deployment_approval',
+  deployment_approval: 'deployment_approval',
+  deployer: 'deployment_approval',
+}
+
+export function buildToolDetailsViewModel(events: PipelineEvent[]): ToolDetailsViewModel {
+  const cats = getNodeCategories(events)
+  const agentSet = new Set(cats.agents)
+  const llmSet = new Set(cats.llm_nodes)
+
+  // --- agents: collect tool calls per owner ---
+  const agentTools = new Map<string, Map<string, AgentToolRow>>()
+  for (const agent of cats.agents) agentTools.set(agent, new Map())
+
+  for (const e of events) {
+    if (e.type !== 'tool_result') continue
+    const toolName = getConcreteToolName(e)
+    if (!toolName) continue
+
+    // Prefer explicit node on the event, fall back to inference
+    const rawNode = (e.data as { node?: string }).node
+    const owner = rawNode && agentSet.has(rawNode)
+      ? rawNode
+      : inferToolOwner(toolName)
+    if (!agentSet.has(owner)) continue
+
+    const nodeMap = agentTools.get(owner)!
+    const dur = Number((e.data as { duration_ms?: number }).duration_ms ?? 0)
+    const prev = nodeMap.get(toolName)
+    if (prev) { prev.calls += 1; prev.totalMs += dur }
+    else nodeMap.set(toolName, { toolName, calls: 1, totalMs: dur })
+  }
+
+  const agentSections: AgentSection[] = cats.agents
+    .map((name) => ({ name, tools: Array.from(agentTools.get(name)?.values() ?? []) }))
+    .filter((s) => s.tools.length > 0)
+
+  // --- LLM nodes: measure time between routing-in and next routing event ---
+  const llmMap = new Map<string, LlmNodeRow>()
+  let activeNode: string | null = null
+  let activeStartMs = 0
+  for (const e of events) {
+    if (e.type !== 'routing') continue
+    const next = (e.data as { next?: string }).next ?? ''
+    if (activeNode && llmSet.has(activeNode)) {
+      const dur = e.timestamp_ms - activeStartMs
+      const prev = llmMap.get(activeNode)
+      if (prev) { prev.activations += 1; prev.totalMs += dur }
+      else llmMap.set(activeNode, { node: activeNode, activations: 1, totalMs: dur })
+    }
+    activeNode = next
+    activeStartMs = e.timestamp_ms
+  }
+  const llmNodes = Array.from(llmMap.values())
+
+  // --- Human gates ---
+  const gateMap = new Map<string, HitlStatus>()
+  for (const e of events) {
+    if (e.type === 'hitl_request') {
+      const raw = ((e.data as { type?: string }).type ?? e.agent ?? '').toLowerCase()
+      const gate = HITL_TYPE_TO_GATE[raw] ?? raw
+      if (!gateMap.has(gate)) gateMap.set(gate, 'waiting')
+    }
+    if (e.type === 'routing') {
+      const next = ((e.data as { next?: string }).next ?? '').toLowerCase()
+      if (HITL_TYPE_TO_GATE[next]) {
+        const gate = HITL_TYPE_TO_GATE[next]
+        if (!gateMap.has(gate)) gateMap.set(gate, 'waiting')
+      }
+    }
+  }
+  // Mark approved once a post-approval routing away from the gate is seen
+  for (const e of events) {
+    if (e.type === 'routing') {
+      const next = (e.data as { next?: string }).next ?? ''
+      if (next === 'planner' || next === 'executor') {
+        if (gateMap.get('dataset_approval') === 'waiting') gateMap.set('dataset_approval', 'approved')
+      }
+      if (next === 'deployer') {
+        if (gateMap.get('deployment_approval') === 'waiting') gateMap.set('deployment_approval', 'approved')
+      }
+    }
+    if (e.type === 'run_complete') {
+      // If gate was waiting and run completed, treat as approved (approval must have occurred)
+      for (const [gate, status] of gateMap.entries()) {
+        if (status === 'waiting') gateMap.set(gate, 'approved')
+      }
+    }
+  }
+  const humanGates: HitlGateRow[] = Array.from(gateMap.entries()).map(([gate, status]) => ({ gate, status }))
+
+  // --- Deterministic: show nodes that appear in routing events ---
+  const detSet = new Set(cats.deterministic)
+  const seenDet = new Set<string>()
+  for (const e of events) {
+    if (e.type === 'routing') {
+      const next = (e.data as { next?: string }).next ?? ''
+      if (detSet.has(next)) seenDet.add(next)
+    }
+    if (e.type === 'training_complete') seenDet.add('executor')
+    if (e.type === 'audit_report') seenDet.add('report_writer')  // only if actually in det
+    if (e.type === 'deployment_complete') seenDet.add('deployer')
+  }
+  const deterministic: DeterministicRow[] = cats.deterministic
+    .filter((n) => seenDet.has(n))
+    .map((n) => ({ node: n }))
+
+  return { agents: agentSections, llmNodes, humanGates, deterministic }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy exports (used by observability page)
+// ---------------------------------------------------------------------------
+
 export interface ToolUsageRow {
   agent: string
   tool_name: string
@@ -11,7 +217,7 @@ export function aggregateToolUsage(events: PipelineEvent[]): ToolUsageRow[] {
   const map = new Map<string, ToolUsageRow>()
   for (const e of events) {
     if (e.type !== 'tool_result') continue
-    const tool = (e.data as { tool_name?: string }).tool_name
+    const tool = getConcreteToolName(e)
     if (!tool) continue
     const key = `${e.agent}::${tool}`
     const dur = Number((e.data as { duration_ms?: number }).duration_ms ?? 0)
@@ -22,11 +228,7 @@ export function aggregateToolUsage(events: PipelineEvent[]): ToolUsageRow[] {
   return Array.from(map.values())
 }
 
-export interface LlmNodeRow {
-  node: string
-  activations: number
-  total_ms: number
-}
+export { type LlmNodeRow }
 
 export function aggregateLlmNodeActivity(events: PipelineEvent[], llmNodes: string[]): LlmNodeRow[] {
   const set = new Set(llmNodes)
@@ -48,6 +250,10 @@ export function aggregateLlmNodeActivity(events: PipelineEvent[], llmNodes: stri
   return Array.from(map.values())
 }
 
+// ---------------------------------------------------------------------------
+// Timeline
+// ---------------------------------------------------------------------------
+
 export interface TimelineRow {
   ts: number
   text: string
@@ -61,8 +267,8 @@ export function buildTimeline(events: PipelineEvent[]): TimelineRow[] {
     const t = e.timestamp_ms
     switch (e.type) {
       case 'run_info': {
-        const models = Object.keys((e.data as { models?: Record<string, string> }).models ?? {})
-        rows.push({ ts: t, text: `Pipeline started · LLM nodes: ${models.join(', ') || '—'}` })
+        const cats = getNodeCategories([e])
+        rows.push({ ts: t, text: `Pipeline started · agents: ${cats.agents.join(', ')}` })
         break
       }
       case 'routing': {
@@ -74,7 +280,8 @@ export function buildTimeline(events: PipelineEvent[]): TimelineRow[] {
         break
       }
       case 'tool_result': {
-        const tn = (e.data as { tool_name?: string }).tool_name
+        const tn = getConcreteToolName(e)
+        if (!tn) break  // skip unnamed internal events
         if (tn === 'load_dataset') {
           const r = (e.data as { result?: string }).result
           let summary = 'Dataset loaded'
@@ -105,7 +312,6 @@ export function buildTimeline(events: PipelineEvent[]): TimelineRow[] {
       }
       case 'deployment_complete': {
         const uri = (e.data as { best_model_uri?: string }).best_model_uri ?? ''
-        // Extract "models:/mlops-agent-model/3" → "mlops-agent-model v3"
         const m = uri.match(/models:\/([^/]+)\/(\d+)/)
         const human = m ? `${m[1]} v${m[2]}` : 'model'
         rows.push({ ts: t, text: `Deployment complete · ${human} (champion alias set)`, agent: 'deployer' })

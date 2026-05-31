@@ -1,12 +1,22 @@
-from mlops_agents.agents.taxonomy import NODE_CATEGORIES, is_agent, is_llm_node, is_deterministic
+from mlops_agents.agents.taxonomy import NODE_CATEGORIES, is_agent, is_llm_node, is_deterministic, is_hitl
 
 def test_categories_are_disjoint_and_cover_all_nodes():
     agents = set(NODE_CATEGORIES["agents"])
     llm = set(NODE_CATEGORIES["llm_nodes"])
     det = set(NODE_CATEGORIES["deterministic"])
+    hitl = set(NODE_CATEGORIES["hitl"])
     assert agents.isdisjoint(llm)
     assert agents.isdisjoint(det)
     assert llm.isdisjoint(det)
+    assert hitl.isdisjoint(agents)
+    assert hitl.isdisjoint(llm)
+    assert hitl.isdisjoint(det)
+
+def test_hitl_nodes():
+    assert is_hitl("dataset_approval")
+    assert is_hitl("deployment_approval")
+    assert not is_hitl("planner")
+    assert not is_hitl("executor")
 
 def test_planner_is_agent_post_refactor():
     assert is_agent("planner")

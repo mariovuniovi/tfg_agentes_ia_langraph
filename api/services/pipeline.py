@@ -137,6 +137,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                 "agents":        NODE_CATEGORIES["agents"],
                 "llm_nodes":     NODE_CATEGORIES["llm_nodes"],
                 "deterministic": NODE_CATEGORIES["deterministic"],
+                "hitl":          NODE_CATEGORIES["hitl"],
             },
         },
     }

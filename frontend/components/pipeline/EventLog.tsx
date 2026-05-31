@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { useRunStore } from '@/stores/run-store'
 import { Card } from '@/components/ui/Card'
 import { displayAgentName } from '@/lib/agent-display'
-import { aggregateToolUsage, aggregateLlmNodeActivity, buildTimeline } from '@/lib/events-aggregate'
+import { buildToolDetailsViewModel, buildTimeline } from '@/lib/events-aggregate'
 import type { PipelineEvent, PipelineEventType } from '@/types/api'
 
 type Tab = 'timeline' | 'tools' | 'raw'
@@ -22,18 +22,25 @@ const TYPE_COLORS: Record<PipelineEventType, string> = {
   run_complete: 'font-semibold text-emerald-600',
 }
 
+const HITL_GATE_LABELS: Record<string, string> = {
+  dataset_approval: 'Dataset Approval',
+  deployment_approval: 'Deployment Approval',
+}
+
+const HITL_STATUS_STYLES: Record<string, string> = {
+  approved: 'text-emerald-700',
+  rejected: 'text-red-600',
+  waiting: 'text-amber-600',
+  none: 'text-zinc-400',
+}
+
 export function EventLog() {
   const events = useRunStore((s) => s.events)
   const runId = useRunStore((s) => s.runId)
   const [tab, setTab] = useState<Tab>('timeline')
 
   const timeline = useMemo(() => buildTimeline(events), [events])
-  const tools = useMemo(() => aggregateToolUsage(events), [events])
-  const llmNodes = useMemo(() => {
-    const info = events.find((e) => e.type === 'run_info')
-    return Object.keys((info?.data as { models?: Record<string, string> } | undefined)?.models ?? {})
-  }, [events])
-  const llmRows = useMemo(() => aggregateLlmNodeActivity(events, llmNodes), [events, llmNodes])
+  const toolDetails = useMemo(() => buildToolDetailsViewModel(events), [events])
 
   function downloadRaw() {
     const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' })
@@ -91,32 +98,70 @@ export function EventLog() {
         )}
 
         {tab === 'tools' && (
-          <div className="space-y-3 text-xs">
-            {tools.length > 0 && (
+          <div className="space-y-4 text-xs">
+            {/* Agents section */}
+            {toolDetails.agents.length > 0 && (
               <div>
-                <p className="mb-1 font-semibold text-zinc-600">Tool calls (agentic loops)</p>
-                {tools.map((t) => (
-                  <div key={`${t.agent}-${t.tool_name}`} className="grid grid-cols-[1fr_60px_80px] gap-2 border-b border-zinc-100 py-1">
-                    <span><span className="text-zinc-400">{displayAgentName(t.agent)}</span> · <span className="font-mono text-zinc-700">{t.tool_name}</span></span>
-                    <span className="text-right text-zinc-500">{t.calls} call{t.calls === 1 ? '' : 's'}</span>
-                    <span className="text-right font-mono text-zinc-500">{t.total_ms} ms</span>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Agents</p>
+                {toolDetails.agents.map((section) => (
+                  <div key={section.name} className="mb-3">
+                    <p className="mb-1 font-semibold text-zinc-700">{displayAgentName(section.name)}</p>
+                    {section.tools.map((row) => (
+                      <div key={row.toolName} className="grid grid-cols-[1fr_60px_80px] gap-2 border-b border-zinc-100 py-1 pl-3">
+                        <span className="font-mono text-zinc-700">{row.toolName}</span>
+                        <span className="text-right text-zinc-500">{row.calls} call{row.calls === 1 ? '' : 's'}</span>
+                        <span className="text-right font-mono text-zinc-500">{row.totalMs > 0 ? `${row.totalMs} ms` : '—'}</span>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
             )}
-            {llmRows.length > 0 && (
+
+            {/* LLM nodes section */}
+            {toolDetails.llmNodes.length > 0 && (
               <div>
-                <p className="mb-1 font-semibold text-zinc-600">LLM nodes (single-shot)</p>
-                {llmRows.map((r) => (
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">LLM nodes</p>
+                {toolDetails.llmNodes.map((r) => (
                   <div key={r.node} className="grid grid-cols-[1fr_80px_80px] gap-2 border-b border-zinc-100 py-1">
-                    <span className="font-mono text-zinc-700">{displayAgentName(r.node)}</span>
+                    <span className="font-semibold text-zinc-700">{displayAgentName(r.node)}</span>
                     <span className="text-right text-zinc-500">{r.activations} activation{r.activations === 1 ? '' : 's'}</span>
-                    <span className="text-right font-mono text-zinc-500">{(r.total_ms / 1000).toFixed(1)} s</span>
+                    <span className="text-right font-mono text-zinc-500">{(r.totalMs / 1000).toFixed(1)} s</span>
                   </div>
                 ))}
               </div>
             )}
-            {tools.length === 0 && llmRows.length === 0 && <p className="text-zinc-400">No activity yet.</p>}
+
+            {/* Human gates section */}
+            {toolDetails.humanGates.length > 0 && (
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Human gates</p>
+                {toolDetails.humanGates.map((g) => (
+                  <div key={g.gate} className="flex items-center justify-between border-b border-zinc-100 py-1">
+                    <span className="font-semibold text-zinc-700">{HITL_GATE_LABELS[g.gate] ?? g.gate}</span>
+                    <span className={`font-mono text-[11px] ${HITL_STATUS_STYLES[g.status] ?? ''}`}>{g.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Deterministic steps section */}
+            {toolDetails.deterministic.length > 0 && (
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Deterministic steps</p>
+                {toolDetails.deterministic.map((d) => (
+                  <div key={d.node} className="flex items-center justify-between border-b border-zinc-100 py-1">
+                    <span className="font-semibold text-zinc-700">{displayAgentName(d.node)}</span>
+                    <span className="text-[11px] text-emerald-600">completed</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {toolDetails.agents.length === 0 && toolDetails.llmNodes.length === 0 &&
+             toolDetails.humanGates.length === 0 && toolDetails.deterministic.length === 0 && (
+              <p className="text-zinc-400">No activity yet.</p>
+            )}
           </div>
         )}
 

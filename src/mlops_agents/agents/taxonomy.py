@@ -6,6 +6,7 @@ NODE_CATEGORIES: dict[str, list[str]] = {
     "agents":        ["data_validator", "planner"],
     "llm_nodes":     ["report_writer"],
     "deterministic": ["controller", "executor", "evaluation", "deployer"],
+    "hitl":          ["dataset_approval", "deployment_approval"],
 }
 
 
@@ -19,3 +20,7 @@ def is_llm_node(name: str) -> bool:
 
 def is_deterministic(name: str) -> bool:
     return name in NODE_CATEGORIES["deterministic"]
+
+
+def is_hitl(name: str) -> bool:
+    return name in NODE_CATEGORIES["hitl"]
