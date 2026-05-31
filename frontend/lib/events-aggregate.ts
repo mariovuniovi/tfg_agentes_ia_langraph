@@ -86,7 +86,7 @@ export interface TokenUsageEventData {
   output_tokens: number
   total_tokens: number
   cached_input_tokens?: number
-  estimated_cost_usd: number
+  estimated_cost_usd: number | null   // null = model not in pricing table
   source?: 'langchain_stream_usage_metadata'
 }
 
@@ -97,12 +97,12 @@ export interface TokenUsageRow {
   inputTokens: number
   outputTokens: number
   totalTokens: number
-  estimatedCostUsd: number
+  estimatedCostUsd: number | null     // null = at least one call had unknown pricing
 }
 
 export interface TokenUsageSummary {
   rows: TokenUsageRow[]
-  totalCostUsd: number
+  totalCostUsd: number                // sum of known costs only (null rows contribute 0)
   totalInputTokens: number
   totalOutputTokens: number
 }
@@ -119,7 +119,11 @@ export function aggregateTokenUsage(events: PipelineEvent[]): TokenUsageSummary 
       prev.inputTokens += d.input_tokens
       prev.outputTokens += d.output_tokens
       prev.totalTokens += d.total_tokens
-      prev.estimatedCostUsd += d.estimated_cost_usd
+      // If either side is null, the aggregate is null (unknown)
+      prev.estimatedCostUsd =
+        prev.estimatedCostUsd !== null && d.estimated_cost_usd !== null
+          ? prev.estimatedCostUsd + d.estimated_cost_usd
+          : null
     } else {
       map.set(key, {
         node: d.node, model: d.model, calls: 1,
@@ -131,7 +135,7 @@ export function aggregateTokenUsage(events: PipelineEvent[]): TokenUsageSummary 
   const rows = Array.from(map.values())
   return {
     rows,
-    totalCostUsd: rows.reduce((s, r) => s + r.estimatedCostUsd, 0),
+    totalCostUsd: rows.reduce((s, r) => s + (r.estimatedCostUsd ?? 0), 0),
     totalInputTokens: rows.reduce((s, r) => s + r.inputTokens, 0),
     totalOutputTokens: rows.reduce((s, r) => s + r.outputTokens, 0),
   }

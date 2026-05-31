@@ -5,7 +5,7 @@ from typing import TypedDict
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
 
-from mlops_agents.observability.pricing import estimate_cost
+from mlops_agents.observability.pricing import _normalize, estimate_cost
 
 _tool_start_times: dict[str, float] = {}
 
@@ -56,13 +56,22 @@ def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict
     }
 
 
-def parse_stream_event(chunk: tuple) -> PipelineEvent | None:
+_LANGRAPH_INTERNAL_NODES = frozenset({"model", "tools", "__start__", "unknown"})
+
+
+def parse_stream_event(
+    chunk: tuple,
+    node_hint: str | None = None,
+) -> PipelineEvent | None:
     try:
         message_chunk, metadata = chunk
     except (TypeError, ValueError):
         return None
 
-    agent: str = metadata.get("langgraph_node", "unknown") if isinstance(metadata, dict) else "unknown"
+    raw_node: str = metadata.get("langgraph_node", "unknown") if isinstance(metadata, dict) else "unknown"
+    # LangGraph uses "model"/"tools" as internal node names inside react agents.
+    # Use the parent namespace hint to recover the semantic node name.
+    agent: str = node_hint if (raw_node in _LANGRAPH_INTERNAL_NODES and node_hint) else raw_node
     now_ms: float = time.time() * 1000
 
     if isinstance(message_chunk, AIMessageChunk):
@@ -85,10 +94,9 @@ def parse_stream_event(chunk: tuple) -> PipelineEvent | None:
             )
         elif message_chunk.usage_metadata:
             usage = message_chunk.usage_metadata
-            model_name: str = (
-                (message_chunk.response_metadata or {}).get("model_name", "")
-                or agent
-            )
+            # Normalize: strip provider prefix and date suffix (e.g. "openai/gpt-5.4-mini-2026-03-17" → "gpt-5.4-mini")
+            raw_model: str = (message_chunk.response_metadata or {}).get("model_name", "") or ""
+            model_name: str = _normalize(raw_model) if raw_model else ""
             input_t: int = usage.get("input_tokens", 0)
             output_t: int = usage.get("output_tokens", 0)
             cached_t: int = (usage.get("input_token_details") or {}).get("cache_read", 0)
@@ -98,12 +106,12 @@ def parse_stream_event(chunk: tuple) -> PipelineEvent | None:
                 timestamp_ms=now_ms,
                 data={
                     "node": agent,
-                    "model": model_name,
+                    "model": model_name,  # may be "" if response_metadata lacked model_name; fixed in pipeline.py
                     "input_tokens": input_t,
                     "output_tokens": output_t,
                     "total_tokens": usage.get("total_tokens", input_t + output_t),
                     "cached_input_tokens": cached_t if cached_t else None,
-                    "estimated_cost_usd": estimate_cost(model_name, input_t, output_t, cached_t),
+                    "estimated_cost_usd": estimate_cost(model_name, input_t, output_t, cached_t) if model_name else None,
                     "source": "langchain_stream_usage_metadata",
                 },
             )

@@ -15,6 +15,7 @@ from api.services.pipeline_helpers import (
 )
 from mlops_agents.graphs.mlops_graph import graph
 from mlops_agents.agents.taxonomy import NODE_CATEGORIES
+from mlops_agents.observability.pricing import estimate_cost
 
 
 def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
@@ -113,6 +114,13 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
         return
 
     from mlops_agents.config.settings import settings
+
+    # Maps semantic node name → its configured model (used to fix fallback when response_metadata lacks model_name)
+    node_model_map: dict[str, str] = {
+        "data_validator": settings.openai_model_data_validator,
+        "planner":        settings.openai_model_planner,
+        "report_writer":  settings.openai_model_report_writer,
+    }
 
     # Read problem_type from the schema JSON the caller posted
     import json as _json
@@ -287,8 +295,30 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                         break
 
             elif mode == "messages":
-                pipeline_event = parse_stream_event(data)
+                # Recover semantic node name from LangGraph namespace.
+                # Inside a react agent, langgraph_node = "model"; namespace[0] = "data_validator:run_id".
+                node_hint: str | None = None
+                if namespace:
+                    candidate = namespace[0].split(":")[0]
+                    if candidate in node_model_map:
+                        node_hint = candidate
+                pipeline_event = parse_stream_event(data, node_hint=node_hint)
                 if pipeline_event:
+                    # Fix missing model name: when response_metadata lacked model_name,
+                    # the event has model="" — fill in the correct model from settings.
+                    if pipeline_event["type"] == "token_usage":
+                        ev_data = pipeline_event["data"]
+                        node_val: str = str(ev_data.get("node", ""))
+                        model_val: str = str(ev_data.get("model", ""))
+                        if not model_val and node_val in node_model_map:
+                            correct_model = node_model_map[node_val]
+                            ev_data["model"] = correct_model
+                            ev_data["estimated_cost_usd"] = estimate_cost(
+                                correct_model,
+                                int(ev_data.get("input_tokens") or 0),
+                                int(ev_data.get("output_tokens") or 0),
+                                int(ev_data.get("cached_input_tokens") or 0),
+                            )
                     if pipeline_event["type"] == "agent_reasoning":
                         agent = pipeline_event["agent"]
                         _reasoning_buf[agent] = _reasoning_buf.get(agent, "") + str(

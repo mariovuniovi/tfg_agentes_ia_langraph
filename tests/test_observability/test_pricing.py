@@ -18,8 +18,8 @@ def test_normalize_plain_name_unchanged():
     assert _normalize("gpt-5.4-mini") == "gpt-5.4-mini"
 
 
-def test_unknown_model_returns_zero():
-    assert estimate_cost("gpt-unknown-xyz", 1000, 1000) == 0.0
+def test_unknown_model_returns_none():
+    assert estimate_cost("gpt-unknown-xyz", 1000, 1000) is None
 
 
 def test_mini_cost_per_million():

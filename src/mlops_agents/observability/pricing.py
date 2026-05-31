@@ -27,11 +27,11 @@ def estimate_cost(
     input_tokens: int,
     output_tokens: int,
     cached_input_tokens: int = 0,
-) -> float:
-    """Return estimated USD cost. Returns 0.0 for unknown models (no crash)."""
+) -> float | None:
+    """Return estimated USD cost. Returns None for unknown models (display as 'Unknown')."""
     p = _load().get(_normalize(model))
     if not p:
-        return 0.0
+        return None
     return (
         input_tokens * p.get("input_per_1m", 0) / 1_000_000
         + output_tokens * p.get("output_per_1m", 0) / 1_000_000

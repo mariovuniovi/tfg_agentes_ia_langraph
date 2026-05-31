@@ -19,8 +19,13 @@ describe('formatK', () => {
 })
 
 describe('formatCost', () => {
-  it('returns $0.00 for zero', () => {
-    expect(formatCost(0)).toBe('$0.00')
+  it('returns Unknown for null or undefined', () => {
+    expect(formatCost(null)).toBe('Unknown')
+    expect(formatCost(undefined)).toBe('Unknown')
+  })
+
+  it('returns $0.00000 for exactly zero', () => {
+    expect(formatCost(0)).toBe('$0.00000')
   })
 
   it('uses 5 decimal places for values below $0.01', () => {
