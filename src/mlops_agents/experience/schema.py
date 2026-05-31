@@ -49,6 +49,10 @@ class ExperienceRecord(BaseModel):
     exog_fit_failures: list[dict] | None = None
     expected_drift: str | None = None
     planner_output: dict | None = None
+    target_mean: float | None = None
+    target_std: float | None = None
+    target_min: float | None = None
+    target_max: float | None = None
 
 
 class CandidateResultView(BaseModel):
@@ -77,3 +81,4 @@ class RetrievalView(BaseModel):
     similarity_score: int
     similarity_ratio: float
     matched_fields: list[str]
+    metric_to_optimize: str | None = None
