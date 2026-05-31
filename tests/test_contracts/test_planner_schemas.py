@@ -227,3 +227,23 @@ def test_planner_output_has_decision_basis_and_evidence_conflicts():
     )
     assert out.decision_basis.final_strategy == "prioritize simple models"
     assert out.evidence_conflicts == []
+
+
+# --- PlannerValidationContext ---
+
+def test_planner_validation_context_minimal():
+    from mlops_agents.contracts.planner import PlannerValidationContext
+    from mlops_agents.models.loader import get_models_for
+
+    specs = get_models_for("forecasting")
+    ctx = PlannerValidationContext(
+        problem_type="forecasting",
+        task_metadata={},
+        available_model_keys=[s.model_key for s in specs],
+        available_model_specs=specs,
+        similar_experiences=[],
+        matched_rules=[],
+        rules_by_id={},
+    )
+    assert ctx.problem_type == "forecasting"
+    assert len(ctx.available_model_keys) > 0
