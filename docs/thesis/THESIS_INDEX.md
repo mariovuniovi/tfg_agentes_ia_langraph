@@ -25,6 +25,10 @@
 | champion model | modelo campeón |
 | model registry | registro de modelos |
 | experiment tracking | seguimiento de experimentos |
+| planner tools | herramientas del planificador |
+| tool trace | traza de herramientas |
+| validation context | contexto de validación |
+| experience record | registro de experiencia |
 
 ## Cross-references
 | Label | Introduced in | Description |
