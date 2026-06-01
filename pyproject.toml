@@ -17,7 +17,6 @@ dependencies = [
 
     # Dashboard & MLOps
     "mlflow>=3.10",
-    "evidently>=0.5",
 
     # ML & Data
     "catboost>=1.2",
@@ -128,7 +127,6 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
     "mlflow.*",
-    "evidently.*",
     "langchain.*",
     "langchain_core.*",
     "langchain_openai.*",

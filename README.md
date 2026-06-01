@@ -29,29 +29,63 @@ See [PLAN.md](PLAN.md) for the full status board and [ARCHITECTURE.md](ARCHITECT
 - **FastAPI + Next.js** for the user-facing API and UI
 - **SQLite** for the experience pool (`storage/mlops_metadata.db`)
 
+## What runs inside Docker
+
+`docker compose up --build` starts three containers on a shared private network (`mlops-net`):
+
+| Container | Port | Role |
+|---|---|---|
+| `mlops-mlflow` | **5000** | MLflow tracking server — stores experiment runs, metrics, artefacts, and the model registry. Data persists in a named Docker volume (`mlflow_data`) so it survives container restarts. |
+| `mlops-api` | **8000** | FastAPI backend + LangGraph agents. This is the Python brain of the system: it calls the LLM, runs the MLOps pipeline, and exposes a REST + SSE API consumed by the frontend. Uploads and benchmark CSVs are mounted from `./data` so they survive restarts. |
+| `mlops-frontend` | **3000** | Next.js UI (standalone mode). Talks to the FastAPI backend at `http://localhost:8000`. The API URL is baked into the build at image-build time — it must be `localhost` because the browser runs outside Docker. |
+
+**Key fact:** `mlops-api` and `mlops-mlflow` talk to each other over the Docker-internal hostname `mlflow:5000`. Your browser always uses `localhost:<port>`.
+
 ## Getting started
 
-**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) — no Python, Node, or any other tool needed.
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) — no Python, Node, or any other tool needed on your machine.
+
+### First time
 
 ```bash
 git clone https://github.com/mariovuniovi/tfg_agentes_ia_langraph.git
 cd tfg_agentes_ia_langraph
-cp .env.example .env          # then edit .env and fill in OPENAI_API_KEY
-docker compose up --build
+cp .env.example .env        # fill in OPENAI_API_KEY (see .env.example for details)
+docker compose up --build   # builds images and starts all three services
 ```
 
 Open **http://localhost:3000** — the pipeline UI is ready.
 
-| Service | URL |
-|---|---|
-| Next.js UI | http://localhost:3000 |
-| FastAPI backend | http://localhost:8000 |
-| MLflow | http://localhost:5000 |
+| Service | URL | What you'll find |
+|---|---|---|
+| Next.js UI | http://localhost:3000 | Pipeline submission, experiments, monitoring |
+| FastAPI backend | http://localhost:8000/docs | Auto-generated OpenAPI docs (Swagger UI) |
+| MLflow | http://localhost:5000 | Experiment runs, metrics, model registry |
 
-**After making code changes:**
+### Day-to-day workflow
+
 ```bash
-docker compose up --build     # rebuilds only what changed, takes ~1-2 min
+# Start all services (skips rebuild if images are unchanged)
+docker compose up
+
+# Start and rebuild images (needed after code changes)
+docker compose up --build
+
+# Stop all services (keeps data volumes intact)
+docker compose down
+
+# Stop and also wipe the MLflow data volume (full reset)
+docker compose down -v
+
+# Watch logs for a specific service
+docker compose logs -f api
+docker compose logs -f frontend
+docker compose logs -f mlflow
 ```
+
+After making **backend code changes** (`src/`, `api/`): `docker compose up --build` — only the `api` image rebuilds (~1 min).
+
+After making **frontend code changes** (`frontend/`): `docker compose up --build` — only the `frontend` image rebuilds (~1–2 min).
 
 ---
 
@@ -76,17 +110,26 @@ docker compose up --build     # rebuilds only what changed, takes ~1-2 min
 
 ### Local development (without Docker)
 
+Use this when you want fast iteration without rebuilding images — e.g., while developing the Python backend.
+
 ```bash
-uv sync                                    # install all Python dependencies
-cp .env.example .env                       # fill in OPENAI_API_KEY
+uv sync                    # install all Python dependencies into .venv
+cp .env.example .env       # fill in OPENAI_API_KEY
 ```
 
-Two terminals:
+You still need MLflow running. The easiest way is to start just that container:
+
 ```bash
-# Terminal 1 — FastAPI backend (port 8000)
+docker compose up mlflow   # only the MLflow service
+```
+
+Then two more terminals:
+
+```bash
+# Terminal 2 — FastAPI backend (port 8000)
 uv run uvicorn api.main:app --reload --port 8000
 
-# Terminal 2 — Next.js frontend (port 3000)
+# Terminal 3 — Next.js frontend (port 3000)
 cd frontend && npm install && npm run dev
 ```
 
@@ -119,7 +162,7 @@ for r in conn.execute('SELECT dataset_name, selected_model_key, validation_score
 ## Tests
 
 ```bash
-uv run python -m pytest -m "not integration"   # unit (~326 tests, no LLM calls)
+uv run python -m pytest -m "not integration"   # unit (~369 tests, no LLM calls)
 uv run python -m pytest                        # all (+ slow LLM-touching integration tests)
 uv run ruff check . && uv run ruff format .    # lint + format
 ```
@@ -155,7 +198,7 @@ dashboard/          ← Streamlit alternative UI
 scripts/            ← run_pipeline, run_benchmark, seed_mlflow
 data/               ← benchmark CSVs + user uploads + schemas
 docs/superpowers/   ← brainstorming specs and implementation plans
-tests/              ← 326 unit tests (mirrors src/ layout)
+tests/              ← 369 unit tests (mirrors src/ layout)
 ```
 
 See [STRUCTURE.md](STRUCTURE.md) for the file-by-file breakdown.

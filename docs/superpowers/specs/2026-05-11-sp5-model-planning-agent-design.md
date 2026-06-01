@@ -364,7 +364,7 @@ INSERT OR IGNORE INTO _schema_version(version) VALUES (4);
 |---|---|
 | **New** | `contracts/planner.py` — `EvidenceReference`, `PlannerOutput`, `PlannerContext`, `ExperienceSummary` |
 | **New** | `agents/planner.py` — `planner_node`, `build_planner_context`, `_check_evidence_references`, `PlannerError` |
-| **New** | `prompts/planner.yaml` — system prompt |
+| **New** | `promBuepts/planner.yaml` — system prompt |
 | **New** | `experience/migrations/004_add_planner_output.sql` |
 | **No change** | `contracts/training.py` — existing integrity checks remain unchanged; exhaustiveness is planner-specific |
 | **Modify** | `graphs/mlops_graph.py` — add `planner` node, rename `trainer_node` → `executor_node` |

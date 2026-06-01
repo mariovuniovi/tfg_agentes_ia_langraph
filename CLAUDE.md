@@ -31,7 +31,6 @@ src/mlops_agents/
 ├── state/       agent_state.py (TypedDict) + schemas.py (Pydantic)
 ├── tools/       data_tools.py, training_tools.py, mlflow_tools.py, evidently_tools.py
 ├── prompts/     YAML templates per agent + loader.py
-├── mcp_servers/ mlflow_server.py, data_server.py
 ├── config/      settings.py (Pydantic Settings reads .env) + constants.py
 └── utils/       llm.py (LLM factory), logging.py, runners.py
 dashboard/       Streamlit multi-page app (imports from mlops_agents)

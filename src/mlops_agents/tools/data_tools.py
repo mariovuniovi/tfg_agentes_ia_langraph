@@ -629,3 +629,29 @@ def impute_missing_values(
     info["output_path"] = str(dest)
     logger.info(f"Imputed {len(info['columns_imputed'])} column(s) in {dest.name}")
     return json.dumps(info, default=str)
+
+
+@tool
+def check_data_quality(dataset_path: str) -> str:
+    """Run a data quality check on the dataset.
+
+    Checks for missing values and duplicate rows.
+    Returns a structured JSON summary with an overall 'passed' flag.
+
+    Args:
+        dataset_path: Path to the CSV file to validate.
+    """
+    df = pd.read_csv(dataset_path)
+    missing = df.isnull().sum()
+    max_missing_pct = float(missing.max() / len(df) * 100) if len(df) > 0 else 0.0
+    summary = {
+        "passed": max_missing_pct < 20.0 and int(df.duplicated().sum()) == 0,
+        "row_count": len(df),
+        "column_count": len(df.columns),
+        "missing_values_total": int(missing.sum()),
+        "columns_with_missing": {col: int(cnt) for col, cnt in missing.items() if cnt > 0},
+        "max_missing_pct": round(max_missing_pct, 2),
+        "duplicate_rows": int(df.duplicated().sum()),
+    }
+    logger.info(f"Data quality check complete for {Path(dataset_path).name}")
+    return json.dumps(summary, default=str)

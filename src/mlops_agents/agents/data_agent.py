@@ -5,6 +5,7 @@ from langchain.agents import create_agent
 from mlops_agents.prompts import get_prompt
 from mlops_agents.tools.data_tools import (
     apply_column_mapping,
+    check_data_quality,
     check_missing_values,
     detect_temporal_gaps,
     impute_missing_values,
@@ -13,7 +14,6 @@ from mlops_agents.tools.data_tools import (
     parse_datetime_column,
     validate_against_schema,
 )
-from mlops_agents.tools.evidently_tools import check_data_drift, check_data_quality
 from mlops_agents.utils.llm import get_llm
 
 
@@ -28,7 +28,6 @@ def build_data_agent():
             validate_against_schema,
             check_missing_values,
             check_data_quality,
-            check_data_drift,
             impute_missing_values,
             parse_datetime_column,
             detect_temporal_gaps,

@@ -1,0 +1,305 @@
+\section{Arquitectura}
+\label{sec:arquitectura}
+
+\subsection{Visión general del sistema}
+\label{sec:vision-general}
+
+La arquitectura del sistema se organiza como un \emph{pipeline} MLOps híbrido: una columna vertebral determinista implementada en Python puro sobre la que se insertan componentes agénticos basados en LLM exclusivamente donde el problema requiere razonamiento genuino. Esta decisión de diseño aplica directamente el principio de \emph{restraint} agéntico descrito en la sección~\ref{sec:restraint}: maximizar la reproducibilidad de las fases críticas del ciclo de vida mientras se aprovecha la capacidad de los modelos de lenguaje únicamente en aquellos puntos donde el código determinista no puede ofrecer un resultado equivalente.
+
+El sistema consta de cuatro capas diferenciadas:
+
+\begin{enumerate}
+  \item \textbf{Capa de orquestación}: un grafo LangGraph cuyo nodo central es un controlador de flujo determinista (\emph{workflow controller}). El controlador examina el estado compartido tras cada nodo y decide la siguiente transición mediante condiciones Python; no realiza ninguna llamada a un modelo de lenguaje.
+  \item \textbf{Capa agéntica}: tres nodos que utilizan modelos de lenguaje --- el agente de validación de datos (patrón ReAct), el agente planificador de modelos (salida estructurada) y el nodo redactor del informe de evaluación (salida estructurada).
+  \item \textbf{Capa determinista}: cinco módulos Python sin LLM --- el ejecutor de entrenamiento, el módulo de evaluación y promoción, el módulo de despliegue, la actualización del \emph{pool} de experiencias, y las dos puertas de aprobación humana.
+  \item \textbf{Capa de infraestructura}: una API REST (FastAPI) que expone el grafo al exterior, una interfaz web (Next.js) para la interacción del usuario, MLflow para el seguimiento de experimentos y registro de modelos, una base de datos SQLite como almacén de experiencias, y Docker para el empaquetado y despliegue del conjunto.
+\end{enumerate}
+
+Desde el punto de vista del usuario, el sistema recibe un dataset CSV junto con un esquema JSON que describe el tipo de problema y las columnas. La ejecución del grafo produce, si todo transcurre sin errores y el usuario aprueba en ambas puertas, un modelo registrado en MLflow listo para inferencia. Cada ejecución queda completamente trazada: métricas, artefactos, decisiones de planificación, razonamiento del agente y análisis del informe de evaluación se almacenan de forma duradera.
+
+\begin{figure}[H]
+\centering
+\begin{Verbatim}[fontsize=\small]
+ ┌───────────────────────────────────────┐
+ │         Interfaz web (Next.js)        │
+ └──────────────────┬────────────────────┘
+                    │  HTTP / SSE
+ ┌──────────────────▼────────────────────┐
+ │         API REST (FastAPI)            │
+ └──────────────────┬────────────────────┘
+                    │
+ ┌──────────────────▼────────────────────┐
+ │         Grafo LangGraph               │
+ │  workflow_controller   [determinista] │
+ │  data_validator        [agente ReAct] │
+ │  dataset_approval      [HITL gate 1]  │
+ │  planner               [LLM s.o.]     │
+ │  executor              [determinista] │
+ │  evaluation            [determinista] │
+ │  report_writer         [LLM s.o.]     │
+ │  deployment_approval   [HITL gate 2]  │
+ │  deployer              [determinista] │
+ │  experience_pool_update[determinista] │
+ └────────┬─────────────────┬────────────┘
+          │                 │
+ ┌────────▼──────┐  ┌───────▼──────────┐
+ │   MLflow      │  │  SQLite          │
+ │ (runs, model  │  │ (experience pool)│
+ │  artifacts)   │  └──────────────────┘
+ └───────────────┘
+\end{Verbatim}
+\caption{Visión general de las capas del sistema. LLM s.o. = nodo LLM con salida estructurada.}
+\label{fig:vision-general}
+\end{figure}
+
+
+\subsection{Patrón controlador determinista y agentes especializados}
+\label{sec:patron-supervisor}
+
+Los sistemas multi-agente descritos en la sección~\ref{sec:sistemas-multiagente} recurren habitualmente a un agente supervisor que utiliza un LLM para decidir qué agente debe actuar a continuación. Este trabajo adopta una variante distinta, motivada por el principio de \emph{restraint} agéntico: el nodo orquestador es un controlador de flujo determinista, implementado como una máquina de estados Python, que toma todas las decisiones de enrutamiento a partir del estado compartido sin invocar ningún modelo de lenguaje.
+
+La justificación de esta elección es directa. En este pipeline, cada decisión de enrutamiento es deducible a partir de campos booleanos y cadenas de texto del estado: si la validación pasó, si el plan de entrenamiento existe, si la evaluación superó los umbrales. Sustituir esta lógica por una llamada LLM introduciría no determinismo, latencia y tokens adicionales sin añadir ninguna capacidad de razonamiento real. El enrutamiento es Python; los agentes son LLM.
+
+\begin{lstlisting}[language=Python, caption={Extracto simplificado del controlador de flujo.}, label={lst:workflow-controller}]
+def workflow_controller(state: AgentState) -> Command:
+    if state.get("error_message"):
+        return Command(goto=END)
+    if not state.get("validation_passed"):
+        return Command(goto="data_validator")
+    if state.get("dataset_approved") is None:
+        return Command(goto="dataset_approval")
+    if not state.get("training_plan"):
+        return Command(goto="planner")
+    if not state.get("training_run_id"):
+        return Command(goto="executor")
+    if state.get("evaluation_passed") is None:
+        return Command(goto="evaluation")
+    if state.get("evaluation_report_audit") is None:
+        return Command(goto="report_writer")
+    if not state.get("evaluation_passed"):
+        return Command(goto=END)
+    if state.get("deployment_approved") is None:
+        return Command(goto="deployment_approval")
+    if state.get("deployment_decision") == "pending":
+        return Command(goto="deployer")
+    return Command(goto=END)
+\end{lstlisting}
+
+Todos los nodos del grafo, tanto agénticos como deterministas, devuelven un \texttt{Command} con destino \texttt{workflow\_controller}. El controlador centraliza así toda la lógica de transición, lo que facilita la trazabilidad y la depuración: para saber por qué el sistema tomó una decisión de enrutamiento concreta, basta con inspeccionar el estado en el momento en que el controlador fue invocado.
+
+Los tres nodos con LLM se justifican individualmente:
+
+\begin{itemize}
+  \item \textbf{Agente de validación de datos} (\texttt{data\_validator}): implementado con el patrón ReAct~\cite{yao_react} mediante \texttt{create\_agent()}. Recibe el dataset y el esquema JSON del usuario, y ejecuta un bucle de herramientas para mapear el esquema de entrada al esquema objetivo, validar la calidad de los datos, detectar fugas de información y generar el dataset canónico. El bucle es genuino: qué herramientas invocar y en qué orden depende de lo que el agente encuentre en los datos, por ejemplo, si hay columnas con muchos valores ausentes, si los tipos de datos no coinciden con el esquema, o si hay solapamiento temporal entre particiones.
+
+  \item \textbf{Agente planificador de modelos} (\texttt{planner}): implementado con salida estructurada (\texttt{with\_structured\_output(PlannerOutput)}). Recibe un contexto ensamblado determinísticamente a partir del perfil del dataset, experiencias pasadas recuperadas del \emph{pool} y reglas estáticas de ML. Produce un \texttt{TrainingPlan} estructurado y auditable: qué modelos incluir como candidatos, por qué, y cuáles descartar con justificación explícita. La elección de salida estructurada en lugar de ReAct es deliberada: los pasos de contexto (perfil, recuperación, reglas) se ejecutan siempre en el mismo orden y no requieren un bucle de herramientas.
+
+  \item \textbf{Nodo redactor de informes} (\texttt{report\_writer}): implementado con salida estructurada (\texttt{with\_structured\_output(EvaluationReport)}). Triangula el razonamiento del planificador, los resultados deterministas del entrenamiento y las métricas del módulo de evaluación para producir un informe auditable destinado al operador humano. No decide la promoción del modelo (esa decisión ya ha sido tomada determinísticamente por el módulo de evaluación); su función es explicar coherentemente por qué el modelo ganador fue seleccionado y si los resultados son consistentes con las experiencias previas.
+\end{itemize}
+
+
+\subsection{Diseño del estado compartido}
+\label{sec:estado-compartido}
+
+LangGraph comparte información entre nodos a través de un objeto de estado tipado, implementado como un \texttt{TypedDict} de Python. Cada nodo recibe el estado completo y devuelve un diccionario parcial con únicamente los campos que modifica; el framework combina las actualizaciones automáticamente. Esta separación entre lectura y escritura parcial garantiza que los nodos no interfieren entre sí ni sobreescriben campos que no les corresponden.
+
+El estado compartido del sistema, denominado \texttt{AgentState}, agrupa los campos en cuatro bloques semánticos:
+
+\textbf{Bloque de entrada y contrato del dataset:}
+\begin{itemize}
+  \item \texttt{problem\_type}: tipo de problema declarado en el esquema (\texttt{"classification"}, \texttt{"regression"} o \texttt{"forecasting"}). Escrito una sola vez por \texttt{data\_validator} a partir del esquema JSON; leído por todos los nodos posteriores.
+  \item \texttt{task\_metadata}: diccionario con la columna objetivo, el horizonte de predicción, la frecuencia y las columnas de identificador de serie (en predicción temporal). Escrito por \texttt{data\_validator}; leído por \texttt{planner} y \texttt{executor}.
+  \item \texttt{schema\_json}: esquema JSON original proporcionado por el usuario.
+  \item \texttt{dataset\_path}: ruta al dataset canónico generado por el agente de validación.
+\end{itemize}
+
+\textbf{Bloque de validación y aprobación del dataset:}
+\begin{itemize}
+  \item \texttt{validation\_passed}: booleano. El controlador no pasa al planificador hasta que este campo sea \texttt{True}.
+  \item \texttt{validation\_report}: informe estructurado del agente de validación (calidad, advertencias, decisiones de limpieza).
+  \item \texttt{dataset\_summary}: perfil descriptivo del dataset (filas, columnas, estadísticas básicas).
+  \item \texttt{dataset\_approved}: \texttt{None} mientras la puerta 1 no ha sido alcanzada, \texttt{True} tras aprobación humana, \texttt{False} tras rechazo.
+  \item \texttt{dataset\_rejection\_comment}: comentario del operador en caso de rechazo, inyectado como retroalimentación en el reintento del agente.
+\end{itemize}
+
+\textbf{Bloque de planificación y entrenamiento:}
+\begin{itemize}
+  \item \texttt{training\_plan}: diccionario serializable que representa el \texttt{TrainingPlan} validado por Pydantic. El ejecutor lo deserializa antes de comenzar el entrenamiento.
+  \item \texttt{planner\_analysis}: texto generado por el planificador que explica la síntesis de evidencias y las decisiones tomadas.
+  \item \texttt{planner\_evidence\_used}: lista de referencias a experiencias, reglas y perfil utilizados como evidencia.
+  \item \texttt{planner\_status}: \texttt{"ok"}, \texttt{"retry\_ok"} o \texttt{"failed"}.
+  \item \texttt{training\_run\_id}: identificador del experimento en MLflow, escrito por el ejecutor.
+  \item \texttt{training\_metrics}: métricas del modelo campeón sobre el conjunto de validación.
+\end{itemize}
+
+\textbf{Bloque de evaluación y despliegue:}
+\begin{itemize}
+  \item \texttt{evaluation\_passed}: \texttt{None} hasta que el módulo de evaluación ha ejecutado, \texttt{True} si el modelo supera los umbrales, \texttt{False} en caso contrario.
+  \item \texttt{evaluation\_report}: informe determinista con las métricas del candidato, el campeón actual y los umbrales aplicados.
+  \item \texttt{evaluation\_report\_audit}: informe narrativo estructurado generado por \texttt{report\_writer}, con análisis de consistencia entre planificación y resultados.
+  \item \texttt{deployment\_approved}: estado de la puerta 2. \texttt{None} hasta que el operador responde; \texttt{True} o \texttt{False} según su decisión.
+  \item \texttt{deployment\_decision}: \texttt{"pending"} hasta que el módulo de despliegue completa el registro en MLflow.
+  \item \texttt{error\_message}: cualquier error terminal escrito por un nodo. Cuando este campo está poblado, el controlador redirige directamente a \texttt{END}.
+\end{itemize}
+
+\textbf{Contrato del dataset (esquema JSON):}
+
+Los nodos de la capa agéntica y determinista leen el tipo de problema y la configuración de la tarea a partir del estado, no del esquema JSON directamente. El agente de validación extrae y valida estos campos desde el esquema al inicio de su ejecución mediante una función determinista (\texttt{\_validate\_schema\_contract}), que comprueba que \texttt{problem\_type} esté declarado y sea uno de los tres valores admitidos, que \texttt{target\_column} exista en la lista de columnas, y que los campos específicos de predicción temporal (\texttt{datetime\_column}, \texttt{forecast\_horizon}, \texttt{frequency}) estén presentes cuando el tipo de problema lo requiere. Cualquier violación del contrato detiene el grafo antes de realizar ninguna llamada al LLM.
+
+
+\subsection{Flujo de ejecución end-to-end}
+\label{sec:flujo-ejecucion}
+
+A continuación se describe la secuencia completa de ejecución del grafo, desde la recepción del dataset hasta el registro del modelo. La figura~\ref{fig:flujo-ejecucion} muestra el grafo de estados con las transiciones principales.
+
+\begin{figure}[H]
+\centering
+\begin{Verbatim}[fontsize=\small]
+  START
+    |
+    v
+  workflow_controller ─────────────────────────────┐
+    |                                               |
+    | [validation_passed = False]                   |
+    v                                               |
+  data_validator (agente ReAct)                     |
+    |                                               |
+    | [validation_passed = True]                    |
+    v                                               |
+  dataset_approval (HITL gate 1)                   |
+    |                    |                          |
+    | [approved=True]    | [approved=False → retry] |
+    v                    +─────────> data_validator |
+  workflow_controller <────────────────────────────-┤
+    |                                               |
+    | [no training_plan]                            |
+    v                                               |
+  planner (LLM salida estructurada)                 |
+    |                                               |
+    v                                               |
+  workflow_controller ──────────────────────────────┤
+    |                                               |
+    | [no training_run_id]                          |
+    v                                               |
+  executor (Python puro + Optuna + MLflow)          |
+    |                                               |
+    v                                               |
+  evaluation (Python puro)                          |
+    |                                               |
+    v                                               |
+  report_writer (LLM salida estructurada)           |
+    |                                               |
+    v                                               |
+  deployment_approval (HITL gate 2)                 |
+    |                    |                          |
+    | [approved=True]    | [approved=False]         |
+    v                    v                          |
+  deployer (Python    END                           |
+  puro + MLflow)                                   |
+    |                                               |
+    v                                               |
+  experience_pool_update (Python puro)              |
+    |                                               |
+    v                                               |
+  END <───────────────────────────────────────────--┘
+       [error_message / evaluation_passed=False]
+\end{Verbatim}
+\caption{Grafo de ejecución del pipeline. Todos los nodos devuelven control al \texttt{workflow\_controller} entre paréntesis; las transiciones mostradas corresponden a las decisiones del controlador.}
+\label{fig:flujo-ejecucion}
+\end{figure}
+
+Las fases principales del flujo son:
+
+\textbf{Fase 1 — Validación del dataset.} El agente de validación recibe el dataset CSV y el esquema JSON. Utilizando su conjunto de herramientas, mapea el esquema de entrada al esquema objetivo, ejecuta operaciones de limpieza, detecta problemas de calidad (valores ausentes, tipos incorrectos, duplicados, fugas de información temporal en datasets de predicción) y produce el dataset canónico junto con un informe de validación. El agente puede ejecutar múltiples rondas de herramientas antes de concluir si los datos presentan problemas que requieren decisiones encadenadas.
+
+\textbf{Fase 2 — Aprobación del dataset (HITL gate 1).} El grafo se suspende y presenta al operador el informe de validación y una vista previa del dataset procesado. Si el operador aprueba, el flujo continúa hacia el planificador. Si rechaza con un comentario, el controlador inyecta dicho comentario como retroalimentación en el estado y redirige al agente de validación para que intente un enfoque alternativo, hasta un máximo configurable de intentos.
+
+\textbf{Fase 3 — Planificación de modelos.} El planificador recibe un contexto ensamblado determinísticamente: el perfil del dataset (características estadísticas en formato estructurado), las experiencias pasadas más similares recuperadas del \emph{pool}, las reglas estáticas de ML aplicables y el registro de modelos disponibles para el tipo de problema. A partir de esta información, produce un \texttt{TrainingPlan} validado por Pydantic que especifica qué modelos entrenar, con qué prioridad, y cuáles descartar explícitamente con justificación. Un validador de cuatro etapas (esquema Pydantic, integridad del plan, referencias de evidencia sin alucinaciones, exhaustividad del registro) rechaza el plan y desencadena un reintento automático si alguna verificación falla.
+
+\textbf{Fase 4 — Ejecución del entrenamiento.} El ejecutor determinista lee el \texttt{TrainingPlan} del estado y entrena cada modelo candidato mediante Optuna para la búsqueda de hiperparámetros. Cada experimento queda registrado en MLflow (parámetros, métricas, artefactos). Al finalizar, el ejecutor identifica el modelo con mejor métrica de validación y escribe su identificador y métricas en el estado.
+
+\textbf{Fase 5 — Evaluación y promoción.} El módulo de evaluación determinista recupera de MLflow las métricas del candidato y del campeón actual, aplica los umbrales definidos para el tipo de problema y escribe \texttt{evaluation\_passed} en el estado. Si el candidato no supera los umbrales, el controlador redirige a \texttt{END} sin invocar el nodo de despliegue.
+
+\textbf{Fase 6 — Informe de auditoría.} El nodo redactor de informes triangula el análisis del planificador, el \texttt{TrainingPlan} ejecutado y los resultados del módulo de evaluación para generar un informe estructurado (\texttt{EvaluationReport}). El informe explica por qué el modelo fue seleccionado como candidato, si los resultados son consistentes con las experiencias previas recuperadas, y señala cualquier discrepancia entre las expectativas del planificador y los resultados empíricos. Este nodo no toma decisiones; su función es producir evidencia auditable para el operador.
+
+\textbf{Fase 7 — Aprobación del despliegue (HITL gate 2).} El grafo se suspende de nuevo y presenta al operador el informe de auditoría junto con el resultado de la evaluación determinista. El operador decide si promover el modelo al registro de producción de MLflow. Un rechazo en esta puerta termina el pipeline sin reintento: la decisión de no desplegar es definitiva.
+
+\textbf{Fase 8 — Despliegue y actualización de experiencias.} Si el operador aprueba, el módulo de despliegue registra el modelo en el Model Registry de MLflow y actualiza el estado. Como paso final, el módulo de actualización del \emph{pool} escribe un registro de experiencia en SQLite con el perfil del dataset, los modelos entrenados, las métricas, el modelo seleccionado, la salida del planificador y la estrategia de validación aplicada. Este registro queda disponible para futuras ejecuciones del planificador.
+
+
+\subsection{Puertas de aprobación humana}
+\label{sec:hitl-gates}
+
+El sistema incorpora dos puntos de control humano, implementados como nodos dedicados del grafo mediante la función \texttt{interrupt()} de LangGraph. Cuando un nodo llama a \texttt{interrupt()}, el framework suspende la ejecución, persiste el estado completo mediante el \emph{checkpointer} en memoria, y espera una respuesta externa. La ejecución se reanuda con \texttt{Command(resume=...)} cuando el usuario envía su decisión a través de la API.
+
+\textbf{Puerta 1 — Aprobación del dataset.} Se activa después de que el agente de validación ha producido el dataset canónico. El operador recibe el informe de validación (advertencias, estadísticas de calidad, decisiones de limpieza) y una vista previa del dataset procesado. La justificación de esta puerta es que el dataset canónico es el único input que el resto del pipeline no puede cuestionar: si el agente de validación tomó decisiones de limpieza incorrectas o el operador considera que el dataset resultante no es adecuado para el problema, corregirlo aquí es mucho menos costoso que descubrirlo tras el entrenamiento. Ante un rechazo con comentario, el controlador reintroduce el comentario en el estado como retroalimentación para el agente, que puede intentar un enfoque alternativo.
+
+\textbf{Puerta 2 — Aprobación del despliegue.} Se activa después de que el informe de auditoría ha sido generado y la evaluación determinista ha confirmado que el candidato supera los umbrales. El operador recibe el informe de auditoría, las métricas comparativas entre el candidato y el campeón actual, y el análisis de consistencia generado por el redactor de informes. Esta puerta responde al principio regulatorio enunciado en la sección~\ref{sec:hitl}: el despliegue de un modelo en producción es una acción irreversible de alto impacto que requiere verificación humana explícita, especialmente en contextos donde el modelo afecta a decisiones industriales. Un rechazo en esta puerta es terminal: el pipeline concluye sin despliegue y sin reintento.
+
+El patrón de implementación de ambas puertas es el mismo:
+
+\begin{lstlisting}[language=Python, caption={Patrón de nodo HITL para la aprobación del dataset.}, label={lst:hitl-gate}]
+def dataset_approval_node(state: AgentState) -> Command:
+    approval = interrupt({
+        "type": "dataset_approval",
+        "preview": state["dataset_summary"],
+        "validation_report": state["validation_report"],
+    })
+    approved = bool(approval.get("approved", False))
+    return Command(
+        update={
+            "dataset_approved": approved,
+            "dataset_rejection_comment": (
+                "" if approved else approval.get("comment", "")
+            ),
+        },
+        goto="workflow_controller",
+    )
+\end{lstlisting}
+
+El diseño de puertas como nodos explícitos del grafo, en lugar de embeberlas dentro de los agentes, tiene dos ventajas arquitectónicas. En primer lugar, mantiene los agentes centrados en su dominio: el agente de validación no necesita saber que existe una puerta de aprobación; simplemente produce su resultado y devuelve control al controlador. En segundo lugar, hace que las puertas sean visibles en la topología del grafo, lo que facilita la comprensión del flujo de supervisión humana por parte de cualquier lector del código.
+
+
+\subsection{Pool de experiencias y base de conocimiento estático}
+\label{sec:experience-pool}
+
+El \emph{pool} de experiencias es el mecanismo de memoria a largo plazo del sistema. Su propósito es acumular información sobre ejecuciones anteriores del pipeline y ponerla a disposición del planificador como evidencia empírica para futuras decisiones de selección de modelos.
+
+\textbf{Almacenamiento.} El \emph{pool} se implementa sobre SQLite mediante tres tablas: \texttt{experiences} (un registro por ejecución con el perfil del dataset, el modelo seleccionado y las métricas principales), \texttt{candidate\_results} (una fila por modelo candidato entrenado, con su métrica y su clasificación relativa) y \texttt{model\_artifacts} (referencias a los artefactos MLflow asociados). La elección de SQLite responde al principio de \emph{restraint}: para un prototipo de investigación con centenares de ejecuciones, una base de datos embebida es suficiente y elimina la dependencia de infraestructura externa.
+
+\textbf{Perfil del dataset y recuperación por similitud.} Cada experiencia almacena un \texttt{DatasetProfile}, un conjunto de características estadísticas del dataset expresadas como valores discretos (por ejemplo, el tamaño del dataset se clasifica en cuatro categorías: \texttt{very\_small}, \texttt{small}, \texttt{medium}, \texttt{large}). La recuperación de experiencias similares (\texttt{ExperiencePool.find\_similar}) compara el perfil del dataset actual contra los almacenados y devuelve las $k$ experiencias más parecidas. Este mecanismo permite al planificador recibir evidencia empírica contextualizada en lugar de depender exclusivamente de reglas estáticas.
+
+\textbf{Base de conocimiento estático.} Junto al \emph{pool} dinámico, el sistema mantiene un fichero YAML de reglas de ML curadas (\texttt{knowledge/ml\_rules.yaml}). Estas reglas codifican heurísticas expertas condicionales, por ejemplo: <<si el dataset tiene más de cincuenta mil filas y el tipo de problema es clasificación, preferir LightGBM o XGBoost sobre SVM>>. Las reglas son versionadas junto con el código y constituyen el conocimiento de arranque del planificador cuando el \emph{pool} está vacío. En ejecuciones posteriores, las experiencias empíricas complementan y, cuando hay conflicto, pueden prevalecer sobre las reglas si el perfil del dataset actual se asemeja más a una experiencia conocida que a la condición genérica de la regla.
+
+\textbf{Integración con el planificador.} El nodo planificador no accede directamente al \emph{pool} ni a las reglas; recibe un \texttt{PlannerContext} ensamblado determinísticamente antes de la llamada al LLM. Este contexto incluye las experiencias similares (con sus resultados y clasificaciones de candidatos), las reglas aplicables y la lista de modelos del registro disponibles para el tipo de problema. La separación entre recuperación determinista y razonamiento LLM garantiza que el planificador no puede inventar referencias a experiencias o reglas que no existan en el contexto que recibió; el validador de evidencias comprueba esto explícitamente.
+
+
+\subsection{Infraestructura de despliegue}
+\label{sec:infraestructura}
+
+El sistema se empaqueta como un conjunto de contenedores Docker orquestados mediante \texttt{docker compose}, con el objetivo de garantizar la reproducibilidad del entorno en cualquier máquina con Docker Desktop instalado, sin requerir Python, Node.js ni ninguna otra dependencia local.
+
+\textbf{Servicios.} La figura~\ref{fig:docker-services} describe los tres servicios que componen el stack:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{llll}
+\hline
+\textbf{Servicio} & \textbf{Imagen / Build} & \textbf{Puerto} & \textbf{Función} \\
+\hline
+\texttt{mlflow}   & \texttt{ghcr.io/mlflow/mlflow:v2.18.0} & 5000 & Seguimiento de experimentos y registro de modelos \\
+\texttt{api}      & \texttt{Dockerfile} (Python/UV)         & 8000 & FastAPI + grafo LangGraph + agentes \\
+\texttt{frontend} & \texttt{Dockerfile.frontend} (Node 20)  & 3000 & Next.js: interfaz de usuario \\
+\hline
+\end{tabular}
+\caption{Servicios del stack Docker.}
+\label{fig:docker-services}
+\end{figure}
+
+El servicio \texttt{api} declara \texttt{depends\_on: mlflow}, lo que garantiza que el servidor de seguimiento esté disponible antes de que los agentes intenten registrar experimentos. El volumen \texttt{./data:/app/data} monta el directorio de datos del repositorio dentro del contenedor, de modo que los datasets de entrada y los modelos generados son accesibles tanto desde el contenedor como desde el host.
+
+\textbf{Construcción del backend.} La imagen del backend utiliza un \emph{build} multietapa con UV: una etapa de construcción que instala las dependencias desde el fichero de bloqueo (\texttt{uv.lock}), y una etapa de ejecución ligera que copia únicamente los artefactos necesarios. El usuario no raíz en la imagen final reduce la superficie de ataque del contenedor.
+
+\textbf{Construcción del frontend.} La imagen del frontend sigue un \emph{build} de tres etapas con Node 20 Alpine: instalación de dependencias, construcción del bundle Next.js en modo \emph{standalone}, y una etapa de ejecución mínima que copia únicamente el directorio \texttt{.next/standalone}. La variable \texttt{NEXT\_PUBLIC\_API\_URL} se inyecta en tiempo de construcción con el valor \texttt{http://localhost:8000}, ya que el navegador accede a la API directamente desde el exterior de Docker.
+
+\textbf{MLflow y la separación de almacenamiento.} MLflow gestiona exclusivamente el seguimiento de experimentos, el almacenamiento de artefactos (modelos entrenados, ficheros de métricas) y el Model Registry. La base de datos SQLite del \emph{pool} de experiencias es completamente independiente de MLflow: nunca se copian datos entre ambos almacenes. Los registros del \emph{pool} referencian las ejecuciones MLflow mediante el campo \texttt{mlflow\_run\_id}, que actúa como puntero externo, pero toda la información de recuperación reside en el \emph{pool} para garantizar velocidad de consulta sin depender del servidor MLflow en tiempo de planificación.

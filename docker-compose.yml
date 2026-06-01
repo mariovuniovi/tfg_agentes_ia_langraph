@@ -4,7 +4,7 @@ services:
   # Access at: http://localhost:5000
   # ===========================================================================
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.18.0
+    image: ghcr.io/mlflow/mlflow:v3.10.1
     container_name: mlops-mlflow
     restart: unless-stopped
     command: >
@@ -14,6 +14,7 @@ services:
         --backend-store-uri sqlite:///mlflow/mlflow.db
         --artifacts-destination /mlflow/artifacts
         --serve-artifacts
+        --allowed-hosts "mlflow:5000,mlflow,localhost,localhost:5000,127.0.0.1,127.0.0.1:5000"
     volumes:
       - mlflow_data:/mlflow
     ports:
@@ -42,6 +43,7 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./storage:/app/storage
     networks:
       - mlops-net
 

@@ -123,12 +123,6 @@ Each agent is `langchain.agents.create_agent(...)` (ReAct loop). The supervisor 
 | `ml_rules.yaml` | Domain rules: hard preferences (`prefer`/`avoid`) and forecasting recipe recommendations (`recommend`). Consumed by the deterministic planner today and by SP5 LLM tomorrow. |
 | `reader.py` | `MLRule` Pydantic model + `load_rules()` + `match_rules(context)` — matches rules against a merged profile+task_metadata context |
 
-### `mcp_servers/` — Model Context Protocol servers
-| File | Purpose |
-|---|---|
-| `mlflow_server.py` | FastMCP server: `list_experiments`, `get_experiment_runs`, `list_registered_models` |
-| `data_server.py` | FastMCP server: `list_datasets`, `preview_dataset` |
-
 ---
 
 ## `api/` — FastAPI backend

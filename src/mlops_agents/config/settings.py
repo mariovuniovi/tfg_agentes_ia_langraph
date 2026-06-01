@@ -28,9 +28,6 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = "sqlite:///./mlflow.db"
     mlflow_experiment_name: str = "mlops-agents"
 
-    # Evidently
-    evidently_workspace: str = "./evidently_workspace"
-
     # LangSmith (optional tracing)
     langchain_tracing_v2: bool = False
     langchain_api_key: str = ""
