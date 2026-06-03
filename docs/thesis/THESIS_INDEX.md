@@ -66,5 +66,15 @@
 | sec:nodo-report-writer | cap04_nodos | report\_writer: LLM de informe de auditoría |
 | sec:nodo-gate2 | cap04_nodos | deployment\_approval: puerta HITL 2 |
 | sec:nodo-deployer | cap04_nodos | deployer: registro en MLflow Model Registry |
+| sec:experience-pool-detalle | cap04_experience_pool | Subsección principal: pool de experiencias |
+| sec:experience-schema | cap04_experience_pool | ExperienceRecord: campos y semántica |
+| sec:experience-storage | cap04_experience_pool | Tres tablas SQLite: experiences, candidate_results, model_artifacts |
+| sec:dataset-profile | cap04_experience_pool | DatasetProfile: discretización por cubos |
+| sec:similarity-function | cap04_experience_pool | Función de similitud ponderada; ratio y tier |
+| sec:experience-value | cap04_experience_pool | Por qué es útil: evidencia empírica vs reglas estáticas |
+| sec:experience-planner-integration | cap04_experience_pool | Integración con el planificador y validación anti-alucinación |
+| sec:experience-current-state | cap04_experience_pool | 19 experiencias de referencia (benchmark) |
+| tab:similarity-weights | cap04_experience_pool | Tabla de pesos de campos en la función de similitud |
+| lst:similarity | cap04_experience_pool | Fragmento del cálculo de similitud ponderada |
 | lst:workflow-controller | cap04 | Extracto del workflow\_controller |
 | lst:hitl-gate | cap04 | Patrón del nodo dataset\_approval\_node |
