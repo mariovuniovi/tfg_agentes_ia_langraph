@@ -22,11 +22,10 @@
     {
       "name": "week_date",
       "dtype": "datetime",
-      "description": "Monday of the measurement week (join key between the two raw files)",
+      "description": "Monday of the measurement week",
       "required": true,
       "nullable": false,
-      "is_key": true,
-      "mapping_hint": "Named 'week_date' in both raw files — use this as the join key"
+      "unique": true
     },
     {
       "name": "kwh_consumed",
@@ -34,16 +33,14 @@
       "description": "Total energy consumed that week in kWh (forecast target)",
       "required": true,
       "nullable": false,
-      "min": 0.0,
-      "mapping_hint": "Named 'kwh_consumed' in energy_readings.csv"
+      "min": 0.0
     },
     {
       "name": "avg_temp_c",
       "dtype": "float",
       "description": "Weekly average outdoor temperature in Celsius — unknown future, will be extended",
       "required": true,
-      "nullable": false,
-      "mapping_hint": "Named 'avg_temp_c' in weather_data.csv"
+      "nullable": false
     },
     {
       "name": "is_holiday_week",
@@ -51,8 +48,7 @@
       "description": "1 if the week contains a public holiday, 0 otherwise — known future (calendar)",
       "required": true,
       "nullable": false,
-      "allowed_values": [0, 1],
-      "mapping_hint": "Named 'is_holiday_week' in weather_data.csv"
+      "allowed_values": [0, 1]
     }
   ]
 }

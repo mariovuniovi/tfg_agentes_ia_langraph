@@ -11,8 +11,7 @@
       "required": true,
       "nullable": false,
       "min": 0.0,
-      "max": 30.0,
-      "mapping_hint": "Usually named 'SepalLengthCm', 'sepal length (cm)' or similar in raw files"
+      "max": 30.0
     },
     {
       "name": "sepal_width",
@@ -21,8 +20,7 @@
       "required": true,
       "nullable": false,
       "min": 0.0,
-      "max": 30.0,
-      "mapping_hint": "Usually named 'SepalWidthCm', 'sepal width (cm)' or similar"
+      "max": 30.0
     },
     {
       "name": "petal_length",
@@ -31,8 +29,7 @@
       "required": true,
       "nullable": false,
       "min": 0.0,
-      "max": 30.0,
-      "mapping_hint": "Usually named 'PetalLengthCm', 'petal length (cm)' or similar"
+      "max": 30.0
     },
     {
       "name": "petal_width",
@@ -41,8 +38,7 @@
       "required": true,
       "nullable": false,
       "min": 0.0,
-      "max": 30.0,
-      "mapping_hint": "Usually named 'PetalWidthCm', 'petal width (cm)' or similar"
+      "max": 30.0
     },
     {
       "name": "sample_id",
@@ -50,8 +46,7 @@
       "description": "Unique sample identifier used to join measurement files",
       "required": true,
       "nullable": false,
-      "is_key": true,
-      "mapping_hint": "Usually named 'id', 'sample_id', 'Id' or similar"
+      "unique": true
     },
     {
       "name": "target",
@@ -59,8 +54,7 @@
       "description": "Class label for the flower species",
       "required": true,
       "nullable": false,
-      "allowed_values": ["setosa", "versicolor", "virginica"],
-      "mapping_hint": "Often named 'species', 'class', 'label', or 'variety' in raw datasets"
+      "allowed_values": ["setosa", "versicolor", "virginica"]
     }
   ]
 }
