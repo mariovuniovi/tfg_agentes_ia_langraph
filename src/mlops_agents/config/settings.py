@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     imputation_strategy_numeric: Literal["mean", "median", "zero"] = "mean"
     imputation_strategy_categorical: Literal["mode", "unknown", "drop_row"] = "mode"
 
+    # Data Validator — Join Discovery
+    data_validator_profile_nrows: int = 10
+    data_validator_max_join_candidates: int = 20
+    data_validator_row_explosion_medium_threshold: float = 1.25
+    data_validator_row_explosion_high_threshold: float = 2.0
+    data_validator_min_left_coverage: float = 0.8
+    data_validator_min_containment: float = 0.8
+
     # Training executor (SP3)
     train_test_split_ratio: float = 0.2
     cv_folds: int = 5
