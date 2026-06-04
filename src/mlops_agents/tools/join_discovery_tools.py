@@ -224,3 +224,179 @@ def evaluate_join_candidates(candidates_json: str, raw_paths_json: str) -> str:
 
     logger.info(f"[evaluate] evaluated {len(evaluations)} candidates, {len(errors)} errors")
     return json.dumps({"evaluations": evaluations, "errors": errors}, default=str)
+
+
+@tool
+def execute_join_plan(
+    selections_json: str,
+    evaluations_json: str,
+    raw_paths_json: str,
+    output_path: str,
+    target_schema_json: str = "",
+) -> str:
+    """Execute join plan from agent selections + prior evaluation results.
+
+    Args:
+        selections_json: Agent's decisions. Format:
+            {
+              "base_dataset": {"dataset_name": str, "confidence": "high"|"medium"|"low",
+                               "covered_target_columns": [...], "missing_target_columns": [...],
+                               "reason": str, "warnings": [...]},
+              "selected": [{"candidate_id": str, "columns_to_add": [...],
+                            "confidence_after_evaluation": "high"|"medium"|"low",
+                            "reason": str, "warnings": [...]}],
+              "rejected": [{"candidate_id": str, "reason": str}],
+              "unresolved_ambiguities": [...],
+              "warnings": [...]
+            }
+        evaluations_json: Raw output from evaluate_join_candidates — pass through unchanged.
+            Format: {"evaluations": [...], "errors": [...]}
+        raw_paths_json: JSON object {"dataset_name": "path/to/file.csv", ...}
+        output_path: Destination path for the merged CSV.
+        target_schema_json: Optional JSON schema — verifies required columns present after join.
+
+    Returns:
+        JSON with {success, output_path, row_count, columns, columns_added_by_join, warnings, join_plan} or {error}.
+    """
+    from mlops_agents.contracts.join_discovery import (
+        JoinPlan, BaseDatasetSelection, SelectedJoin, RejectedJoinCandidate, JoinCandidateEvaluation,
+    )
+
+    selections: dict = json.loads(selections_json)
+    eval_data: dict = json.loads(evaluations_json)
+    raw_paths: dict[str, str] = json.loads(raw_paths_json)
+
+    # Build evaluation lookup by candidate_id
+    eval_by_id: dict[str, dict] = {e["candidate_id"]: e for e in eval_data.get("evaluations", [])}
+
+    # Validate all selected candidates have evaluations
+    for sel in selections.get("selected", []):
+        cid = sel["candidate_id"]
+        if cid not in eval_by_id:
+            return json.dumps({"error": f"Selected candidate '{cid}' was not evaluated — call evaluate_join_candidates first"})
+        if eval_by_id[cid].get("left_coverage", 0.0) == 0.0:
+            ev = eval_by_id[cid]
+            return json.dumps({"error": f"Join blocked for {cid}: zero overlap between "
+                                        f"'{ev['left_dataset']}.{ev['left_column']}' and "
+                                        f"'{ev['right_dataset']}.{ev['right_column']}' — wrong join key pair"})
+
+    # Build BaseDatasetSelection
+    try:
+        base_sel = BaseDatasetSelection(**selections["base_dataset"])
+    except Exception as e:
+        return json.dumps({"error": f"Invalid base_dataset: {e}"})
+
+    # Build SelectedJoin list
+    selected_joins: list[SelectedJoin] = []
+    for i, sel in enumerate(selections.get("selected", []), start=1):
+        cid = sel["candidate_id"]
+        try:
+            ev = JoinCandidateEvaluation(**eval_by_id[cid])
+        except Exception as e:
+            return json.dumps({"error": f"Invalid evaluation for {cid}: {e}"})
+        selected_joins.append(SelectedJoin(
+            step_id=i,
+            candidate_id=cid,
+            left_dataset=ev.left_dataset,
+            left_column=ev.left_column,
+            right_dataset=ev.right_dataset,
+            right_column=ev.right_column,
+            join_type="left",
+            columns_added=sel.get("columns_to_add", []),
+            evaluation=ev,
+            confidence_after_evaluation=sel.get("confidence_after_evaluation", "medium"),
+            reason=sel.get("reason", "selected"),
+            warnings=sel.get("warnings", []),
+        ))
+
+    # Build RejectedJoinCandidate list
+    rejected: list[RejectedJoinCandidate] = []
+    for rej in selections.get("rejected", []):
+        cid = rej["candidate_id"]
+        ev_dict = eval_by_id.get(cid)
+        ev = JoinCandidateEvaluation(**ev_dict) if ev_dict else None
+        rejected.append(RejectedJoinCandidate(
+            candidate_id=cid,
+            left_dataset=ev.left_dataset if ev else "",
+            left_column=ev.left_column if ev else "",
+            right_dataset=ev.right_dataset if ev else "",
+            right_column=ev.right_column if ev else "",
+            reason=rej.get("reason", "rejected"),
+            evaluation=ev,
+        ))
+
+    plan = JoinPlan(
+        mode="inferred",
+        base_dataset=base_sel,
+        selected_joins=selected_joins,
+        rejected_candidates=rejected,
+        unresolved_ambiguities=selections.get("unresolved_ambiguities", []),
+        warnings=selections.get("warnings", []),
+    )
+
+    # Execute merges
+    base_name = plan.base_dataset.dataset_name
+    base_path = raw_paths.get(base_name)
+    if not base_path or not Path(base_path).exists():
+        return json.dumps({"error": f"Base dataset '{base_name}' not found"})
+
+    current_df = pd.read_csv(base_path)
+    columns_added_by_join: dict[str, list[str]] = {}
+    join_warnings: list[str] = []
+
+    for step in plan.selected_joins:
+        right_path = raw_paths.get(step.right_dataset)
+        if not right_path or not Path(right_path).exists():
+            return json.dumps({"error": f"Right dataset '{step.right_dataset}' not found at step {step.step_id}"})
+
+        right_df = pd.read_csv(right_path)
+        keep_cols = [step.right_column] + [c for c in step.columns_added if c in right_df.columns and c != step.right_column]
+        right_before = len(right_df)
+        right_df = right_df[keep_cols].drop_duplicates(subset=[step.right_column])
+        if len(right_df) < right_before:
+            join_warnings.append(
+                f"Step {step.step_id}: {right_before - len(right_df)} duplicate key(s) dropped from "
+                f"'{step.right_dataset}.{step.right_column}' — first occurrence retained"
+            )
+
+        # Avoid column collisions
+        existing = set(current_df.columns)
+        rename_map = {
+            c: f"{c}_{step.right_dataset}"
+            for c in keep_cols
+            if c in existing and c != step.right_column
+        }
+        if rename_map:
+            right_df = right_df.rename(columns=rename_map)
+            join_warnings += [f"Column '{c}' renamed to '{rename_map[c]}' to avoid collision" for c in rename_map]
+
+        current_df = current_df.merge(right_df, left_on=step.left_column, right_on=step.right_column, how="left")
+
+        # Drop the right join key if it differs from the left — pandas keeps both after merge
+        if step.right_column != step.left_column and step.right_column in current_df.columns:
+            current_df = current_df.drop(columns=[step.right_column])
+
+        columns_added_by_join[step.candidate_id] = [rename_map.get(c, c) for c in step.columns_added]
+
+    # Verify required target columns present
+    if target_schema_json:
+        schema = json.loads(target_schema_json)
+        required_cols = {c["name"] for c in schema.get("columns", []) if c.get("required", False)}
+        missing = required_cols - set(current_df.columns)
+        if missing:
+            return json.dumps({"error": f"Required target columns missing after all joins: {sorted(missing)}"})
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    current_df.to_csv(output_path, index=False)
+
+    result = {
+        "success": True,
+        "output_path": output_path,
+        "row_count": len(current_df),
+        "columns": current_df.columns.tolist(),
+        "columns_added_by_join": columns_added_by_join,
+        "warnings": join_warnings + plan.warnings,
+        "join_plan": plan.model_dump(),  # echoed so data_validator_node can write it to state
+    }
+    logger.info(f"[execute_join_plan] {len(plan.selected_joins)} join(s) → {len(current_df)} rows, {len(current_df.columns)} cols → {output_path}")
+    return json.dumps(result, default=str)
