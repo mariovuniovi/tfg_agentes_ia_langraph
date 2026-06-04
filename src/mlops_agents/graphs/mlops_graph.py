@@ -167,6 +167,13 @@ def _validate_schema_contract(schema_data: dict) -> None:
             if col not in column_names:
                 raise ValueError(f"'series_id_columns' entry '{col}' not found in columns.")
 
+    join_policy = schema_data.get("join_policy", {})
+    if join_policy:
+        valid_modes = {"explicit", "inferred", "hybrid"}
+        mode = join_policy.get("mode")
+        if mode and mode not in valid_modes:
+            raise ValueError(f"join_policy.mode must be one of {valid_modes}, got {mode!r}")
+
 
 def data_validator_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     import pandas as pd
