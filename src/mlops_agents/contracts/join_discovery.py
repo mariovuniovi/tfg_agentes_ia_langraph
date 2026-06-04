@@ -1,4 +1,9 @@
-from typing import Literal, Any
+"""Pydantic contracts for agentic join discovery."""
+
+from __future__ import annotations
+
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -19,7 +24,7 @@ class RawDatasetProfile(BaseModel):
     n_rows: int
     n_columns: int
     columns: list[ColumnProfile]
-    head_rows: list[dict] = Field(default_factory=list)  # head(profile_nrows) for agent inspection
+    head_rows: list[dict[str, Any]] = Field(default_factory=list)  # head(profile_nrows) for agent inspection
 
 
 class BaseDatasetSelection(BaseModel):

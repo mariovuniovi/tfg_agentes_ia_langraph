@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from mlops_agents.contracts.join_discovery import JoinPlan, BaseDatasetSelection
 
 
-def test_join_plan_valid():
+def test_join_plan_valid() -> None:
     base = BaseDatasetSelection(
         dataset_name="energy",
         confidence="high",
@@ -14,7 +14,7 @@ def test_join_plan_valid():
     assert plan.selected_joins == []
 
 
-def test_base_dataset_selection_requires_reason():
+def test_base_dataset_selection_requires_reason() -> None:
     with pytest.raises(ValidationError):
         BaseDatasetSelection(
             dataset_name="energy",
