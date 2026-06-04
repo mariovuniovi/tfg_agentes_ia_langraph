@@ -95,6 +95,57 @@ template: |
   7. Call validate_against_schema.
   8. Call check_data_quality.
 
+  ## Join discovery workflow
+
+  When multiple raw datasets are provided and explicit join keys are not fully specified,
+  compact profiles for every raw dataset are already included in your initial context
+  under "Raw dataset profiles". Use them — do not call any profiling tool.
+
+  1. Select a base_dataset using the profiles. Its row count defines the final table row count — all other datasets are joined to it (left join, NAs for unmatched rows).
+     - Prefer the dataset covering the most required target columns — this identifies the semantic "fact table".
+     - Prefer the dataset that contains the target variable.
+     - Prefer the dataset that contains the time/entity index of the final dataset.
+     - Use row count as a tiebreaker when coverage is equal — prefer the larger dataset.
+     Dataset names must exactly match the `dataset_name` field from the Raw dataset profiles in your context. Do not invent aliases, abbreviations, or guesses. If the profile says `"dataset_name": "energy_readings"`, every reference to that dataset in tool calls must use exactly `"energy_readings"`.
+
+  2. Identify missing target columns not covered by the base dataset.
+
+  3. Propose at most 20 join candidates to add those missing columns.
+     Use the profiles (column names, dtypes, null_rate, unique_ratio, min/max values, head rows) to reason about plausible join keys — do not guess blindly.
+
+  4. Call evaluate_join_candidates() with only those proposed candidates.
+     Pass a JSON array where each entry has: candidate_id, left_dataset, left_column, right_dataset, right_column.
+     For raw_paths_json: build {"dataset_name": "path"} from the profiles in your context (each profile has dataset_name and path fields).
+
+  5. Select a JoinPlan using the evaluation metrics.
+     Reject or request human clarification if:
+     - No candidate has acceptable coverage/containment
+     - Selected join has many_to_many relationship
+     - Row explosion risk is high
+
+  6. Call execute_join_plan() with:
+     - selections_json: your decisions (base_dataset, selected candidate IDs with columns_to_add/reason, rejected candidate IDs with reason)
+     - evaluations_json: the raw output you received from evaluate_join_candidates — pass it through unchanged
+     - raw_paths_json: same {"dataset_name": "path"} mapping from profiles
+     Do NOT reconstruct evaluation metrics — the tool looks them up internally.
+
+  7. Proceed to apply_column_mapping, validate_against_schema, and other standard validation steps on the merged dataset.
+
+  Always use left join. The base dataset defines the target rows and its row count must be preserved. Unmatched enrichment rows are filled with NAs. Inner joins are not supported.
+
+  Do not exhaustively test every possible column pair.
+  You are responsible for reducing the search space by proposing semantically plausible candidates.
+  You must not select a final join unless evaluate_join_candidates confirms the join quality.
+
+  Example:
+  Raw datasets: energy_readings(week_date, kwh_consumed), weather(week_date, avg_temp_c)
+  Target: week_date, kwh_consumed, avg_temp_c
+  Correct behavior:
+  - select energy_readings as base (contains target and time index, most target columns)
+  - propose energy_readings.week_date LEFT JOIN weather.week_date
+  - evaluate candidate
+  - call execute_join_plan with selections + evaluations
+
   REPORTING:
   Report clearly at the end:
   - PASSED or FAILED

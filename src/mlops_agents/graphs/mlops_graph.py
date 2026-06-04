@@ -63,10 +63,26 @@ def _build_data_validator_context(
     schema_json: str = "{}",
     schema_path: str = "",
 ) -> HumanMessage:
+    from mlops_agents.tools.join_discovery_tools import profile_raw_datasets as _profile
+
     paths: list[str] = state.get("dataset_paths") or []
+
+    # Build name → path mapping; use filename stem as dataset name
+    raw_paths = {Path(p).stem: p for p in paths}
+
+    profiles_section = ""
+    if len(paths) > 1:
+        try:
+            profiles = _profile(raw_paths)
+            profiles_section = "\nRaw dataset profiles:\n" + json.dumps(
+                [p.model_dump() for p in profiles], default=str, indent=2
+            )
+        except Exception as exc:
+            profiles_section = f"\n(Could not pre-profile raw files: {exc})"
+
     single_file_note = (
         "\nNOTE: Only ONE file was uploaded. "
-        "Do NOT call merge_datasets. "
+        "Do NOT call merge_datasets or execute_join_plan. "
         "After load_dataset, go directly to apply_column_mapping on this single file."
         if len(paths) == 1 else ""
     )
@@ -74,6 +90,7 @@ def _build_data_validator_context(
         f"Raw files: {json.dumps(paths)}\n"
         f"Schema path: {schema_path}\n"
         f"Target schema:\n{schema_json}"
+        f"{profiles_section}"
         f"{single_file_note}"
     ))
 
