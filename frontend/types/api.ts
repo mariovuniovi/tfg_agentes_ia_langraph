@@ -33,6 +33,92 @@ export interface HITLDecision {
   comment?: string
 }
 
+export interface ColumnProfile {
+  column_name: string
+  dtype: string
+  non_null_count: number
+  null_rate: number
+  unique_count: number
+  unique_ratio: number
+  min_value?: string | null
+  max_value?: string | null
+}
+
+export interface RawDatasetProfile {
+  dataset_name: string
+  path: string
+  n_rows: number
+  n_columns: number
+  columns: ColumnProfile[]
+  head_rows: Record<string, unknown>[]
+}
+
+export interface BaseDatasetSelection {
+  dataset_name: string
+  confidence: 'high' | 'medium' | 'low'
+  covered_target_columns: string[]
+  missing_target_columns: string[]
+  reason: string
+  warnings: string[]
+}
+
+export interface JoinCandidateEvaluation {
+  candidate_id: string
+  left_dataset: string
+  left_column: string
+  right_dataset: string
+  right_column: string
+  left_distinct: number
+  right_distinct: number
+  intersection_count: number
+  left_coverage: number
+  right_coverage: number
+  jaccard: number
+  containment: number
+  left_unique_ratio: number
+  right_unique_ratio: number
+  inferred_relationship: string
+  estimated_inner_rows: number
+  estimated_left_rows: number
+  row_multiplier_left: number
+  join_explosion_risk: 'low' | 'medium' | 'high'
+  warnings: string[]
+}
+
+export interface SelectedJoin {
+  step_id: number
+  candidate_id: string
+  left_dataset: string
+  left_column: string
+  right_dataset: string
+  right_column: string
+  join_type: 'left'
+  columns_added: string[]
+  evaluation: JoinCandidateEvaluation
+  confidence_after_evaluation: 'high' | 'medium' | 'low'
+  reason: string
+  warnings: string[]
+}
+
+export interface RejectedJoinCandidate {
+  candidate_id: string
+  left_dataset: string
+  left_column: string
+  right_dataset: string
+  right_column: string
+  reason: string
+  evaluation?: JoinCandidateEvaluation | null
+}
+
+export interface JoinPlan {
+  mode: 'explicit' | 'inferred' | 'hybrid'
+  base_dataset: BaseDatasetSelection
+  selected_joins: SelectedJoin[]
+  rejected_candidates: RejectedJoinCandidate[]
+  unresolved_ambiguities: string[]
+  warnings: string[]
+}
+
 export interface DataValidationInterrupt {
   type: 'data_validation'
   attempt?: number
@@ -53,6 +139,9 @@ export interface DataValidationInterrupt {
     missing_values: Record<string, number>
     schema_validated: boolean
   }
+  join_plan?: JoinPlan | null
+  join_evaluations?: JoinCandidateEvaluation[]
+  join_base_nrows?: number | null
 }
 
 export interface AuditReportEventData {
