@@ -4,10 +4,11 @@ import { toast } from 'sonner'
 import type { DataValidationInterrupt } from '@/types/api'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { JoinPlanPanel } from './JoinPlanPanel'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
-type Tab = 'head' | 'tail' | 'schema' | 'validation'
+type Tab = 'head' | 'tail' | 'schema' | 'validation' | 'join_plan'
 
 interface Props {
   runId: string | null
@@ -30,6 +31,7 @@ export function DatasetApprovalCard({ runId, interrupt, onApprove, isPending, ma
     ...(hasTail ? [{ key: 'tail' as const, label: 'Tail' }] : []),
     { key: 'schema', label: 'Schema' },
     { key: 'validation', label: 'Validation report' },
+    ...(interrupt.join_plan !== undefined ? [{ key: 'join_plan' as const, label: 'Join plan' }] : []),
   ]
 
   const rows =
@@ -125,6 +127,10 @@ export function DatasetApprovalCard({ runId, interrupt, onApprove, isPending, ma
         <pre className="overflow-x-auto rounded bg-zinc-50 p-2 font-mono text-xs text-zinc-700">
           {JSON.stringify(interrupt.validation_report ?? {}, null, 2)}
         </pre>
+      )}
+
+      {tab === 'join_plan' && (
+        <JoinPlanPanel joinPlan={interrupt.join_plan} joinBaseNrows={interrupt.join_base_nrows} />
       )}
 
       <label htmlFor="reject-comment" className="mt-4 mb-1 block text-xs font-medium text-zinc-500">
