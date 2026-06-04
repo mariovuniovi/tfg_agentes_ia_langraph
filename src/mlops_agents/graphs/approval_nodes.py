@@ -61,6 +61,9 @@ def dataset_approval_node(state: dict[str, Any]) -> Command:
         "attempt": attempt,
         "dataset_preview": preview,
         "validation_report": state.get("validation_report", {}),
+        "join_plan": state.get("data_join_plan"),
+        "join_evaluations": state.get("data_join_evaluations"),
+        "join_base_nrows": state.get("data_join_base_nrows"),
     })
     approved = bool(approval.get("approved", False))
     comment = approval.get("comment", "")
