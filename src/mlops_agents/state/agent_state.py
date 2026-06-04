@@ -83,6 +83,11 @@ class AgentState(TypedDict):
     #   "frequency": str,
     # }
 
+    # Join discovery outputs — written by data_validator_node after agent run
+    data_join_plan: dict | None
+    data_join_base_nrows: int | None  # row count of the base dataset before any joins
+    data_join_evaluations: list[dict]
+
     # SP5 planner outputs
     planner_analysis: str | None            # LLM-generated planning explanation artifact
     planner_evidence_used: list[dict]       # list of EvidenceReference dicts

@@ -53,6 +53,9 @@ def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict
         "thresholds_applied": {},
         "evaluation_report_audit": None,
         "evaluation_report_audit_status": "",
+        "data_join_plan": None,
+        "data_join_base_nrows": None,
+        "data_join_evaluations": [],
     }
 
 

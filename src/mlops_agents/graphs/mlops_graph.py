@@ -244,6 +244,25 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
     validation_result: dict = _extract_tool_json(result["messages"], "validate_against_schema")
     imputation_result: dict = _extract_tool_json(result["messages"], "impute_missing_values")
 
+    join_exec_result: dict = _extract_tool_json(result["messages"], "execute_join_plan")
+    eval_result: dict = _extract_tool_json(result["messages"], "evaluate_join_candidates")
+
+    data_join_plan = join_exec_result.get("join_plan")          # echoed by execute_join_plan
+    data_join_evaluations = eval_result.get("evaluations", [])
+
+    # Capture base dataset row count for audit
+    data_join_base_nrows: int | None = None
+    if data_join_plan:
+        base_name = data_join_plan.get("base_dataset", {}).get("dataset_name")
+        if base_name:
+            raw_paths = {Path(p).stem: p for p in (state.get("dataset_paths") or [])}
+            base_path = raw_paths.get(base_name)
+            if base_path and Path(base_path).exists():
+                try:
+                    data_join_base_nrows = len(pd.read_csv(base_path))
+                except Exception:
+                    pass
+
     processed_path = (
         imputation_result.get("output_path", "")
         or mapping_result.get("output_path", "")
@@ -284,6 +303,9 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
         "problem_type": problem_type,
         "task_metadata": task_metadata,
         "schema_json": schema_json,
+        "data_join_plan": data_join_plan,
+        "data_join_base_nrows": data_join_base_nrows,
+        "data_join_evaluations": data_join_evaluations,
     }
 
     if not validation_passed:

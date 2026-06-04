@@ -3,6 +3,10 @@
 from langchain.agents import create_agent
 
 from mlops_agents.prompts import get_prompt
+from mlops_agents.tools.join_discovery_tools import (
+    evaluate_join_candidates,
+    execute_join_plan,
+)
 from mlops_agents.tools.data_tools import (
     apply_column_mapping,
     check_data_quality,
@@ -24,6 +28,8 @@ def build_data_agent():
         tools=[
             load_dataset,
             merge_datasets,
+            evaluate_join_candidates,
+            execute_join_plan,
             apply_column_mapping,
             validate_against_schema,
             check_missing_values,
