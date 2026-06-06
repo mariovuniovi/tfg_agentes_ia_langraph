@@ -22,6 +22,7 @@ from mlops_agents.planning.validation import (
     _collect_all_refs,
     detect_soft_conflicts,
 )
+from mlops_agents.contracts.outputs import PlannerStateUpdate
 from mlops_agents.prompts import get_prompt
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.training.profiler import build_dataset_profile
@@ -115,20 +116,18 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
         f"rejected={len(output.plan.models_not_recommended)} tool_calls={trace.tool_call_count}"
     )
 
-    return Command(
-        goto="workflow_controller",
-        update={
-            "planner_analysis": output.planning_analysis,
-            "planner_evidence_used": [e.model_dump() for e in output.evidence_used],
-            "planner_warnings": output.risks_or_warnings,
-            "planner_status": planner_status,
-            "planner_retry_used": retry_used,
-            "training_plan": output.plan.model_dump(),
-            "planner_tool_trace": trace.model_dump(),
-            "planner_validation_context": _audit_subset(validation_ctx),
-            "_planner_output_record": record,
-        },
+    output_state = PlannerStateUpdate(
+        planner_analysis=output.planning_analysis,
+        planner_evidence_used=[e.model_dump() for e in output.evidence_used],
+        planner_warnings=output.risks_or_warnings,
+        planner_status=planner_status,
+        planner_retry_used=retry_used,
+        training_plan=output.plan.model_dump(),
+        planner_tool_trace=trace.model_dump(),
+        planner_validation_context=_audit_subset(validation_ctx),
+        planner_output_record=record,
     )
+    return Command(goto="workflow_controller", update=output_state.to_update())
 
 
 # Helpers — placed below so test file imports cleanly
