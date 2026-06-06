@@ -10,6 +10,7 @@ from typing import Any
 
 from langgraph.types import Command, interrupt
 
+from mlops_agents.contracts.outputs import DatasetApprovalStateUpdate, DeploymentApprovalStateUpdate
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -70,10 +71,10 @@ def dataset_approval_node(state: dict[str, Any]) -> Command:
     logger.info(f"[gate1] dataset_approved={approved} comment={comment!r}")
     return Command(
         goto="workflow_controller",
-        update={
-            "dataset_approved": approved,
-            "dataset_rejection_comment": "" if approved else comment,
-        },
+        update=DatasetApprovalStateUpdate(
+            dataset_approved=approved,
+            dataset_rejection_comment="" if approved else comment,
+        ).to_update(),
     )
 
 
@@ -103,5 +104,5 @@ def deployment_approval_node(state: dict[str, Any]) -> Command:
     logger.info(f"[gate2] deployment_approved={approved} reason={reason!r} model={champion!r}")
     return Command(
         goto="workflow_controller",
-        update={"deployment_approved": approved},
+        update=DeploymentApprovalStateUpdate(deployment_approved=approved).to_update(),
     )
