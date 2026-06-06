@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from mlops_agents.state.schemas import SchemaContract
+from mlops_agents.contracts.schema import SchemaContract
 
 
 def _classification_schema(**overrides):

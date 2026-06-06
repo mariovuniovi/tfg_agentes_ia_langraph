@@ -1,51 +1,17 @@
-"""Pydantic schemas for structured LLM outputs and tool I/O."""
+"""Canonical target-schema contract, validated on dataset upload.
+
+Threaded through the pipeline as ``AgentState.schema_json`` (serialised form).
+"""
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-
-class ValidationResult(BaseModel):
-    """Output schema for the data validation tool."""
-
-    passed: bool
-    issues: list[str] = Field(default_factory=list)
-    row_count: int
-    feature_count: int
-    missing_pct: float
-    drift_detected: bool
-    drift_score: float | None = None
-    summary: str
-
-
-class TrainingResult(BaseModel):
-    """Output schema for the model training tool."""
-
-    run_id: str
-    model_path: str
-    model_type: str
-    hyperparameters: dict
-    train_accuracy: float
-    val_accuracy: float
-    summary: str
-
-
-class EvaluationResult(BaseModel):
-    """Output schema for the model evaluation tool."""
-
-    run_id: str
-    accuracy: float
-    f1_score: float
-    auc_roc: float
-    precision: float
-    recall: float
-    beats_baseline: bool
-    improvement_pct: float
-    recommendation: Literal["promote", "reject", "retrain"]
-    summary: str
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class ColumnSchema(BaseModel):
+    """A single canonical column. ``extra="allow"`` keeps optional metadata
+    (nullable, unique, mapping hints) supplied in the uploaded schema."""
+
     model_config = ConfigDict(extra="allow")
 
     name: str
@@ -53,6 +19,8 @@ class ColumnSchema(BaseModel):
 
 
 class SchemaContract(BaseModel):
+    """Full target schema: problem type, target, columns, and forecasting keys."""
+
     model_config = ConfigDict(extra="allow")
 
     problem_type: Literal["classification", "regression", "forecasting"]

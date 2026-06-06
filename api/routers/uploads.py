@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import ValidationError
 from typing import Optional
 
-from mlops_agents.state.schemas import SchemaContract
+from mlops_agents.contracts.schema import SchemaContract
 
 UPLOAD_DIR = "data/uploads"
 
