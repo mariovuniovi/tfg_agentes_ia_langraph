@@ -1,11 +1,15 @@
 """Main LangGraph StateGraph — the MLOps pipeline topology.
 
 Architecture:
-  START → supervisor → [data_validator | planner | executor | evaluator | deployer] → supervisor → … → END
+  START → workflow_controller → [data_validator | dataset_approval | planner |
+  executor | evaluation | report_writer | deployment_approval | deployer]
+  → workflow_controller → … → END
 
-The supervisor (LLM with structured output) decides routing at every step.
-Worker nodes wrap create_react_agent sub-graphs and return Command(goto="supervisor").
-The deployer node includes a HITL interrupt() before the champion promotion step.
+workflow_controller is a deterministic router (no LLM): it reads state and
+returns Command(goto=...), writing only routing-control updates inline. Every
+other node returns its state slice via a typed contract from
+mlops_agents.contracts.outputs (`.to_update()`), then routes back to
+workflow_controller. HITL interrupts live in the two approval gate nodes.
 
 Run with:
     uv run python scripts/run_pipeline.py

@@ -1,1 +1,2 @@
-"""Cross-cutting Pydantic contracts shared across SP3 executor, SP4 benchmark runner, and SP5 planner."""
+"""Cross-cutting Pydantic contracts shared across the data, planning, training,
+evaluation, and deployment stages, plus the per-node state-update contracts."""
