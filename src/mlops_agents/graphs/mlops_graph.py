@@ -24,6 +24,7 @@ from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
+from mlops_agents.contracts.outputs import AuditStateUpdate, DeploymentStateUpdate, EvaluationStateUpdate
 from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.deployment.deployer import run_deployer as run_deployer_module
 from mlops_agents.evaluation.promotion import evaluate_promotion
@@ -71,11 +72,20 @@ def _build_data_validator_context(
     raw_paths = {Path(p).stem: p for p in paths}
 
     profiles_section = ""
+    multi_file_note = ""
     if len(paths) > 1:
         try:
             profiles = _profile(raw_paths)
             profiles_section = "\nRaw dataset profiles:\n" + json.dumps(
                 [p.model_dump() for p in profiles], default=str, indent=2
+            )
+            multi_file_note = (
+                "\n\nIMPORTANT: Multiple raw datasets are provided. "
+                "You MUST use the join discovery workflow:\n"
+                "  1. Propose join candidates based on the profiles above.\n"
+                "  2. Call evaluate_join_candidates() to measure overlap and cardinality.\n"
+                "  3. Call execute_join_plan() with your selections + the exact evaluations string.\n"
+                "Do NOT call merge_datasets — that tool does not support inferred joins."
             )
         except Exception as exc:
             profiles_section = f"\n(Could not pre-profile raw files: {exc})"
@@ -91,6 +101,7 @@ def _build_data_validator_context(
         f"Schema path: {schema_path}\n"
         f"Target schema:\n{schema_json}"
         f"{profiles_section}"
+        f"{multi_file_note}"
         f"{single_file_note}"
     ))
 
@@ -400,19 +411,25 @@ def evaluation_node(state: AgentState) -> Command[Literal["workflow_controller"]
     """Deterministic promotion decision — no LLM."""
     result = evaluate_promotion(state)
     logger.info(f"[evaluation] passed={result['evaluation_passed']}")
-    return Command(update=result, goto="workflow_controller")
+    return Command(
+        update=EvaluationStateUpdate(**result).to_update(), goto="workflow_controller"
+    )
 
 
 def report_writer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Audit LLM node — produces structured EvaluationReport."""
     result = run_report_writer(state)
-    return Command(update=result, goto="workflow_controller")
+    return Command(
+        update=AuditStateUpdate(**result).to_update(), goto="workflow_controller"
+    )
 
 
 def deployer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Deterministic deployment — Gate 2 has already approved upstream."""
     result = run_deployer_module(state)
-    return Command(update=result, goto="workflow_controller")
+    return Command(
+        update=DeploymentStateUpdate(**result).to_update(), goto="workflow_controller"
+    )
 
 
 # =============================================================================
