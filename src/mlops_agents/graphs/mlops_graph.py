@@ -24,7 +24,7 @@ from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
-from mlops_agents.contracts.outputs import AuditStateUpdate, DeploymentStateUpdate, EvaluationStateUpdate
+from mlops_agents.contracts.outputs import AuditStateUpdate, DeploymentStateUpdate, EvaluationStateUpdate, PlannerErrorStateUpdate, TrainingStateUpdate
 from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.deployment.deployer import run_deployer as run_deployer_module
 from mlops_agents.evaluation.promotion import evaluate_promotion
@@ -372,20 +372,8 @@ def executor_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     )
 
     logger.info("[executor] completed — routing back to workflow_controller")
-    return Command(
-        goto="workflow_controller",
-        update={
-            "training_plan": plan.model_dump(),
-            "train_pool_path": result.train_pool_path,
-            "test_path": result.test_path,
-            "split_metadata_path": result.split_metadata_path,
-            "trained_model_path": result.champion_model_path,
-            "training_run_id": result.mlflow_parent_run_id,
-            "training_metrics": result.champion_metrics,
-            "champion_candidate": result.champion_candidate,
-            "experience_record_path": result.experience_record_path,
-        },
-    )
+    output = TrainingStateUpdate.from_training_result(result, training_plan=plan.model_dump())
+    return Command(goto="workflow_controller", update=output.to_update())
 
 
 def _planner_node_with_error_handling(
@@ -396,14 +384,12 @@ def _planner_node_with_error_handling(
         return planner_node(state)
     except PlannerError as exc:
         logger.error(f"[planner] failed after retry: {exc}")
+        output = PlannerErrorStateUpdate(error_message=f"Model planner failed: {exc}")
         return Command(
             goto="workflow_controller",
-            update={
-                "planner_status": "failed",
-                "planner_retry_used": True,
-                "error_message": f"Model planner failed: {exc}",
-                "messages": [HumanMessage(content=f"Planner failed: {exc}", name="planner")],
-            },
+            update=output.to_update(
+                messages=[HumanMessage(content=f"Planner failed: {exc}", name="planner")]
+            ),
         )
 
 
