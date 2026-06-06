@@ -24,7 +24,7 @@ from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
-from mlops_agents.contracts.outputs import AuditStateUpdate, DeploymentStateUpdate, EvaluationStateUpdate, PlannerErrorStateUpdate, TrainingStateUpdate
+from mlops_agents.contracts.outputs import AuditStateUpdate, DataValidationStateUpdate, DeploymentStateUpdate, EvaluationStateUpdate, PlannerErrorStateUpdate, TrainingStateUpdate
 from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.deployment.deployer import run_deployer as run_deployer_module
 from mlops_agents.evaluation.promotion import evaluate_promotion
@@ -205,17 +205,9 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
         error_msg = "No schema uploaded. Upload a schema JSON before running the pipeline."
         logger.error(f"[data_validator] {error_msg}")
         return Command(
-            update={
-                "messages": [HumanMessage(content=error_msg, name="data_validator")],
-                "validation_passed": False,
-                "error_message": error_msg,
-                "problem_type": "",
-                "task_metadata": {},
-                "dataset_summary": {},
-                "validation_report": {},
-                "processed_dataset_path": "",
-                "schema_json": "",
-            },
+            update=DataValidationStateUpdate(
+                validation_passed=False, error_message=error_msg, schema_json=""
+            ).to_update(messages=[HumanMessage(content=error_msg, name="data_validator")]),
             goto="workflow_controller",
         )
 
@@ -225,17 +217,9 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
         error_msg = f"Schema contract violation: {exc}"
         logger.error(f"[data_validator] {error_msg}")
         return Command(
-            update={
-                "messages": [HumanMessage(content=error_msg, name="data_validator")],
-                "validation_passed": False,
-                "error_message": error_msg,
-                "problem_type": "",
-                "task_metadata": {},
-                "dataset_summary": {},
-                "validation_report": {},
-                "processed_dataset_path": "",
-                "schema_json": schema_json,
-            },
+            update=DataValidationStateUpdate(
+                validation_passed=False, error_message=error_msg, schema_json=schema_json
+            ).to_update(messages=[HumanMessage(content=error_msg, name="data_validator")]),
             goto="workflow_controller",
         )
 
@@ -261,14 +245,12 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
     mapping_result: dict = _extract_tool_json(result["messages"], "apply_column_mapping")
     validation_result: dict = _extract_tool_json(result["messages"], "validate_against_schema")
     imputation_result: dict = _extract_tool_json(result["messages"], "impute_missing_values")
-
     join_exec_result: dict = _extract_tool_json(result["messages"], "execute_join_plan")
     eval_result: dict = _extract_tool_json(result["messages"], "evaluate_join_candidates")
 
-    data_join_plan = join_exec_result.get("join_plan")          # echoed by execute_join_plan
+    data_join_plan = join_exec_result.get("join_plan")
     data_join_evaluations = eval_result.get("evaluations", [])
 
-    # Capture base dataset row count for audit
     data_join_base_nrows: int | None = None
     if data_join_plan:
         base_name = data_join_plan.get("base_dataset", {}).get("dataset_name")
@@ -309,39 +291,34 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
             "series_id_columns": schema_data.get("series_id_columns", []),
             "forecast_horizon": schema_data.get("forecast_horizon"),
             "frequency": schema_data.get("frequency", ""),
-            "exogenous_columns": schema_data.get("exogenous_columns"),  # [{name, future_availability}]
+            "exogenous_columns": schema_data.get("exogenous_columns"),
         })
 
-    base_update = {
-        "messages": [HumanMessage(content=final_message, name="data_validator")],
-        "validation_report": quality_report,
-        "validation_passed": validation_passed,
-        "processed_dataset_path": processed_path,
-        "dataset_summary": dataset_summary,
-        "problem_type": problem_type,
-        "task_metadata": task_metadata,
-        "schema_json": schema_json,
-        "data_join_plan": data_join_plan,
-        "data_join_base_nrows": data_join_base_nrows,
-        "data_join_evaluations": data_join_evaluations,
-    }
-
+    error_message = (
+        "" if validation_passed
+        else f"Data validation failed after auto-fix attempt: {final_message}"
+    )
     if not validation_passed:
-        # Validation failed after agent's auto-fix attempt — abort without HITL.
-        # The workflow_controller will see error_message set and select FINISH.
-        error_msg = f"Data validation failed after auto-fix attempt: {final_message}"
         logger.warning("[data_validator] validation failed — aborting without HITL")
-        return Command(
-            update={**base_update, "error_message": error_msg},
-            goto="workflow_controller",
-        )
 
+    output = DataValidationStateUpdate(
+        validation_report=quality_report,
+        validation_passed=validation_passed,
+        processed_dataset_path=processed_path,
+        dataset_summary=dataset_summary,
+        problem_type=problem_type,
+        task_metadata=task_metadata,
+        schema_json=schema_json,
+        data_join_plan=data_join_plan,
+        data_join_base_nrows=data_join_base_nrows,
+        data_join_evaluations=data_join_evaluations,
+        error_message=error_message,
+    )
     return Command(
-        update={
-            **base_update,
-            "dataset_rejection_comment": "",
-        },
         goto="workflow_controller",
+        update=output.to_update(
+            messages=[HumanMessage(content=final_message, name="data_validator")]
+        ),
     )
 
 
