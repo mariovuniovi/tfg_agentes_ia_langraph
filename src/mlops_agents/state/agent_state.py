@@ -65,6 +65,7 @@ class AgentState(TypedDict):
     champion_candidate: dict | None        # winning candidate spec
     experience_record_path: str | None     # JSON experience record serialised to disk
     forecast_chart_png: str | None         # base64 PNG chart; only set for forecasting runs
+    selection_score: float | None          # validation score the champion was selected on (forecasting)
 
     # === evaluation node — deterministic promotion decision ===
     evaluation_passed: bool | None

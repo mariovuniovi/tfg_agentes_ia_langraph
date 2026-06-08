@@ -105,6 +105,7 @@ class TrainingStateUpdate(StateUpdate):
     champion_candidate: dict | None = None
     experience_record_path: str | None = None
     forecast_chart_png: str | None = None
+    selection_score: float | None = None
 
     @classmethod
     def from_training_result(
@@ -121,6 +122,7 @@ class TrainingStateUpdate(StateUpdate):
             champion_candidate=result.champion_candidate,
             experience_record_path=result.experience_record_path,
             forecast_chart_png=result.forecast_chart_png,
+            selection_score=result.selection_score,
         )
 
 

@@ -163,3 +163,4 @@ class TrainingResult(BaseModel):
     experience_record_path: str
     champion_metrics: dict[str, float]
     forecast_chart_png: str | None = None  # base64 PNG; only set for forecasting runs
+    selection_score: float | None = None   # validation score the champion was selected on (metric_to_optimize units)
