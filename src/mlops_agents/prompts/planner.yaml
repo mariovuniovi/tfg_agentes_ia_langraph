@@ -45,7 +45,7 @@ template: |
     avoid high-complexity supervised models unless similar experiences strongly support them.
   - If expected_drift is high and history is sufficient: prefer rolling_window.
   - For unknown_future exogenous columns: choose extension strategies from
-    {naive_carry, ets, auto_arima, drop}.
+    {naive_carry, ets, auto_arima}.
   - known_future variables must not appear in per-column unknown-future overrides at all.
 
   ## Output

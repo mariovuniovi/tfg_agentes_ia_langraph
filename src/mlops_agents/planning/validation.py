@@ -21,7 +21,7 @@ REQUIRED_TOOLS = {
     "retrieve_ml_knowledge",
 }
 ALLOWED_VAL_STRATEGIES = {"single_split", "rolling_window", "expanding_window"}
-ALLOWED_EXOG_STRATEGIES = {"naive_carry", "ets", "auto_arima", "drop"}
+ALLOWED_EXOG_STRATEGIES = {"naive_carry", "ets", "auto_arima"}
 
 
 class PlannerValidationError(Exception):
@@ -110,7 +110,7 @@ def _check_plan_integrity(
             if col in known_future:
                 raise PlannerValidationError(
                     f"known_future column {col!r} cannot appear in per-column "
-                    f"unknown-future strategies (no 'drop' loophole)"
+                    f"unknown-future strategies"
                 )
 
     # 6. Per-candidate registry self-citation

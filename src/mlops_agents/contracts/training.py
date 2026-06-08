@@ -15,8 +15,8 @@ from pydantic import BaseModel, Field, model_validator
 
 from mlops_agents.contracts.evidence import EvidenceReference
 
-ExogStrategy = Literal["known_future", "naive_carry", "ets", "auto_arima", "drop"]
-UnknownFutureStrategy = Literal["naive_carry", "ets", "auto_arima", "drop"]
+ExogStrategy = Literal["known_future", "naive_carry", "ets", "auto_arima"]
+UnknownFutureStrategy = Literal["naive_carry", "ets", "auto_arima"]
 
 
 class ValidationStrategy(BaseModel):
