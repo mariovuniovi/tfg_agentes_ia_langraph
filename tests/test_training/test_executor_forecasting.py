@@ -47,3 +47,32 @@ def test_executor_forecasting_single_series_statistical(air_passengers_csv, tmp_
     record = json.loads(Path(result.experience_record_path).read_text())
     assert record["problem_type"] == "forecasting"
     assert record["selected_solution"]["model_key"] in {"seasonal_naive", "ets"}
+
+
+def test_forecasting_reports_test_metrics_and_selection_score(air_passengers_csv, tmp_path, monkeypatch):
+    monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+    from mlops_agents.training.executor import run_training_plan
+
+    plan = TrainingPlan(
+        problem_type="forecasting",
+        candidates=[TrainingPlanCandidate(priority=1, model_key="ets")],
+        trial_budget=TrialBudget(total_trials=3, min_trials_per_candidate=3, max_trials_per_candidate=3),
+    )
+    result = run_training_plan(
+        plan=plan,
+        processed_dataset_path=air_passengers_csv,
+        target_column="passengers",
+        task_metadata={
+            "problem_type": "forecasting", "target_column": "passengers",
+            "datetime_column": "month", "series_id_columns": [],
+            "frequency": "MS", "forecast_horizon": 12,
+        },
+        output_dir=tmp_path / "splits",
+        mlflow_experiment="test-air-honest",
+        random_state=42,
+    )
+    assert "rmse" in result.champion_metrics
+    assert "smape" in result.champion_metrics
+    assert result.selection_score is not None
+    assert result.forecast_chart_png is not None

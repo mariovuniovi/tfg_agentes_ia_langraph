@@ -550,7 +550,6 @@ def _run_candidate_forecasting(
     strategies = forecasting_settings.exog_strategies
 
     exog_cache: dict[tuple, pd.Series] = {}
-    _val_preview: list[dict] = []  # last fold's y_true vs pred; mutated by fit_score
 
     def fit_score(params: dict) -> tuple[float, list[float], list[dict]]:
         fold_scores: list[float] = []
@@ -575,18 +574,8 @@ def _run_candidate_forecasting(
                     if n == 0:
                         raise ValueError("Statsforecast produced no predictions")
                     score = _fc_metrics(val_s["y"].values[:n], fct_s[model_col].values[:n])[metric]
-                    _val_preview.clear()
-                    _val_preview.extend(
-                        {"ds": str(val_s["ds"].iloc[i])[:10], "y_true": float(val_s["y"].iloc[i]), "y_pred": float(fct_s[model_col].iloc[i])}
-                        for i in range(n)
-                    )
                 else:
                     score = _fc_metrics(merged["y"].values, merged[model_col].values)[metric]
-                    _val_preview.clear()
-                    _val_preview.extend(
-                        {"ds": str(row["ds"])[:10], "y_true": float(row["y"]), "y_pred": float(row[model_col])}
-                        for _, row in merged.iterrows()
-                    )
                 fold_scores.append(score)
                 continue
 
@@ -601,8 +590,6 @@ def _run_candidate_forecasting(
                     future_values[col] = cand_val[col].reset_index(drop=True)
                     continue
                 strat = strategies.per_column.get(col, strategies.default_unknown_future)
-                if strat == "drop":
-                    continue
                 cache_key = (col, strat, fold_id, "default")
                 if cache_key in exog_cache:
                     future_values[col] = exog_cache[cache_key]
@@ -642,13 +629,6 @@ def _run_candidate_forecasting(
                 )[metric]
             else:
                 score = _fc_metrics(joined["y_true"].values, joined["pred"].values)[metric]
-            # capture this fold for the chart (last fold wins; good enough for visualisation)
-            _val_preview.clear()
-            src = joined if not joined.empty else val_long.assign(pred=preds["pred"].values[: len(val_long)])
-            _val_preview.extend(
-                {"ds": str(row["ds"])[:10], "y_true": float(row["y_true"]), "y_pred": float(row["pred"])}
-                for _, row in src.iterrows()
-            )
             fold_scores.append(score)
 
         return float(np.mean(fold_scores)), fold_scores, fold_failures
@@ -704,7 +684,6 @@ def _run_candidate_forecasting(
         "complexity_rank": spec.complexity_rank,
         "per_fold_scores": [float(x) for x in last_per_fold],
         "exog_fit_failures": last_failures,
-        "last_val_preview": list(_val_preview),
     }
 
 
@@ -1009,17 +988,13 @@ def run_training_plan(
         models_dir.mkdir(parents=True, exist_ok=True)
         spec = get_model(champion["model_key"])
 
+        selection_score: float | None = None
         if plan.problem_type in ("classification", "regression"):
             champion_path = _retrain_tabular(spec, champion, train_pool, target_column, models_dir)
             forecast_chart_png: str | None = None
         else:
             champion_path = _retrain_forecasting(spec, champion, train_pool, task_metadata, models_dir)
-            val_preview = champion.get("last_val_preview") or []
-            dt_col = task_metadata["datetime_column"]
-            forecast_chart_png = (
-                _build_forecast_chart_png(train_pool, val_preview, dt_col, target_column)
-                if val_preview else None
-            )
+            forecast_chart_png = None
 
         with mlflow.start_run(run_id=champion["mlflow_run_id"], nested=True):
             mlflow.set_tag("champion", "true")
@@ -1051,8 +1026,22 @@ def run_training_plan(
             else:
                 all_champion_metrics = _reg_metrics(_y_test, _eval_model.predict(_X_test))
         else:
-            all_champion_metrics = {metric: champion["best_score"]}
+            selection_score = float(champion["best_score"])
+            try:
+                all_champion_metrics, _test_preview = _forecast_champion_on_test(
+                    champion, champion_path, train_pool, test_path,
+                    task_metadata, fs, metric,
+                )
+                forecast_chart_png = _build_forecast_chart_png(
+                    train_pool, _test_preview, task_metadata["datetime_column"], target_column
+                )
+            except Exception as exc:
+                logger.warning(f"[executor] test forecast failed: {exc}")
+                all_champion_metrics = {}
+                forecast_chart_png = None
         mlflow.log_metrics(all_champion_metrics)
+        if plan.problem_type == "forecasting" and selection_score is not None:
+            mlflow.log_metric(f"selection_{metric}", selection_score)
         logger.info(f"[executor] champion metrics: {all_champion_metrics}")
 
         val_strategy = (
@@ -1153,4 +1142,5 @@ def run_training_plan(
         experience_record_path=str(record_path),
         champion_metrics=all_champion_metrics,
         forecast_chart_png=forecast_chart_png,
+        selection_score=selection_score,
     )
