@@ -254,6 +254,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                                 "champion_candidate": ex.get("champion_candidate", {}),
                                 "trained_model_path": ex.get("trained_model_path", ""),
                                 "forecast_chart_png": ex.get("forecast_chart_png"),
+                                "selection_score":    ex.get("selection_score"),
                             },
                         }
                         entry.events.append(training_event)
