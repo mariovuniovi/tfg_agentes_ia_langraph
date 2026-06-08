@@ -19,7 +19,6 @@ from sklearn.preprocessing import LabelEncoder
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.contracts.training import (
-    ExogStrategySettings,
     ForecastingSettings,
     TrainingPlan,
     TrainingPlanCandidate,
@@ -30,6 +29,7 @@ from mlops_agents.models.factories import FACTORY_REGISTRY
 from mlops_agents.models.loader import get_model
 from mlops_agents.models.search_spaces import build_suggest_fn
 from mlops_agents.training.exog_extender import align_val_exog_index, extend_exog
+from mlops_agents.training.exog_policy import resolve_exog_strategies
 from mlops_agents.training.experience import build_task_id, write_experience_record
 from mlops_agents.training.override_validation import narrow_search_space
 from mlops_agents.training.profiler import build_dataset_profile
@@ -38,7 +38,7 @@ from mlops_agents.training.trial_budget import allocate_trials
 from mlops_agents.training.validation_folds import iter_folds
 from mlops_agents.training.validation_policy import (
     resolve_rolling_window_size,
-    select_validation_strategy,
+    resolve_validation_strategy,
     validate_forecasting_plan,
 )
 from mlops_agents.utils.logging import get_logger
@@ -921,12 +921,16 @@ def run_training_plan(
 
     profile = build_dataset_profile(processed_dataset_path, task_metadata)
 
-    # Resolve forecasting_settings before any candidate runs
+    # Resolve forecasting_settings before any candidate runs (fallback for plans built
+    # without the planner, e.g. the benchmark runner / direct-executor tests).
     fs = plan.forecasting_settings
     if fs is None and plan.problem_type == "forecasting":
+        _full_df = pd.read_csv(processed_dataset_path)
         fs = ForecastingSettings(
-            validation_strategy=select_validation_strategy(profile, task_metadata),
-            exog_strategies=ExogStrategySettings(),
+            validation_strategy=resolve_validation_strategy(task_metadata, len(_full_df)),
+            exog_strategies=resolve_exog_strategies(
+                _full_df, task_metadata, task_metadata.get("frequency")
+            ),
         )
         plan = plan.model_copy(update={"forecasting_settings": fs})
 

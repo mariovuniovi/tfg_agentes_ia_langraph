@@ -1,7 +1,6 @@
 """Deterministic validation-strategy policy + plan-level guard rails.
 
-select_validation_strategy: picks the right ValidationStrategy from the
-dataset profile and task_metadata.
+resolve_validation_strategy: picks the ValidationStrategy from capacity (history length + horizon).
 
 validate_forecasting_plan: enforced before any modelling runs. Raises
 ValueError or NotImplementedError on capacity / leakage / type violations.
@@ -22,35 +21,6 @@ _WINDOW_SIZE_FLOOR = 50       # rolling window minimum regardless of horizon
 _HORIZON_MULTIPLIER = 3       # min training rows = 3 * horizon
 _DEFAULT_N_FOLDS = 3          # K=3 balances backtest stability vs. compute
 _MAX_FOLDS = 5                # cap backtest folds regardless of how much history is available
-
-
-def select_validation_strategy(
-    profile: DatasetProfile,
-    task_metadata: dict[str, Any],
-) -> ValidationStrategy:
-    horizon = int(task_metadata["forecast_horizon"])
-    history = profile.history_length
-    drift = task_metadata.get("expected_drift", "low")
-
-    # Short history wins over drift hints: K-fold with too little data is
-    # worse than a single clean split.
-    if history in ("very_short", "short"):
-        return ValidationStrategy(type="single_split", n_folds=1, horizon=horizon)
-
-    if drift == "high":
-        return ValidationStrategy(
-            type="rolling_window",
-            n_folds=_DEFAULT_N_FOLDS,
-            horizon=horizon,
-            step_size=horizon,
-            window_size=None,
-        )
-    return ValidationStrategy(
-        type="expanding_window",
-        n_folds=_DEFAULT_N_FOLDS,
-        horizon=horizon,
-        step_size=horizon,
-    )
 
 
 def resolve_validation_strategy(task_metadata: dict[str, Any], n_obs: int) -> ValidationStrategy:

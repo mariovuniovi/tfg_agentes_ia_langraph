@@ -1,4 +1,4 @@
-"""Tests for select_validation_strategy and validate_forecasting_plan."""
+"""Tests for resolve_validation_strategy and validate_forecasting_plan."""
 import pytest
 
 from mlops_agents.contracts.training import (
@@ -11,8 +11,8 @@ from mlops_agents.contracts.training import (
 )
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.training.validation_policy import (
-    select_validation_strategy,
     resolve_rolling_window_size,
+    resolve_validation_strategy,
     validate_forecasting_plan,
 )
 
@@ -43,27 +43,6 @@ def _task_meta(horizon=6, exog_cols=None, expected_drift=None):
     if expected_drift is not None:
         meta["expected_drift"] = expected_drift
     return meta
-
-
-# ─── select_validation_strategy ────────────────────────────────────
-
-def test_short_history_returns_single_split_even_with_high_drift():
-    s = select_validation_strategy(_profile("short"), _task_meta(expected_drift="high"))
-    assert s.type == "single_split"
-    assert s.n_folds == 1
-
-
-def test_medium_history_low_drift_returns_expanding():
-    s = select_validation_strategy(_profile("medium"), _task_meta())
-    assert s.type == "expanding_window"
-    assert s.n_folds == 3
-
-
-def test_long_history_high_drift_returns_rolling():
-    s = select_validation_strategy(_profile("long"), _task_meta(expected_drift="high"))
-    assert s.type == "rolling_window"
-    assert s.n_folds == 3
-    assert s.window_size is None  # auto
 
 
 # ─── resolve_rolling_window_size ───────────────────────────────────
@@ -170,9 +149,6 @@ def test_validate_panel_rejects_per_column_overrides():
 
 # ─── resolve_validation_strategy ───────────────────────────────────
 
-from mlops_agents.training.validation_policy import resolve_validation_strategy
-
-
 def _vmeta(horizon=8, drift="low"):
     return {"forecast_horizon": horizon, "expected_drift": drift}
 
@@ -197,7 +173,6 @@ def test_resolve_floor_is_single_split():
 
 
 def test_resolve_too_small_raises():
-    import pytest
     with pytest.raises(ValueError, match="need >= 46 observations for horizon 8, have 20"):
         resolve_validation_strategy(_vmeta(), n_obs=20)
 
