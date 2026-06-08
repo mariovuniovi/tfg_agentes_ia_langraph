@@ -767,6 +767,110 @@ def _retrain_forecasting(
 
 
 # ---------------------------------------------------------------------------
+# Test-set forecast helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_test_exog(
+    train_pool: pd.DataFrame,
+    test_df: pd.DataFrame,
+    task_metadata: dict[str, Any],
+    forecasting_settings: ForecastingSettings,
+    horizon: int,
+    freq: str | None,
+    series_dict: dict[str, pd.Series],
+) -> pd.DataFrame | None:
+    """Build the test-horizon exog for a skforecast champion.
+
+    Mirrors validation: known_future columns use the actual test values;
+    unknown_future columns are extended from train history (no `drop` — all
+    exog kept). No oracle peeking at unknown-future actuals.
+    """
+    dt_col = task_metadata["datetime_column"]
+    availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
+    strategies = forecasting_settings.exog_strategies
+    future_values: dict[str, pd.Series] = {}
+    for col, avail in availability.items():
+        if col not in train_pool.columns:
+            continue
+        if avail == "known_future":
+            future_values[col] = test_df[col].reset_index(drop=True)
+        else:
+            strat = strategies.per_column.get(col, strategies.default_unknown_future)
+            preds_col, _ = extend_exog(train_pool[col], horizon, strat, freq)
+            future_values[col] = preds_col.reset_index(drop=True)
+    if not future_values:
+        return None
+    return align_val_exog_index(
+        pd.DataFrame(future_values),
+        series_dict,
+        train_len=len(next(iter(series_dict.values()))),
+        dt_col=dt_col,
+        freq=freq,
+    )
+
+
+def _forecast_champion_on_test(
+    champion: dict,
+    champion_model_path: Path,
+    train_pool: pd.DataFrame,
+    test_path: Path,
+    task_metadata: dict[str, Any],
+    forecasting_settings: ForecastingSettings,
+    metric: str,
+) -> tuple[dict[str, float], list[dict]]:
+    """Forecast the retrained champion across the held-out test horizon.
+
+    Returns (test_metrics, test_preview) where test_preview is
+    [{"ds": str, "y_true": float, "y_pred": float}, ...] for the chart.
+    statsforecast -> predict(h); skforecast -> extend unknown-future exog from
+    train history, use actual known-future values, then predict(steps, exog).
+    """
+    target = task_metadata["target_column"]
+    dt_col = task_metadata["datetime_column"]
+    sid_cols = task_metadata.get("series_id_columns") or []
+    horizon = int(task_metadata["forecast_horizon"])
+    freq = task_metadata.get("frequency")
+
+    test_df = pd.read_csv(test_path)
+    test_df[dt_col] = pd.to_datetime(test_df[dt_col])
+    test_df = test_df.sort_values(dt_col).reset_index(drop=True)
+    y_true = test_df[target].to_numpy(dtype=float)
+
+    with champion_model_path.open("rb") as f:
+        model = pickle.load(f)
+
+    if _is_statsforecast_model(champion["model_key"]):
+        fcst = model.predict(h=horizon).sort_values("ds").reset_index(drop=True)
+        model_col = [c for c in fcst.columns if c not in ("unique_id", "ds")][0]
+        y_pred = fcst[model_col].to_numpy(dtype=float)
+        ds_vals = pd.to_datetime(fcst["ds"]).dt.strftime("%Y-%m-%d").tolist()
+    else:
+        pool = train_pool.copy()
+        pool[dt_col] = pd.to_datetime(pool[dt_col])
+        series_dict = _build_series_dict(pool, dt_col, target, sid_cols, freq)
+        test_exog = _build_test_exog(
+            pool, test_df, task_metadata, forecasting_settings, horizon, freq, series_dict
+        )
+        preds = model.predict(steps=horizon, exog=test_exog)
+        preds = preds.reset_index().rename(columns={"index": "ds"})
+        preds["ds"] = pd.to_datetime(preds["ds"])
+        y_pred = preds["pred"].to_numpy(dtype=float)
+        ds_vals = preds["ds"].dt.strftime("%Y-%m-%d").tolist()
+
+    n = min(len(y_true), len(y_pred))
+    if n == 0:
+        raise ValueError("test forecast produced no overlapping points")
+    y_true, y_pred, ds_vals = y_true[:n], y_pred[:n], ds_vals[:n]
+    test_metrics = _fc_metrics(y_true, y_pred)
+    test_preview = [
+        {"ds": ds_vals[i], "y_true": float(y_true[i]), "y_pred": float(y_pred[i])}
+        for i in range(n)
+    ]
+    return test_metrics, test_preview
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
