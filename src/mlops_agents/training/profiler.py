@@ -144,6 +144,11 @@ def _detect_per_series(series: pd.Series, freq: str) -> tuple[bool, bool, bool]:
     return seasonality, trend, stationary
 
 
+def detect_series_structure(series: pd.Series, freq: str | None) -> tuple[bool, bool, bool]:
+    """Public wrapper for _detect_per_series: (seasonality, trend, stationarity)."""
+    return _detect_per_series(series, freq or "")
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
