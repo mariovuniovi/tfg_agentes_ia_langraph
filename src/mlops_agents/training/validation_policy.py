@@ -21,6 +21,7 @@ _MIN_TRAIN_ROWS = 30          # smallest tolerable training set size
 _WINDOW_SIZE_FLOOR = 50       # rolling window minimum regardless of horizon
 _HORIZON_MULTIPLIER = 3       # min training rows = 3 * horizon
 _DEFAULT_N_FOLDS = 3          # K=3 balances backtest stability vs. compute
+_MAX_FOLDS = 5                # cap backtest folds regardless of how much history is available
 
 
 def select_validation_strategy(
@@ -50,6 +51,30 @@ def select_validation_strategy(
         horizon=horizon,
         step_size=horizon,
     )
+
+
+def resolve_validation_strategy(task_metadata: dict[str, Any], n_obs: int) -> ValidationStrategy:
+    """Capacity-driven validation strategy. Fold count scales with available history,
+    floors at a single split, and hard-errors when even one clean split doesn't fit.
+
+    `n_obs` is the full series length; the held-out test split takes the last `horizon`
+    rows, so the validation budget is `n_obs - horizon`.
+    """
+    horizon = int(task_metadata["forecast_horizon"])
+    drift = task_metadata.get("expected_drift", "low")
+    train_pool_len = n_obs - horizon
+    min_train = max(_HORIZON_MULTIPLIER * horizon, _MIN_TRAIN_ROWS)
+    k_max = (train_pool_len - min_train) // horizon
+    if k_max < 1:
+        raise ValueError(
+            f"Not enough history for a single validation split: need >= "
+            f"{min_train + 2 * horizon} observations for horizon {horizon}, have {n_obs}."
+        )
+    k = min(k_max, _MAX_FOLDS)
+    if k == 1:
+        return ValidationStrategy(type="single_split", n_folds=1, horizon=horizon)
+    vtype = "rolling_window" if drift == "high" else "expanding_window"
+    return ValidationStrategy(type=vtype, n_folds=k, horizon=horizon, step_size=horizon)
 
 
 def resolve_rolling_window_size(

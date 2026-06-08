@@ -166,3 +166,43 @@ def test_validate_panel_rejects_per_column_overrides():
             _profile("medium"),
             {"single_series": False, "series_lengths": {"A": 100, "B": 100}, "total_len": 200},
         )
+
+
+# ─── resolve_validation_strategy ───────────────────────────────────
+
+from mlops_agents.training.validation_policy import resolve_validation_strategy
+
+
+def _vmeta(horizon=8, drift="low"):
+    return {"forecast_horizon": horizon, "expected_drift": drift}
+
+
+def test_resolve_ample_history_caps_at_5_folds():
+    vs = resolve_validation_strategy(_vmeta(), n_obs=156)
+    assert vs.type == "expanding_window"
+    assert vs.n_folds == 5
+    assert vs.horizon == 8
+
+
+def test_resolve_moderate_history_two_folds():
+    vs = resolve_validation_strategy(_vmeta(), n_obs=60)
+    assert vs.type == "expanding_window"
+    assert vs.n_folds == 2
+
+
+def test_resolve_floor_is_single_split():
+    vs = resolve_validation_strategy(_vmeta(), n_obs=46)
+    assert vs.type == "single_split"
+    assert vs.n_folds == 1
+
+
+def test_resolve_too_small_raises():
+    import pytest
+    with pytest.raises(ValueError, match="need >= 46 observations for horizon 8, have 20"):
+        resolve_validation_strategy(_vmeta(), n_obs=20)
+
+
+def test_resolve_high_drift_uses_rolling_window():
+    vs = resolve_validation_strategy(_vmeta(drift="high"), n_obs=156)
+    assert vs.type == "rolling_window"
+    assert vs.n_folds == 5
