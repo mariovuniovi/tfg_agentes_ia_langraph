@@ -318,7 +318,7 @@ function ModelPanel({
 }
 
 
-function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null } }) {
+function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null; selection_score?: number | null } }) {
   const champ = data.champion_candidate as { model_key?: string; primary_metric?: string; primary_score?: number }
   const metricEntries = Object.entries(data.training_metrics ?? {})
   return (
@@ -336,9 +336,9 @@ function TrainingCompletePanel({ data }: { data: { training_run_id: string; trai
           <span className="ml-auto font-mono text-[11px] text-zinc-400">{data.training_run_id.slice(0, 8)}…</span>
         )}
       </div>
-      {metricEntries.length > 0 && (
+      {metricEntries.length > 0 ? (
         <div>
-          <p className="mb-1.5 text-xs font-medium text-zinc-500">Champion metrics</p>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Test metrics (held-out)</p>
           <div className="grid grid-cols-2 gap-2">
             {metricEntries.map(([k, v]) => (
               <div key={k} className="rounded border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs">
@@ -347,11 +347,25 @@ function TrainingCompletePanel({ data }: { data: { training_run_id: string; trai
               </div>
             ))}
           </div>
+          {typeof data.selection_score === 'number' && (
+            <p className="mt-1.5 text-[11px] text-zinc-400">
+              Selected on validation: <span className="font-mono">{data.selection_score.toFixed(4)}</span>
+            </p>
+          )}
+        </div>
+      ) : (
+        <div>
+          <p className="text-xs text-amber-600">Test evaluation unavailable.</p>
+          {typeof data.selection_score === 'number' && (
+            <p className="mt-1 text-[11px] text-zinc-400">
+              Selected on validation: <span className="font-mono">{data.selection_score.toFixed(4)}</span>
+            </p>
+          )}
         </div>
       )}
       {data.forecast_chart_png && (
         <div>
-          <p className="mb-1.5 text-xs font-medium text-zinc-500">Forecast vs actuals</p>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Test forecast vs actuals</p>
           <img
             src={`data:image/png;base64,${data.forecast_chart_png}`}
             alt="Forecast chart"
@@ -418,7 +432,7 @@ export function ResultsDashboard() {
 
   const trainingData = useMemo(() => {
     const ev = events.findLast((e) => e.type === 'training_complete')
-    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null }) : null
+    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null; selection_score?: number | null }) : null
   }, [events])
 
   const loadDatasetCallCount = useMemo(

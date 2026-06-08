@@ -876,8 +876,8 @@ def _build_forecast_chart_png(
 
         fig, ax = plt.subplots(figsize=(10, 3.5))
         ax.plot(train_ds, train_y, color="#4f46e5", linewidth=1.5, label="Train (actual)")
-        ax.plot(val_ds, val_true, color="#6b7280", linewidth=1.5, label="Validation (actual)")
-        ax.plot(val_ds, val_pred, color="#f97316", linewidth=1.5, linestyle="--", label="Validation (predicted)")
+        ax.plot(val_ds, val_true, color="#6b7280", linewidth=1.5, label="Test (actual)")
+        ax.plot(val_ds, val_pred, color="#f97316", linewidth=1.5, linestyle="--", label="Test (predicted)")
         if len(val_ds):
             ax.axvline(val_ds[0], color="#d1d5db", linewidth=1, linestyle=":")
         ax.set_ylabel(target_col, fontsize=9)
