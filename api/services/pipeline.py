@@ -114,12 +114,18 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
         return
 
     from mlops_agents.config.settings import settings
+    from mlops_agents.prompts.loader import get_agent_config
 
-    # Maps semantic node name → its configured model (used to fix fallback when response_metadata lacks model_name)
+    # Maps semantic node name → its configured model
+    _agent_yaml = {"data_validator": "data_agent", "planner": "planner", "report_writer": "report_writer"}
     node_model_map: dict[str, str] = {
-        "data_validator": settings.openai_model_data_validator,
-        "planner":        settings.openai_model_planner,
-        "report_writer":  settings.openai_model_report_writer,
+        node: get_agent_config(yaml).get("model", settings.openai_model)
+        for node, yaml in _agent_yaml.items()
+    }
+    node_reasoning_map: dict[str, str] = {
+        node: effort
+        for node, yaml in _agent_yaml.items()
+        if (effort := get_agent_config(yaml).get("reasoning_effort", ""))
     }
 
     # Read problem_type from the schema JSON the caller posted
@@ -135,11 +141,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
         "agent": "system",
         "timestamp_ms": time.time() * 1000,
         "data": {
-            "models": {
-                "data_validator": settings.openai_model_data_validator,
-                "planner":        settings.openai_model_planner,
-                "report_writer":  settings.openai_model_report_writer,
-            },
+            "models": node_model_map,
             "problem_type": pt,
             "node_categories": {
                 "agents":        NODE_CATEGORIES["agents"],
@@ -160,10 +162,14 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
     _reasoning_buf: dict[str, str] = {}
 
     async def _flush_reasoning() -> None:
-        for agent_name, content in list(_reasoning_buf.items()):
+        for buf_key, content in list(_reasoning_buf.items()):
             if content:
+                # buf_key format: "agent_name:event_type"
+                parts = buf_key.split(":", 1)
+                agent_name = parts[0]
+                event_type = parts[1] if len(parts) > 1 else "agent_reasoning"
                 ev: dict = {
-                    "type": "agent_reasoning",
+                    "type": event_type,
                     "agent": agent_name,
                     "timestamp_ms": time.time() * 1000,
                     "data": {"content": content},
@@ -247,6 +253,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                                 "training_metrics":   ex.get("training_metrics", {}),
                                 "champion_candidate": ex.get("champion_candidate", {}),
                                 "trained_model_path": ex.get("trained_model_path", ""),
+                                "forecast_chart_png": ex.get("forecast_chart_png"),
                             },
                         }
                         entry.events.append(training_event)
@@ -319,9 +326,11 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                                 int(ev_data.get("output_tokens") or 0),
                                 int(ev_data.get("cached_input_tokens") or 0),
                             )
-                    if pipeline_event["type"] == "agent_reasoning":
-                        agent = pipeline_event["agent"]
-                        _reasoning_buf[agent] = _reasoning_buf.get(agent, "") + str(
+                        if node_val in node_reasoning_map:
+                            ev_data["reasoning_effort"] = node_reasoning_map[node_val]
+                    if pipeline_event["type"] in ("agent_reasoning", "agent_thinking"):
+                        buf_key = f'{pipeline_event["agent"]}:{pipeline_event["type"]}'
+                        _reasoning_buf[buf_key] = _reasoning_buf.get(buf_key, "") + str(
                             pipeline_event["data"].get("content", "")
                         )
                     else:

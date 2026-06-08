@@ -104,6 +104,7 @@ class TrainingStateUpdate(StateUpdate):
     training_metrics: dict = Field(default_factory=dict)
     champion_candidate: dict | None = None
     experience_record_path: str | None = None
+    forecast_chart_png: str | None = None
 
     @classmethod
     def from_training_result(
@@ -119,6 +120,7 @@ class TrainingStateUpdate(StateUpdate):
             training_metrics=result.champion_metrics,
             champion_candidate=result.champion_candidate,
             experience_record_path=result.experience_record_path,
+            forecast_chart_png=result.forecast_chart_png,
         )
 
 

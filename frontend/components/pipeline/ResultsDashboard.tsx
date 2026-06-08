@@ -318,7 +318,7 @@ function ModelPanel({
 }
 
 
-function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string } }) {
+function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null } }) {
   const champ = data.champion_candidate as { model_key?: string; primary_metric?: string; primary_score?: number }
   const metricEntries = Object.entries(data.training_metrics ?? {})
   return (
@@ -347,6 +347,16 @@ function TrainingCompletePanel({ data }: { data: { training_run_id: string; trai
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {data.forecast_chart_png && (
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">Forecast vs actuals</p>
+          <img
+            src={`data:image/png;base64,${data.forecast_chart_png}`}
+            alt="Forecast chart"
+            className="w-full rounded border border-zinc-200"
+          />
         </div>
       )}
       {data.trained_model_path && (
@@ -408,11 +418,18 @@ export function ResultsDashboard() {
 
   const trainingData = useMemo(() => {
     const ev = events.findLast((e) => e.type === 'training_complete')
-    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string }) : null
+    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null }) : null
   }, [events])
 
-  const dataset = toolResults['load_dataset'] as DatasetSummary | undefined
-  const merged = toolResults['merge_datasets'] as MergedSummary | undefined
+  const loadDatasetCallCount = useMemo(
+    () => events.filter((e) => e.type === 'tool_call' && e.data.tool_name === 'load_dataset').length,
+    [events],
+  )
+  // Only show the load_dataset result when exactly one file was loaded (single-file shortcut).
+  // With multiple files, the last load_dataset result is just one raw source — not the final merged table.
+  const dataset = loadDatasetCallCount === 1 ? toolResults['load_dataset'] as DatasetSummary | undefined : undefined
+  // merge_datasets (classic) OR execute_join_plan (join discovery) both produce a merged summary
+  const merged = (toolResults['merge_datasets'] ?? toolResults['execute_join_plan']) as MergedSummary | undefined
   const missing = toolResults['check_missing_values'] as MissingSummary | undefined
   const validation = toolResults['validate_against_schema'] as ValidationResult | undefined
   const trained = toolResults['train_model'] as TrainResult | undefined

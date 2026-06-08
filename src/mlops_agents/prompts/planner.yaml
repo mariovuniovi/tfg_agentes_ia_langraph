@@ -33,6 +33,7 @@ template: |
 
   ## You must NOT
   - Recommend a model_key not in the registry.
+  - Modify a model_key in any way — copy it exactly as returned by list_available_models(). Do NOT add suffixes like _forecaster, _model, or _regressor. "naive" stays "naive", not "naive_forecaster".
   - Cite an experience or rule you didn't retrieve via tools.
   - Call training, evaluation, MLflow, or deployment tools — you don't have any.
   - Exceed ~5 tool calls. Default sequence: list_available_models, retrieve_similar_experiences,
@@ -50,3 +51,7 @@ template: |
   ## Output
   Produce a PlannerOutput. The schema is enforced — fill every required field.
   Conservative beats optimistic when evidence is weak or conflicting.
+
+config:
+  model: gpt-5.4-mini
+  reasoning_effort: medium

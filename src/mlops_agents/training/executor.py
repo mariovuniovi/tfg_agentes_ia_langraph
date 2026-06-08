@@ -550,6 +550,7 @@ def _run_candidate_forecasting(
     strategies = forecasting_settings.exog_strategies
 
     exog_cache: dict[tuple, pd.Series] = {}
+    _val_preview: list[dict] = []  # last fold's y_true vs pred; mutated by fit_score
 
     def fit_score(params: dict) -> tuple[float, list[float], list[dict]]:
         fold_scores: list[float] = []
@@ -574,8 +575,18 @@ def _run_candidate_forecasting(
                     if n == 0:
                         raise ValueError("Statsforecast produced no predictions")
                     score = _fc_metrics(val_s["y"].values[:n], fct_s[model_col].values[:n])[metric]
+                    _val_preview.clear()
+                    _val_preview.extend(
+                        {"ds": str(val_s["ds"].iloc[i])[:10], "y_true": float(val_s["y"].iloc[i]), "y_pred": float(fct_s[model_col].iloc[i])}
+                        for i in range(n)
+                    )
                 else:
                     score = _fc_metrics(merged["y"].values, merged[model_col].values)[metric]
+                    _val_preview.clear()
+                    _val_preview.extend(
+                        {"ds": str(row["ds"])[:10], "y_true": float(row["y"]), "y_pred": float(row[model_col])}
+                        for _, row in merged.iterrows()
+                    )
                 fold_scores.append(score)
                 continue
 
@@ -631,6 +642,13 @@ def _run_candidate_forecasting(
                 )[metric]
             else:
                 score = _fc_metrics(joined["y_true"].values, joined["pred"].values)[metric]
+            # capture this fold for the chart (last fold wins; good enough for visualisation)
+            _val_preview.clear()
+            src = joined if not joined.empty else val_long.assign(pred=preds["pred"].values[: len(val_long)])
+            _val_preview.extend(
+                {"ds": str(row["ds"])[:10], "y_true": float(row["y_true"]), "y_pred": float(row["pred"])}
+                for _, row in src.iterrows()
+            )
             fold_scores.append(score)
 
         return float(np.mean(fold_scores)), fold_scores, fold_failures
@@ -686,6 +704,7 @@ def _run_candidate_forecasting(
         "complexity_rank": spec.complexity_rank,
         "per_fold_scores": [float(x) for x in last_per_fold],
         "exog_fit_failures": last_failures,
+        "last_val_preview": list(_val_preview),
     }
 
 
@@ -750,6 +769,48 @@ def _retrain_forecasting(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def _build_forecast_chart_png(
+    train_df: pd.DataFrame,
+    val_preview: list[dict],
+    dt_col: str,
+    target_col: str,
+) -> str | None:
+    try:
+        import base64
+        import io
+
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        train_ds = pd.to_datetime(train_df[dt_col])
+        train_y = train_df[target_col].values
+        val_ds = pd.to_datetime([p["ds"] for p in val_preview])
+        val_true = [p["y_true"] for p in val_preview]
+        val_pred = [p["y_pred"] for p in val_preview]
+
+        fig, ax = plt.subplots(figsize=(10, 3.5))
+        ax.plot(train_ds, train_y, color="#4f46e5", linewidth=1.5, label="Train (actual)")
+        ax.plot(val_ds, val_true, color="#6b7280", linewidth=1.5, label="Validation (actual)")
+        ax.plot(val_ds, val_pred, color="#f97316", linewidth=1.5, linestyle="--", label="Validation (predicted)")
+        if len(val_ds):
+            ax.axvline(val_ds[0], color="#d1d5db", linewidth=1, linestyle=":")
+        ax.set_ylabel(target_col, fontsize=9)
+        ax.legend(fontsize=8, framealpha=0.7)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.tick_params(labelsize=8)
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        buf.seek(0)
+        return base64.b64encode(buf.read()).decode()
+    except Exception as exc:
+        logger.warning(f"[executor] forecast chart generation failed: {exc}")
+        return None
 
 
 def run_training_plan(
@@ -846,8 +907,15 @@ def run_training_plan(
 
         if plan.problem_type in ("classification", "regression"):
             champion_path = _retrain_tabular(spec, champion, train_pool, target_column, models_dir)
+            forecast_chart_png: str | None = None
         else:
             champion_path = _retrain_forecasting(spec, champion, train_pool, task_metadata, models_dir)
+            val_preview = champion.get("last_val_preview") or []
+            dt_col = task_metadata["datetime_column"]
+            forecast_chart_png = (
+                _build_forecast_chart_png(train_pool, val_preview, dt_col, target_column)
+                if val_preview else None
+            )
 
         with mlflow.start_run(run_id=champion["mlflow_run_id"], nested=True):
             mlflow.set_tag("champion", "true")
@@ -980,4 +1048,5 @@ def run_training_plan(
         mlflow_parent_run_id=parent_run_id,
         experience_record_path=str(record_path),
         champion_metrics=all_champion_metrics,
+        forecast_chart_png=forecast_chart_png,
     )

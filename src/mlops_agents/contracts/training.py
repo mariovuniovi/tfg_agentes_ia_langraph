@@ -1,10 +1,10 @@
 """Cross-cutting Pydantic contracts for the training pipeline.
 
 Used by:
-- SP3 deterministic executor
-- SP4 benchmark runner + retrieval
-- SP5 planner agent (future)
-- Graph state (via re-export in agent_state)
+- the deterministic training executor (mlops_agents.training)
+- the benchmark runner + experience retrieval
+- the planner agent (mlops_agents.planning) — produces TrainingPlan
+- graph nodes, which dump these models into AgentState as plain dicts
 """
 
 from __future__ import annotations
@@ -63,11 +63,10 @@ class SearchParamOverride(BaseModel):
 class CandidateSpec(BaseModel):
     """A model candidate in a training plan.
 
-    priority: int = Field(ge=1) — must be >= 1 and unique across candidates.
-    reason/evidence_refs default to "" / [] for backward compatibility with existing
-    constructors that predate SP5 planner.
-    # TODO: Task 5.2 (planner_node) will validate min_length on the planner's output
-    # specifically, so strict enforcement is deferred until the planner produces plans.
+    priority must be >= 1 and unique across candidates (enforced by TrainingPlan).
+    reason/evidence_refs default to "" / [] so non-planner constructors (default
+    plans, tests) stay valid; the planner's stricter requirements are enforced by
+    the deterministic validators in mlops_agents.planning.validation.
     """
 
     priority: int = Field(ge=1)
@@ -87,9 +86,9 @@ TrainingPlanCandidate = CandidateSpec
 class RejectedModelSpec(BaseModel):
     """A model excluded from the training plan.
 
-    evidence_refs defaults to [] for backward compatibility; reconsider_if is optional.
-    # TODO: Task 5.2 (planner_node) will validate min_length on the planner's output
-    # specifically, so strict enforcement is deferred until the planner produces plans.
+    evidence_refs defaults to [] so non-planner constructors stay valid; reconsider_if
+    is optional. The planner's stricter requirements are enforced by the deterministic
+    validators in mlops_agents.planning.validation.
     """
 
     model_key: str
@@ -163,3 +162,4 @@ class TrainingResult(BaseModel):
     mlflow_parent_run_id: str
     experience_record_path: str
     champion_metrics: dict[str, float]
+    forecast_chart_png: str | None = None  # base64 PNG; only set for forecasting runs
