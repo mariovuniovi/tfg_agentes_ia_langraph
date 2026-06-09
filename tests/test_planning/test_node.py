@@ -118,12 +118,14 @@ def test_planner_node_happy_path(
     }
     mock_build_agent.return_value = fake_agent
 
+    # 35 rows + forecast_horizon=1 satisfies capacity check (k_max=4)
+    rows = "\n".join(f"2024-01-{i + 1:02d},{ i + 1}" for i in range(35))
     csv = tmp_path / "p.csv"
-    csv.write_text("ds,y\n2024-01-01,1\n2024-01-02,2\n")
+    csv.write_text("ds,y\n" + rows + "\n")
     state = {
         "processed_dataset_path": str(csv),
         "problem_type": "forecasting",
-        "task_metadata": {"target_column": "y", "datetime_column": "ds"},
+        "task_metadata": {"target_column": "y", "datetime_column": "ds", "forecast_horizon": 1},
     }
     result = planner_node(state)
 
@@ -178,12 +180,14 @@ def test_planner_node_status_ok_no_retry(
     }
     mock_build_agent.return_value = fake_agent
 
+    # 35 rows + forecast_horizon=1 satisfies capacity check (k_max=4)
+    rows = "\n".join(f"2024-01-{i + 1:02d},{i + 1}" for i in range(35))
     csv = tmp_path / "p.csv"
-    csv.write_text("ds,y\n2024-01-01,1\n")
+    csv.write_text("ds,y\n" + rows + "\n")
     state = {
         "processed_dataset_path": str(csv),
         "problem_type": "forecasting",
-        "task_metadata": {},
+        "task_metadata": {"forecast_horizon": 1},
     }
     result = planner_node(state)
 
@@ -246,12 +250,14 @@ def test_planner_node_retry_on_first_failure(
         None,
     ]
 
+    # 35 rows + forecast_horizon=1 satisfies capacity check (k_max=4)
+    rows = "\n".join(f"2024-01-{i + 1:02d},{i + 1}" for i in range(35))
     csv = tmp_path / "p.csv"
-    csv.write_text("ds,y\n2024-01-01,1\n")
+    csv.write_text("ds,y\n" + rows + "\n")
     state = {
         "processed_dataset_path": str(csv),
         "problem_type": "forecasting",
-        "task_metadata": {},
+        "task_metadata": {"forecast_horizon": 1},
     }
     result = planner_node(state)
 
@@ -305,12 +311,14 @@ def test_planner_node_raises_after_two_failures(
     # Both calls to _check_plan_integrity raise
     mock_integrity.side_effect = PlannerValidationError("always fails")
 
+    # 35 rows + forecast_horizon=1 satisfies capacity check (k_max=4)
+    rows = "\n".join(f"2024-01-{i + 1:02d},{i + 1}" for i in range(35))
     csv = tmp_path / "p.csv"
-    csv.write_text("ds,y\n2024-01-01,1\n")
+    csv.write_text("ds,y\n" + rows + "\n")
     state = {
         "processed_dataset_path": str(csv),
         "problem_type": "forecasting",
-        "task_metadata": {},
+        "task_metadata": {"forecast_horizon": 1},
     }
     with pytest.raises(PlannerError):
         planner_node(state)
@@ -388,12 +396,14 @@ def test_planner_node_candidates_sorted_by_priority(
     }
     mock_build_agent.return_value = fake_agent
 
+    # 35 rows + forecast_horizon=1 satisfies capacity check (k_max=4)
+    rows = "\n".join(f"2024-01-{i + 1:02d},{i + 1}" for i in range(35))
     csv = tmp_path / "p.csv"
-    csv.write_text("ds,y\n2024-01-01,1\n")
+    csv.write_text("ds,y\n" + rows + "\n")
     state = {
         "processed_dataset_path": str(csv),
         "problem_type": "forecasting",
-        "task_metadata": {},
+        "task_metadata": {"forecast_horizon": 1},
     }
     result = planner_node(state)
 
@@ -401,3 +411,83 @@ def test_planner_node_candidates_sorted_by_priority(
     priorities = [c["priority"] for c in candidates]
     assert priorities == sorted(priorities), f"Expected sorted priorities, got {priorities}"
     assert candidates[0]["model_key"] == "ets"
+
+
+@patch("mlops_agents.planning.node._check_conflict_resolution_present_if_flagged")
+@patch("mlops_agents.planning.node._check_evidence_references_hybrid")
+@patch("mlops_agents.planning.node._check_plan_exhaustiveness")
+@patch("mlops_agents.planning.node._check_plan_integrity")
+@patch("mlops_agents.planning.node.build_planner_validation_context")
+@patch("mlops_agents.planning.node.build_planner_agent")
+@patch("mlops_agents.planning.node.build_planner_tools")
+@patch("mlops_agents.planning.node.build_dataset_profile")
+def test_planner_node_injects_policy_forecasting_settings(
+    mock_profile, mock_build_tools, mock_build_agent, mock_build_ctx,
+    mock_integrity, mock_exhaust, mock_evidence, mock_conflict, tmp_path,
+):
+    """The plan's forecasting_settings must equal the deterministic policy output,
+    regardless of what the LLM returns (here: forecasting_settings=None)."""
+    mock_profile_instance = MagicMock()
+    mock_profile_instance.model_dump.return_value = {}
+    mock_profile.return_value = mock_profile_instance
+    mock_ctx = MagicMock()
+    mock_ctx.problem_type = "forecasting"
+    mock_ctx.task_metadata = {}
+    mock_ctx.available_model_keys = ["ets"]
+    mock_ctx.similar_experiences = []
+    mock_ctx.matched_rules = []
+    mock_ctx.rules_by_id = {}
+    mock_build_ctx.return_value = mock_ctx
+    mock_build_tools.return_value = []
+    fake_agent = MagicMock()
+    fake_agent.invoke.return_value = {
+        "structured_response": _make_output_for("forecasting"),  # plan.forecasting_settings is None
+        "messages": [],
+    }
+    mock_build_agent.return_value = fake_agent
+
+    # 60 observations, horizon 8 -> capacity policy => expanding_window, 2 folds (NOT single_split)
+    rows = "\n".join(f"2023-{(i % 12) + 1:02d}-01,{i}" for i in range(60))
+    csv = tmp_path / "p.csv"
+    csv.write_text("ds,y\n" + rows + "\n")
+    state = {
+        "processed_dataset_path": str(csv),
+        "problem_type": "forecasting",
+        "task_metadata": {
+            "target_column": "y", "datetime_column": "ds",
+            "forecast_horizon": 8, "exogenous_columns": [],
+        },
+    }
+    result = planner_node(state)
+    fs = result.update["training_plan"]["forecasting_settings"]
+    assert fs is not None
+    assert fs["validation_strategy"]["type"] == "expanding_window"
+    assert fs["validation_strategy"]["n_folds"] == 2
+
+
+@patch("mlops_agents.planning.node.build_planner_validation_context")
+@patch("mlops_agents.planning.node.build_planner_agent")
+@patch("mlops_agents.planning.node.build_planner_tools")
+@patch("mlops_agents.planning.node.build_dataset_profile")
+def test_planner_node_raises_plannererror_on_too_small_forecasting(
+    mock_profile, mock_build_tools, mock_build_agent, mock_build_ctx, tmp_path,
+):
+    import pytest
+    from mlops_agents.planning.node import PlannerError
+    mock_profile_instance = MagicMock()
+    mock_profile_instance.model_dump.return_value = {}
+    mock_profile.return_value = mock_profile_instance
+    mock_build_ctx.return_value = MagicMock()
+    mock_build_tools.return_value = []
+    # 10 rows, horizon 8 -> capacity check fails (need >= 46)
+    rows = "\n".join(f"2023-{(i % 12) + 1:02d}-01,{i}" for i in range(10))
+    csv = tmp_path / "tiny.csv"
+    csv.write_text("ds,y\n" + rows + "\n")
+    state = {
+        "processed_dataset_path": str(csv),
+        "problem_type": "forecasting",
+        "task_metadata": {"target_column": "y", "datetime_column": "ds",
+                          "forecast_horizon": 8, "exogenous_columns": []},
+    }
+    with pytest.raises(PlannerError, match="capacity check failed"):
+        planner_node(state)

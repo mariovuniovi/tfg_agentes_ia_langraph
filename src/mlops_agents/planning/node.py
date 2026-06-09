@@ -3,12 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
+import pandas as pd
 from langchain.agents.structured_output import StructuredOutputError
 from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import Command
 
 from mlops_agents.config.settings import settings
+from mlops_agents.contracts.training import ForecastingSettings
 from mlops_agents.planning.agent import build_planner_agent
 from mlops_agents.planning.context import build_planner_validation_context
 from mlops_agents.planning.prompts import build_retry_message, format_planner_inputs
@@ -26,7 +28,9 @@ from mlops_agents.planning.validation import (
 from mlops_agents.contracts.outputs import PlannerStateUpdate
 from mlops_agents.prompts import get_prompt
 from mlops_agents.state.agent_state import AgentState
+from mlops_agents.training.exog_policy import resolve_exog_strategies
 from mlops_agents.training.profiler import build_dataset_profile
+from mlops_agents.training.validation_policy import resolve_validation_strategy
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -51,6 +55,26 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     validation_ctx = build_planner_validation_context(profile, task_meta, problem_type)
     system_prompt = get_prompt("planner").template
 
+    # Deterministic forecasting policy: resolve validation + exog BEFORE the agent so the
+    # LLM plans models under fixed settings it cannot override.
+    forecasting_fs: ForecastingSettings | None = None
+    policy_summary: str | None = None
+    if problem_type == "forecasting":
+        _df = pd.read_csv(processed_path)
+        try:
+            forecasting_fs = ForecastingSettings(
+                validation_strategy=resolve_validation_strategy(task_meta, len(_df)),
+                exog_strategies=resolve_exog_strategies(_df, task_meta, task_meta.get("frequency")),
+            )
+        except ValueError as exc:
+            raise PlannerError(f"Forecasting capacity check failed: {exc}") from exc
+        policy_summary = (
+            f"validation_strategy: type={forecasting_fs.validation_strategy.type}, "
+            f"n_folds={forecasting_fs.validation_strategy.n_folds}; "
+            f"exog extension per unknown-future column: "
+            f"{forecasting_fs.exog_strategies.per_column or 'none'}"
+        )
+
     output = None
     trace = ToolTrace()
     last_error = ""
@@ -63,7 +87,7 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
 
         messages: list = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content=format_planner_inputs(profile, task_meta, problem_type)),
+            HumanMessage(content=format_planner_inputs(profile, task_meta, problem_type, policy_summary)),
         ]
         if attempt == 1:
             messages.append(build_retry_message(last_error))
@@ -78,6 +102,12 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
             if output is None:
                 raise PlannerValidationError(
                     "agent returned no structured_response — model failed to produce PlannerOutput"
+                )
+
+            if forecasting_fs is not None:
+                output = output.model_copy(
+                    update={"plan": output.plan.model_copy(
+                        update={"forecasting_settings": forecasting_fs})}
                 )
 
             _check_plan_integrity(output, trace, validation_ctx)
