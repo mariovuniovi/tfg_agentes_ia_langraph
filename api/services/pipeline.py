@@ -244,6 +244,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                 if "executor" in data and isinstance(data["executor"], dict):
                     ex = data["executor"]
                     if ex.get("training_run_id") or ex.get("training_metrics") or ex.get("champion_candidate"):
+                        _fc_settings = (ex.get("training_plan") or {}).get("forecasting_settings") or {}
                         training_event: dict = {
                             "type": "training_complete",
                             "agent": "executor",
@@ -255,6 +256,7 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                                 "trained_model_path": ex.get("trained_model_path", ""),
                                 "forecast_chart_png": ex.get("forecast_chart_png"),
                                 "selection_score":    ex.get("selection_score"),
+                                "validation_strategy": _fc_settings.get("validation_strategy"),
                             },
                         }
                         entry.events.append(training_event)

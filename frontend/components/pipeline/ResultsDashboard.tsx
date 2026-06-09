@@ -318,9 +318,11 @@ function ModelPanel({
 }
 
 
-function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null; selection_score?: number | null } }) {
+function TrainingCompletePanel({ data }: { data: { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null; selection_score?: number | null; validation_strategy?: { type?: string; n_folds?: number } | null } }) {
   const champ = data.champion_candidate as { model_key?: string; primary_metric?: string; primary_score?: number }
   const metricEntries = Object.entries(data.training_metrics ?? {})
+  const vs = data.validation_strategy
+  const vsLabel = vs?.type ? ` · via ${vs.type}${typeof vs.n_folds === 'number' ? `, ${vs.n_folds} fold${vs.n_folds === 1 ? '' : 's'}` : ''}` : ''
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -349,7 +351,7 @@ function TrainingCompletePanel({ data }: { data: { training_run_id: string; trai
           </div>
           {typeof data.selection_score === 'number' && (
             <p className="mt-1.5 text-[11px] text-zinc-400">
-              Selected on validation: <span className="font-mono">{data.selection_score.toFixed(4)}</span>
+              Selected on validation: <span className="font-mono">{data.selection_score.toFixed(4)}</span>{vsLabel}
             </p>
           )}
         </div>
@@ -358,7 +360,7 @@ function TrainingCompletePanel({ data }: { data: { training_run_id: string; trai
           <p className="text-xs text-amber-600">Test evaluation unavailable.</p>
           {typeof data.selection_score === 'number' && (
             <p className="mt-1 text-[11px] text-zinc-400">
-              Selected on validation: <span className="font-mono">{data.selection_score.toFixed(4)}</span>
+              Selected on validation: <span className="font-mono">{data.selection_score.toFixed(4)}</span>{vsLabel}
             </p>
           )}
         </div>
@@ -432,7 +434,7 @@ export function ResultsDashboard() {
 
   const trainingData = useMemo(() => {
     const ev = events.findLast((e) => e.type === 'training_complete')
-    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null; selection_score?: number | null }) : null
+    return ev ? (ev.data as { training_run_id: string; training_metrics: Record<string, number>; champion_candidate: Record<string, unknown>; trained_model_path: string; forecast_chart_png?: string | null; selection_score?: number | null; validation_strategy?: { type?: string; n_folds?: number } | null }) : null
   }, [events])
 
   const loadDatasetCallCount = useMemo(
