@@ -105,3 +105,52 @@ def test_fetch_uci_url_unknown_raises():
     with pytest.raises(ValueError, match="No uci_url handler"):
         fetch_dataset({"source": "uci_url", "source_id": "https://x.com/f.csv",
                        "dataset_id": "unknown_dataset"})
+
+
+# ---------------------------------------------------------------------------
+# Family-check unit tests
+# ---------------------------------------------------------------------------
+
+def test_family_check_statistical() -> None:
+    from scripts.run_benchmark import _check_family
+    assert _check_family("ets", "statistical") is True
+    assert _check_family("auto_arima", "statistical") is True
+    assert _check_family("naive", "statistical") is True
+    assert _check_family("lightgbm_forecaster", "statistical") is False
+
+
+def test_family_check_random_walk() -> None:
+    from scripts.run_benchmark import _check_family
+    assert _check_family("naive", "random_walk") is True
+    assert _check_family("ets", "random_walk") is False      # only naive qualifies
+    assert _check_family("seasonal_naive", "random_walk") is False
+
+
+def test_family_check_supervised() -> None:
+    from scripts.run_benchmark import _check_family
+    assert _check_family("lightgbm_forecaster", "supervised") is True
+    assert _check_family("random_forest_forecaster", "supervised") is True
+    assert _check_family("ets", "supervised") is False
+    assert _check_family("naive", "supervised") is False
+
+
+def test_reset_forecasting_experiences(tmp_path) -> None:
+    from mlops_agents.experience.pool import ExperiencePool
+    pool = ExperiencePool(tmp_path / "test.db", audit_dir=tmp_path)
+    with pool._conn() as conn:
+        for task_id, problem_type in [("fc1", "forecasting"), ("cls1", "classification")]:
+            conn.execute(
+                """INSERT INTO experiences
+                   (task_id, problem_type, dataset_profile_json,
+                    training_plan_json, created_at)
+                   VALUES (?, ?, '{}', '{}', datetime('now'))""",
+                (task_id, problem_type),
+            )
+    assert pool.count("forecasting") == 1
+    assert pool.count("classification") == 1
+
+    n = pool.reset_forecasting_experiences()
+
+    assert n == 1
+    assert pool.count("forecasting") == 0
+    assert pool.count("classification") == 1  # untouched

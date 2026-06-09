@@ -92,6 +92,23 @@ class ExperiencePool:
             except Exception as e:
                 logger.warning(f"Failed to write audit JSON for {record.task_id}: {e}")
 
+    def reset_forecasting_experiences(self) -> int:
+        """Delete all forecasting experiences and their cascade-linked rows.
+
+        candidate_results and model_artifacts have ON DELETE CASCADE, so a single
+        DELETE on experiences suffices (foreign_keys = ON is set in _conn).
+        Returns the number of experience rows deleted.
+        """
+        with self._conn() as conn:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM experiences WHERE problem_type = 'forecasting'"
+            ).fetchone()[0]
+            if n == 0:
+                return 0
+            conn.execute("DELETE FROM experiences WHERE problem_type = 'forecasting'")
+        logger.info(f"[pool] reset_forecasting: deleted {n} experiences")
+        return n
+
     def get(self, task_id: str) -> ExperienceRecord:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM experiences WHERE task_id = ?", (task_id,)).fetchone()

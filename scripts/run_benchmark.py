@@ -38,6 +38,23 @@ from scripts._dataset_sources import fetch_dataset
 
 logger = get_logger(__name__)
 
+_STATISTICAL_MODELS = frozenset({"naive", "seasonal_naive", "ets", "auto_arima"})
+_SUPERVISED_MODELS = frozenset({
+    "random_forest_forecaster", "extra_trees_forecaster", "gbm_forecaster",
+    "lightgbm_forecaster", "xgboost_forecaster", "svr_forecaster",
+})
+
+
+def _check_family(model_key: str, expected_family: str) -> bool:
+    """True if model_key belongs to expected_family."""
+    if expected_family == "statistical":
+        return model_key in _STATISTICAL_MODELS
+    if expected_family == "random_walk":
+        return model_key == "naive"
+    if expected_family == "supervised":
+        return model_key in _SUPERVISED_MODELS
+    return False
+
 
 def _preprocess_benchmark_df(df: "pd.DataFrame", entry: dict) -> "pd.DataFrame":  # type: ignore[name-defined]
     """Label-encode categoricals; drop high-cardinality string columns."""
@@ -116,6 +133,8 @@ def run_benchmark(
     splits_dir: Path | None = None,
     staged_dir: Path | None = None,
     n_trials_override: int | None = None,
+    reset_forecasting: bool = False,
+    strict: bool = False,
 ) -> tuple[int, int]:
     """Seed the experience pool. Returns (n_success, n_fail)."""
     db_path = db_path or settings.experience_db_path
@@ -125,6 +144,12 @@ def run_benchmark(
 
     manifest = yaml.safe_load(manifest_path.read_text()) or []
     pool = ExperiencePool(db_path, audit_dir=audit_dir)
+
+    if reset_forecasting:
+        n_del = pool.reset_forecasting_experiences()
+        logger.info(f"[benchmark] reset_forecasting: removed {n_del} stale forecasting experiences")
+
+    family_mismatches: list[dict[str, str]] = []
     n_success = n_fail = 0
 
     for entry in manifest:
@@ -162,12 +187,39 @@ def run_benchmark(
                 json.loads(Path(result.experience_record_path).read_text())
             )
             pool.insert_from_record(record)
+            champion_key = result.champion_candidate["model_key"]
+            expected_family = entry.get("expected_family")
+            if expected_family and entry.get("problem_type") == "forecasting":
+                match = _check_family(champion_key, expected_family)
+                symbol = "✓" if match else "✗"
+                logger.info(
+                    f"[{dataset_id}] family_check {symbol} "
+                    f"champion={champion_key} expected_family={expected_family}"
+                )
+                if not match:
+                    family_mismatches.append({
+                        "dataset_id": dataset_id,
+                        "champion": champion_key,
+                        "expected_family": expected_family,
+                    })
             n_success += 1
-            logger.info(f"[{dataset_id}] champion={result.champion_candidate['model_key']}")
+            logger.info(f"[{dataset_id}] champion={champion_key}")
 
         except Exception as e:
             n_fail += 1
             logger.error(f"[{dataset_id}] FAILED: {e}")
+
+    if family_mismatches:
+        logger.warning(f"[benchmark] {len(family_mismatches)} family mismatch(es):")
+        for m in family_mismatches:
+            logger.warning(
+                f"  ✗ {m['dataset_id']}: champion={m['champion']} "
+                f"expected={m['expected_family']}"
+            )
+        if strict:
+            n_fail += len(family_mismatches)
+    else:
+        logger.info("[benchmark] All forecasting family checks passed ✓")
 
     logger.info(f"Benchmark complete: {n_success} success, {n_fail} failed")
     return n_success, n_fail
@@ -177,8 +229,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=Path("scripts/benchmark_manifest.yaml"))
     parser.add_argument("--trials", type=int, default=8)
+    parser.add_argument("--reset-forecasting", action="store_true",
+                        help="Delete all forecasting pool experiences before re-seeding")
+    parser.add_argument("--strict", action="store_true",
+                        help="Count family mismatches as failures (non-zero exit)")
     args = parser.parse_args()
-    n_ok, n_fail = run_benchmark(manifest_path=args.manifest, n_trials_override=args.trials)
+    n_ok, n_fail = run_benchmark(
+        manifest_path=args.manifest,
+        n_trials_override=args.trials,
+        reset_forecasting=args.reset_forecasting,
+        strict=args.strict,
+    )
     sys.exit(0 if n_fail == 0 else 1)
 
 
