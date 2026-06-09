@@ -78,4 +78,119 @@ def fetch_dataset(entry: dict) -> pd.DataFrame:
         df[dt_col] = pd.to_datetime(df[dt_col]).dt.strftime("%Y-%m-%d")
         return df
 
-    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi")
+    if src == "statsmodels":
+        return _fetch_statsmodels(entry)
+
+    if src == "uci_url":
+        return _fetch_uci_url(entry)
+
+    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi, statsmodels, uci_url")
+
+
+# ---------------------------------------------------------------------------
+# statsmodels source — static public datasets (co2, sunspots, nile,
+# air_passengers). No network after statsmodels is installed.
+# ---------------------------------------------------------------------------
+
+def _fetch_statsmodels(entry: dict) -> pd.DataFrame:
+    import statsmodels.api as sm
+    sid = entry["source_id"]
+
+    if sid == "co2":
+        raw = sm.datasets.co2.load_pandas().data  # weekly, DatetimeIndex, col 'co2'
+        monthly = raw.resample("MS").mean().interpolate("linear").dropna()
+        df = monthly.reset_index()
+        df.columns = ["date", "co2"]
+        df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+        return df
+
+    if sid == "sunspots":
+        raw = sm.datasets.sunspots.load_pandas().data.copy()
+        raw.columns = [c.upper() for c in raw.columns]  # normalise capitalisation
+        return pd.DataFrame({
+            "year": raw["YEAR"].astype(int).apply(lambda y: f"{y}-01-01"),
+            "sunspots": raw["SUNACTIVITY"].values,
+        })
+
+    if sid == "nile":
+        raw = sm.datasets.nile.load_pandas().data.reset_index()
+        raw.columns = [c.lower() for c in raw.columns]
+        return pd.DataFrame({
+            "year": raw["year"].astype(int).apply(lambda y: f"{y}-01-01"),
+            "volume": raw["volume"].values,
+        })
+
+    if sid == "air_passengers":
+        data = sm.datasets.get_rdataset("AirPassengers", "datasets").data
+        # 'time' is a float year (1949.0, 1949.0833, ...); 'value' is the count
+        def _fy(y: float) -> str:
+            year = int(y)
+            month = round((y - year) * 12) + 1
+            return f"{year}-{month:02d}-01"
+        return pd.DataFrame({
+            "month": data["time"].apply(_fy),
+            "passengers": data["value"].astype(int),
+        })
+
+    raise ValueError(f"Unknown statsmodels dataset source_id: {sid!r}. "
+                     f"Valid: co2, sunspots, nile, air_passengers")
+
+
+# ---------------------------------------------------------------------------
+# uci_url source — downloads a CSV from a UCI archive URL and applies
+# dataset-specific resampling. Identified by entry['dataset_id'].
+# ---------------------------------------------------------------------------
+
+def _fetch_uci_url(entry: dict) -> pd.DataFrame:
+    dataset_id = entry["dataset_id"]
+    url = entry["source_id"]
+
+    if dataset_id == "metro_traffic_volume":
+        # UCI 492 — hourly Metro Interstate Traffic Volume → resample to daily
+        df = pd.read_csv(url, parse_dates=["date_time"])
+        df = df.set_index("date_time")
+        df["is_holiday"] = (df["holiday"] != "None").astype(int)
+        agg = {"traffic_volume": "mean", "temp": "mean", "rain_1h": "mean",
+               "snow_1h": "mean", "clouds_all": "mean", "is_holiday": "max"}
+        daily = df[list(agg)].resample("D").agg(agg).dropna().reset_index()
+        daily = daily.rename(columns={"date_time": "date"})
+        daily["date"] = daily["date"].dt.strftime("%Y-%m-%d")
+        return daily
+
+    if dataset_id == "beijing_pm25":
+        # UCI 381 — hourly Beijing PM2.5 → resample to daily
+        df = pd.read_csv(url)
+        df["datetime"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
+        keep = ["pm2.5", "DEWP", "TEMP", "PRES", "Iws", "Is", "Ir"]
+        daily = df.set_index("datetime")[keep].resample("D").mean().dropna().reset_index()
+        daily = daily.rename(columns={"datetime": "date", "pm2.5": "pm25"})
+        daily["date"] = daily["date"].dt.strftime("%Y-%m-%d")
+        return daily
+
+    if dataset_id == "appliances_energy":
+        # UCI 374 — 10-min Appliances Energy → resample to hourly (~3,300 rows)
+        df = pd.read_csv(url, parse_dates=["date"])
+        df = df.set_index("date")
+        keep = ["Appliances", "T6", "RH_6", "T_out", "RH_out",
+                "Windspeed", "Visibility", "Press_mm_hg"]
+        hourly = df[keep].resample("h").mean().dropna().reset_index()
+        hourly["date"] = hourly["date"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        return hourly
+
+    if dataset_id == "vic_elec":
+        # Half-hourly Victorian electricity demand → resample to daily
+        # Source: tsibbledata R package (GitHub raw).
+        df = pd.read_csv(url, parse_dates=["Time"])
+        df = df.rename(columns={"Time": "datetime", "Demand": "demand",
+                                 "Temperature": "temperature", "Holiday": "holiday"})
+        df["holiday"] = df["holiday"].astype(int)
+        daily = df.set_index("datetime")[["demand", "temperature", "holiday"]].resample("D").agg(
+            {"demand": "sum", "temperature": "mean", "holiday": "max"}
+        ).dropna().reset_index()
+        daily = daily.rename(columns={"datetime": "date"})
+        daily["date"] = daily["date"].dt.strftime("%Y-%m-%d")
+        return daily
+
+    raise ValueError(f"No uci_url handler for dataset_id: {dataset_id!r}. "
+                     f"Valid: metro_traffic_volume, beijing_pm25, "
+                     f"appliances_energy, vic_elec")

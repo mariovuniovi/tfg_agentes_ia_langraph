@@ -29,6 +29,7 @@ dependencies = [
     "statsforecast>=1.7",
     "xgboost>=2.0",
     "yfinance>=0.2",
+    "statsmodels>=0.14",
 
     # Configuration & Validation
     "pydantic>=2.10",
