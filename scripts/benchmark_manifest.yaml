@@ -224,7 +224,7 @@
 # Victorian electricity demand 30-min → daily
 - dataset_id: vic_elec
   source: uci_url
-  source_id: "https://raw.githubusercontent.com/tidyverts/tsibbledata/master/data-raw/vic_elec/vic_elec.csv"
+  source_id: "https://raw.githubusercontent.com/tidyverts/tsibbledata/master/data-raw/vic_elec/VIC2015"
   problem_type: forecasting
   target_column: demand
   datetime_column: date

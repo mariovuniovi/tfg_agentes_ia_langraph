@@ -198,16 +198,41 @@ def _fetch_uci_url(entry: dict[str, Any]) -> pd.DataFrame:
         return hourly
 
     if dataset_id == "vic_elec":
-        # Half-hourly Victorian electricity demand → resample to daily
-        # Source: tsibbledata R package (GitHub raw).
-        df = pd.read_csv(url, parse_dates=["Time"])
-        df = df.rename(columns={"Time": "datetime", "Demand": "demand",
-                                 "Temperature": "temperature", "Holiday": "holiday"})
-        df["holiday"] = df["holiday"].astype(int)
-        daily = df.set_index("datetime")[["demand", "temperature", "holiday"]].resample("D").agg(
-            {"demand": "sum", "temperature": "mean", "holiday": "max"}
-        ).dropna().reset_index()
-        daily = daily.rename(columns={"datetime": "date"})
+        # VIC2015 half-hourly demand + temperature (3 separate files, Excel serial dates)
+        # url is the base directory, e.g. .../VIC2015
+        import urllib.request as _req
+        excel_origin = pd.Timestamp("1899-12-30")
+
+        demand = pd.read_csv(f"{url}/demand.csv")
+        demand["datetime"] = (
+            excel_origin
+            + pd.to_timedelta(demand["Date"], unit="D")
+            + pd.to_timedelta((demand["Period"] - 1) * 30, unit="min")
+        )
+        demand["demand"] = demand["OperationalLessIndustrial"] + demand["Industrial"]
+
+        temp = pd.read_csv(f"{url}/temperature.csv")
+        temp["datetime"] = (
+            excel_origin
+            + pd.to_timedelta(temp["Date"], unit="D")
+            + pd.to_timedelta((temp["Period"] - 1) * 30, unit="min")
+        )
+
+        with _req.urlopen(f"{url}/holidays.txt") as resp:
+            holiday_dates = {
+                pd.to_datetime(line.strip(), dayfirst=True).date()
+                for line in resp.read().decode().splitlines()
+                if line.strip()
+            }
+
+        df = demand[["datetime", "demand"]].merge(
+            temp[["datetime", "Temp"]].rename(columns={"Temp": "temperature"}),
+            on="datetime", how="inner",
+        ).set_index("datetime")
+
+        daily = df.resample("D").agg({"demand": "sum", "temperature": "mean"}).dropna()
+        daily["holiday"] = [int(d in holiday_dates) for d in daily.index.date]
+        daily = daily.reset_index().rename(columns={"datetime": "date"})
         daily["date"] = daily["date"].dt.strftime("%Y-%m-%d")
         return daily
 
