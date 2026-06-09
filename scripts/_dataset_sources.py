@@ -154,6 +154,17 @@ def _fetch_uci_url(entry: dict[str, Any]) -> pd.DataFrame:
     dataset_id = entry["dataset_id"]
     url = entry["source_id"]
 
+    if dataset_id == "bike_sharing_daily":
+        # UCI 275 — daily Bike Sharing packaged as zip; day.csv has dteday + all exog
+        import urllib.request
+        import zipfile
+        import io as _io
+        with urllib.request.urlopen(url) as resp:
+            with zipfile.ZipFile(_io.BytesIO(resp.read())) as zf:
+                df = pd.read_csv(zf.open("day.csv"), parse_dates=["dteday"])
+        df["dteday"] = df["dteday"].dt.strftime("%Y-%m-%d")
+        return df
+
     if dataset_id == "metro_traffic_volume":
         # UCI 492 — hourly Metro Interstate Traffic Volume → resample to daily
         df = pd.read_csv(url, parse_dates=["date_time"])

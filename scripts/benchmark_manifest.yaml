@@ -144,10 +144,10 @@
 
 # ── Supervised (5): long history + exog → tree ensembles win ────────────────
 
-# OpenML 42712 — UCI Bike Sharing daily (dteday, cnt + weather/calendar exog)
+# UCI 275 — Bike Sharing daily zip → day.csv (dteday, cnt + weather/calendar exog)
 - dataset_id: bike_sharing_daily
-  source: openml
-  source_id: 42712
+  source: uci_url
+  source_id: "https://archive.ics.uci.edu/ml/machine-learning-databases/00275/Bike-Sharing-Dataset.zip"
   problem_type: forecasting
   target_column: cnt
   datetime_column: dteday
