@@ -1,9 +1,10 @@
 """Dataset fetchers for the benchmark runner."""
 from __future__ import annotations
+from typing import Any
 import pandas as pd
 
 
-def fetch_dataset(entry: dict) -> pd.DataFrame:
+def fetch_dataset(entry: dict[str, Any]) -> pd.DataFrame:
     src = entry["source"]
     if src == "sklearn":
         from sklearn import datasets
@@ -92,7 +93,7 @@ def fetch_dataset(entry: dict) -> pd.DataFrame:
 # air_passengers). No network after statsmodels is installed.
 # ---------------------------------------------------------------------------
 
-def _fetch_statsmodels(entry: dict) -> pd.DataFrame:
+def _fetch_statsmodels(entry: dict[str, Any]) -> pd.DataFrame:
     import statsmodels.api as sm
     sid = entry["source_id"]
 
@@ -141,7 +142,7 @@ def _fetch_statsmodels(entry: dict) -> pd.DataFrame:
 # dataset-specific resampling. Identified by entry['dataset_id'].
 # ---------------------------------------------------------------------------
 
-def _fetch_uci_url(entry: dict) -> pd.DataFrame:
+def _fetch_uci_url(entry: dict[str, Any]) -> pd.DataFrame:
     dataset_id = entry["dataset_id"]
     url = entry["source_id"]
 

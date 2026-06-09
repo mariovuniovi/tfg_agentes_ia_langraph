@@ -70,7 +70,6 @@ def _make_metro_raw() -> str:
         holiday = "None" if i % 24 != 0 else "New Years Day"
         rows.append(f"{holiday},280.0,0.0,0.0,40,Clouds,broken clouds,"
                     f"{dt.strftime('%Y-%m-%d %H:%M:%S')},3000")
-    import io
     return "\n".join(rows)
 
 
@@ -99,3 +98,10 @@ def test_fetch_uci_url_metro(monkeypatch):
     assert "traffic_volume" in df.columns
     assert "is_holiday" in df.columns
     assert len(df) >= 1  # at least one daily row
+
+
+def test_fetch_uci_url_unknown_raises():
+    from scripts._dataset_sources import fetch_dataset
+    with pytest.raises(ValueError, match="No uci_url handler"):
+        fetch_dataset({"source": "uci_url", "source_id": "https://x.com/f.csv",
+                       "dataset_id": "unknown_dataset"})
