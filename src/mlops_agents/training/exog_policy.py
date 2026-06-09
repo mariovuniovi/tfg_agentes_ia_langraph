@@ -6,17 +6,19 @@ values (handled downstream) and are omitted from the per-column map.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
-from mlops_agents.contracts.training import ExogStrategySettings
+from mlops_agents.contracts.training import ExogStrategy, ExogStrategySettings
 from mlops_agents.training.profiler import detect_series_structure
 
 
 def resolve_exog_strategies(
-    df: pd.DataFrame, task_metadata: dict, freq: str | None
+    df: pd.DataFrame, task_metadata: dict[str, Any], freq: str | None
 ) -> ExogStrategySettings:
     declared = task_metadata.get("exogenous_columns") or []
-    per_column: dict[str, str] = {}
+    per_column: dict[str, ExogStrategy] = {}
     for entry in declared:
         col, avail = entry["name"], entry["future_availability"]
         if avail != "unknown_future" or col not in df.columns:

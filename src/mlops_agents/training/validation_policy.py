@@ -7,7 +7,7 @@ ValueError or NotImplementedError on capacity / leakage / type violations.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.contracts.training import TrainingPlan, ValidationStrategy
@@ -43,7 +43,9 @@ def resolve_validation_strategy(task_metadata: dict[str, Any], n_obs: int) -> Va
     k = min(k_max, _MAX_FOLDS)
     if k == 1:
         return ValidationStrategy(type="single_split", n_folds=1, horizon=horizon)
-    vtype = "rolling_window" if drift == "high" else "expanding_window"
+    vtype: Literal["rolling_window", "expanding_window"] = (
+        "rolling_window" if drift == "high" else "expanding_window"
+    )
     return ValidationStrategy(type=vtype, n_folds=k, horizon=horizon, step_size=horizon)
 
 
