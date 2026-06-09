@@ -40,13 +40,11 @@ template: |
     retrieve_ml_knowledge, optional inspect_model_details (1–2), then produce output.
 
   ## Forecasting-specific guidance
-  - If history_length is very_short or short: prefer single_split validation; include
-    statistical baselines (naive, seasonal_naive, ets, auto_arima where registered);
-    avoid high-complexity supervised models unless similar experiences strongly support them.
-  - If expected_drift is high and history is sufficient: prefer rolling_window.
-  - For unknown_future exogenous columns: choose extension strategies from
-    {naive_carry, ets, auto_arima}.
-  - known_future variables must not appear in per-column unknown-future overrides at all.
+  - If history_length is very_short or short: include statistical baselines (naive,
+    seasonal_naive, ets, auto_arima where registered); avoid high-complexity supervised
+    models unless similar experiences strongly support them.
+  - Validation strategy and exogenous-extension handling are FIXED by deterministic
+    policy (shown in your inputs) — do not choose them; select models suited to them.
 
   ## Output
   Produce a PlannerOutput. The schema is enforced — fill every required field.
