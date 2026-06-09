@@ -134,6 +134,12 @@ def test_family_check_supervised() -> None:
     assert _check_family("naive", "supervised") is False
 
 
+def test_family_check_unknown_family() -> None:
+    from scripts.run_benchmark import _check_family
+    assert _check_family("ets", "unknown_family") is False
+    assert _check_family("naive", "") is False
+
+
 def test_reset_forecasting_experiences(tmp_path) -> None:
     from mlops_agents.experience.pool import ExperiencePool
     pool = ExperiencePool(tmp_path / "test.db", audit_dir=tmp_path)
