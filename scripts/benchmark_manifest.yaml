@@ -92,77 +92,154 @@
   target_column: Y1
 
 # ---------------------------------------------------------------------------
-# Forecasting (4) — single-target datasets covering forecasting rules in ml_rules.yaml
-# V1 is single-target only; panel datasets (series_id_columns non-empty) are out of scope.
-# Run scripts/_generate_benchmarks.py to create the local CSVs first.
+# Forecasting (14) — curated, regime-balanced
+# 3 regimes: statistical, supervised, random_walk
 # ---------------------------------------------------------------------------
 
-# Rules 5 + 13: strong seasonality + single series no exog → statistical models
+# ── Statistical (4): short/univariate → ETS / AutoARIMA wins ────────────────
+
 - dataset_id: air_passengers
-  source: local
-  source_id: data/benchmarks/air_passengers.csv
+  source: statsmodels
+  source_id: air_passengers
   problem_type: forecasting
   target_column: passengers
   datetime_column: month
   series_id_columns: []
   frequency: MS
   forecast_horizon: 12
+  expected_family: statistical
 
-# Rule 4: long history + exogenous variables → supervised ML wins
-# Gold price target + Oil, Silver, S&P500, USD as macro exogenous features
-- dataset_id: gold_macro_monthly
-  source: local
-  source_id: data/benchmarks/gold_macro_monthly.csv
+- dataset_id: co2_mauna_loa
+  source: statsmodels
+  source_id: co2
   problem_type: forecasting
-  target_column: gold_close
+  target_column: co2
   datetime_column: date
   series_id_columns: []
   frequency: MS
   forecast_horizon: 6
-  expected_drift: high
-  exogenous_columns:
-    - { name: oil_close,    future_availability: unknown_future }
-    - { name: silver_close, future_availability: unknown_future }
-    - { name: sp500_close,  future_availability: unknown_future }
-    - { name: usd_close,    future_availability: unknown_future }
+  expected_family: statistical
 
-# Rule 8: non-stationary + strong trend → AutoARIMA (differencing)
-# Bitcoin: highly non-stationary, strongly trending, high volatility
-- dataset_id: crypto_weekly
-  source: local
-  source_id: data/benchmarks/crypto_weekly.csv
+- dataset_id: sunspots
+  source: statsmodels
+  source_id: sunspots
   problem_type: forecasting
-  target_column: btc_close
-  datetime_column: week
+  target_column: sunspots
+  datetime_column: year
   series_id_columns: []
-  frequency: W
-  forecast_horizon: 13
+  frequency: YS
+  forecast_horizon: 3
+  expected_family: statistical
 
-# Rule 4 again: exogenous → supervised — FX domain (similar structure to user's dataset)
-# EUR/USD target + GBP/USD, JPY/USD, Gold as correlated exogenous signals
-- dataset_id: fx_exog_weekly
-  source: local
-  source_id: data/benchmarks/fx_exog_weekly.csv
+- dataset_id: nile
+  source: statsmodels
+  source_id: nile
   problem_type: forecasting
-  target_column: eurusd_close
-  datetime_column: week
+  target_column: volume
+  datetime_column: year
   series_id_columns: []
-  frequency: W
-  forecast_horizon: 13
-  expected_drift: high
+  frequency: YS
+  forecast_horizon: 3
+  expected_family: statistical
+
+# ── Supervised (5): long history + exog → tree ensembles win ────────────────
+
+# OpenML 42712 — UCI Bike Sharing daily (dteday, cnt + weather/calendar exog)
+- dataset_id: bike_sharing_daily
+  source: openml
+  source_id: 42712
+  problem_type: forecasting
+  target_column: cnt
+  datetime_column: dteday
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 14
+  expected_family: supervised
   exogenous_columns:
-    - { name: gbpusd_close, future_availability: unknown_future }
-    - { name: jpyusd_close, future_availability: unknown_future }
-    - { name: gold_close,   future_availability: unknown_future }
+    - { name: temp,       future_availability: unknown_future }
+    - { name: hum,        future_availability: unknown_future }
+    - { name: windspeed,  future_availability: unknown_future }
+    - { name: season,     future_availability: known_future }
+    - { name: holiday,    future_availability: known_future }
+    - { name: workingday, future_availability: known_future }
+    - { name: weekday,    future_availability: known_future }
 
-# ---------------------------------------------------------------------------
-# Large exogenous forecasting (3) — ~1000 weekly rows each, 7+ exogenous
-# Rule 4 + rule 11: long history + many exogenous → supervised ML beats naive
-# ---------------------------------------------------------------------------
+# UCI 492 — Metro Interstate Traffic Volume hourly → daily
+- dataset_id: metro_traffic_volume
+  source: uci_url
+  source_id: "https://archive.ics.uci.edu/ml/machine-learning-databases/00492/Metro_Interstate_Traffic_Volume.csv.gz"
+  problem_type: forecasting
+  target_column: traffic_volume
+  datetime_column: date
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 14
+  expected_family: supervised
+  exogenous_columns:
+    - { name: temp,       future_availability: unknown_future }
+    - { name: rain_1h,    future_availability: unknown_future }
+    - { name: snow_1h,    future_availability: unknown_future }
+    - { name: clouds_all, future_availability: unknown_future }
+    - { name: is_holiday, future_availability: known_future }
 
-# S&P 500 weekly with 7 macro/market exogenous (2005-2024, ~1000 rows)
-# Exog: VIX, 10Y Treasury, Oil, Gold, USD index, EUR/USD, Nasdaq
-- dataset_id: sp500_macro_weekly
+# UCI 381 — Beijing PM2.5 hourly 2010-2014 → daily
+- dataset_id: beijing_pm25
+  source: uci_url
+  source_id: "https://archive.ics.uci.edu/ml/machine-learning-databases/00381/PRSA_data_2010.1.1-2014.12.31.csv"
+  problem_type: forecasting
+  target_column: pm25
+  datetime_column: date
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 14
+  expected_family: supervised
+  exogenous_columns:
+    - { name: DEWP, future_availability: unknown_future }
+    - { name: TEMP, future_availability: unknown_future }
+    - { name: PRES, future_availability: unknown_future }
+    - { name: Iws,  future_availability: unknown_future }
+    - { name: Is,   future_availability: unknown_future }
+    - { name: Ir,   future_availability: unknown_future }
+
+# UCI 374 — Appliances Energy 10-min → hourly (~3,300 rows; lightgbm/xgboost eligible)
+- dataset_id: appliances_energy
+  source: uci_url
+  source_id: "https://archive.ics.uci.edu/ml/machine-learning-databases/00374/energydata_complete.csv"
+  problem_type: forecasting
+  target_column: Appliances
+  datetime_column: date
+  series_id_columns: []
+  frequency: H
+  forecast_horizon: 24
+  expected_family: supervised
+  exogenous_columns:
+    - { name: T6,          future_availability: unknown_future }
+    - { name: RH_6,        future_availability: unknown_future }
+    - { name: T_out,       future_availability: unknown_future }
+    - { name: RH_out,      future_availability: unknown_future }
+    - { name: Windspeed,   future_availability: unknown_future }
+    - { name: Visibility,  future_availability: unknown_future }
+    - { name: Press_mm_hg, future_availability: unknown_future }
+
+# Victorian electricity demand 30-min → daily
+- dataset_id: vic_elec
+  source: uci_url
+  source_id: "https://raw.githubusercontent.com/tidyverts/tsibbledata/master/data-raw/vic_elec/vic_elec.csv"
+  problem_type: forecasting
+  target_column: demand
+  datetime_column: date
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 14
+  expected_family: supervised
+  exogenous_columns:
+    - { name: temperature, future_availability: unknown_future }
+    - { name: holiday,     future_availability: known_future }
+
+# ── Random walk (5): near-efficient financial series → naive wins ────────────
+# Fixed end: "2024-06-01" ensures reproducible snapshots.
+
+- dataset_id: sp500_weekly
   source: yfinance_multi
   source_id: "^GSPC"
   exog_tickers: ["^VIX", "^TNX", "CL=F", "GC=F", "DX-Y.NYB", "EURUSD=X", "^IXIC"]
@@ -184,7 +261,7 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
-  expected_drift: high
+  expected_family: random_walk
   exogenous_columns:
     - { name: vix,          future_availability: unknown_future }
     - { name: treasury_10y, future_availability: unknown_future }
@@ -194,9 +271,7 @@
     - { name: eurusd,       future_availability: unknown_future }
     - { name: nasdaq,       future_availability: unknown_future }
 
-# WTI crude oil weekly with 7 energy/macro exogenous (2005-2024, ~1000 rows)
-# Exog: Natural Gas, Gasoline, Copper, S&P500, USD, Gold, VIX
-- dataset_id: oil_multi_exog_weekly
+- dataset_id: oil_weekly
   source: yfinance_multi
   source_id: "CL=F"
   exog_tickers: ["NG=F", "RB=F", "HG=F", "^GSPC", "DX-Y.NYB", "GC=F", "^VIX"]
@@ -218,7 +293,7 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
-  expected_drift: high
+  expected_family: random_walk
   exogenous_columns:
     - { name: nat_gas,   future_availability: unknown_future }
     - { name: gasoline,  future_availability: unknown_future }
@@ -228,9 +303,7 @@
     - { name: gold,      future_availability: unknown_future }
     - { name: vix,       future_availability: unknown_future }
 
-# Gold weekly with 7 precious-metals/macro exogenous (2005-2024, ~1000 rows)
-# Exog: Silver, Copper, Oil, USD, 10Y Treasury, S&P500, VIX
-- dataset_id: gold_multi_exog_weekly
+- dataset_id: gold_macro_weekly
   source: yfinance_multi
   source_id: "GC=F"
   exog_tickers: ["SI=F", "HG=F", "CL=F", "DX-Y.NYB", "^TNX", "^GSPC", "^VIX"]
@@ -252,7 +325,7 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
-  expected_drift: high
+  expected_family: random_walk
   exogenous_columns:
     - { name: silver,       future_availability: unknown_future }
     - { name: copper,       future_availability: unknown_future }
@@ -261,3 +334,29 @@
     - { name: treasury_10y, future_availability: unknown_future }
     - { name: sp500,        future_availability: unknown_future }
     - { name: vix,          future_availability: unknown_future }
+
+- dataset_id: crypto_weekly
+  source: local
+  source_id: data/benchmarks/crypto_weekly.csv
+  problem_type: forecasting
+  target_column: btc_close
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  expected_family: random_walk
+
+- dataset_id: fx_weekly
+  source: local
+  source_id: data/benchmarks/fx_exog_weekly.csv
+  problem_type: forecasting
+  target_column: eurusd_close
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  expected_family: random_walk
+  exogenous_columns:
+    - { name: gbpusd_close, future_availability: unknown_future }
+    - { name: jpyusd_close, future_availability: unknown_future }
+    - { name: gold_close,   future_availability: unknown_future }
