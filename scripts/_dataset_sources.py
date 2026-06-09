@@ -23,6 +23,14 @@ def fetch_dataset(entry: dict[str, Any]) -> pd.DataFrame:
                 df[target_col] = bunch.target.values
             elif len(df.columns) > 0:
                 df = df.rename(columns={df.columns[-1]: target_col})
+        # OpenML strips string datetime columns; reconstruct from instant (1-based day index)
+        dt_col = entry.get("datetime_column")
+        if dt_col and dt_col not in df.columns and "instant" in df.columns:
+            origin = pd.Timestamp("2011-01-01")
+            df = df.sort_values("instant")
+            df[dt_col] = (
+                origin + pd.to_timedelta(df["instant"].astype(int) - 1, unit="D")
+            ).dt.strftime("%Y-%m-%d")
         return df
     if src == "local":
         return pd.read_csv(entry["source_id"])
