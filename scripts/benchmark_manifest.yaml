@@ -155,6 +155,7 @@
   frequency: D
   forecast_horizon: 14
   expected_family: supervised
+  skip_models: [auto_arima]
   exogenous_columns:
     - { name: temp,       future_availability: unknown_future }
     - { name: hum,        future_availability: unknown_future }
@@ -175,6 +176,7 @@
   frequency: D
   forecast_horizon: 14
   expected_family: supervised
+  skip_models: [auto_arima]
   exogenous_columns:
     - { name: temp,       future_availability: unknown_future }
     - { name: rain_1h,    future_availability: unknown_future }
@@ -193,6 +195,7 @@
   frequency: D
   forecast_horizon: 14
   expected_family: supervised
+  skip_models: [auto_arima]
   exogenous_columns:
     - { name: DEWP, future_availability: unknown_future }
     - { name: TEMP, future_availability: unknown_future }
@@ -212,6 +215,7 @@
   frequency: H
   forecast_horizon: 24
   expected_family: supervised
+  skip_models: [auto_arima]
   exogenous_columns:
     - { name: T6,          future_availability: unknown_future }
     - { name: RH_6,        future_availability: unknown_future }
@@ -232,6 +236,7 @@
   frequency: D
   forecast_horizon: 14
   expected_family: supervised
+  skip_models: [auto_arima]
   exogenous_columns:
     - { name: temperature, future_availability: unknown_future }
     - { name: holiday,     future_availability: known_future }

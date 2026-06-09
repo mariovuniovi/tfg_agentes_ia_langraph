@@ -164,6 +164,11 @@ def run_benchmark(
             profile = build_dataset_profile(csv_path, task_meta)
             plan = default_training_plan(entry["problem_type"], profile)
 
+            skip_models: list[str] = entry.get("skip_models") or []
+            if skip_models:
+                filtered = [c for c in plan.candidates if c.model_key not in skip_models]
+                plan = plan.model_copy(update={"candidates": filtered})
+
             if n_trials_override is not None:
                 plan = plan.model_copy(update={
                     "trial_budget": TrialBudget(
