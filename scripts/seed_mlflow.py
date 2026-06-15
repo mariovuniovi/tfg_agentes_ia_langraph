@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import mlflow
 import mlflow.sklearn
-import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score

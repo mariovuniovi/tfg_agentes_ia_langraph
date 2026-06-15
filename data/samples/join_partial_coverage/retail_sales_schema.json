@@ -1,0 +1,125 @@
+{
+  "problem_type": "regression",
+  "name": "retail_sales_partial_join",
+  "description": "Retail sales regression problem built from a fact table plus three dimension tables that must be joined before training. The target is revenue_eur. Four source files must be uploaded together: retail_sales.csv (fact, 320 rows), product_catalog.csv (join: retail_sales.product_id = product_catalog.sku), store_directory.csv (join: retail_sales.store_id = store_directory.store_code), and customer_segments.csv (join: retail_sales.segment_code = customer_segments.segment_code). The join keys have DIFFERENT column names across files, so they must be matched semantically. This scenario stress-tests partial-coverage joins: the product and customer dimensions contain more keys than the fact table uses (foreign key is a subset of the primary key), and the store directory is MISSING several stores referenced by the fact table (orphan foreign keys), so a left join will leave some store attributes null. Used to validate how join discovery reports coverage, containment and cardinality, and how the controller tolerates incomplete referential integrity.",
+  "target_column": "revenue_eur",
+  "columns": [
+    {
+      "name": "txn_id",
+      "dtype": "int",
+      "description": "Unique transaction identifier. Not a join key. Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "product_id",
+      "dtype": "str",
+      "description": "Product foreign key (e.g. SKU001). Join key to product_catalog.sku. Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "store_id",
+      "dtype": "str",
+      "description": "Store foreign key (e.g. ST01). Join key to store_directory.store_code. Some values have no matching store (orphan FK). Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "segment_code",
+      "dtype": "str",
+      "description": "Customer segment foreign key (A-D). Join key to customer_segments.segment_code. Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "units",
+      "dtype": "int",
+      "description": "Units sold in the transaction. Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 1
+    },
+    {
+      "name": "promo_flag",
+      "dtype": "int",
+      "description": "1 if the transaction had a promotion, else 0. Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "name": "revenue_eur",
+      "dtype": "float",
+      "description": "Transaction revenue in euros. TARGET COLUMN. Source: retail_sales.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "category",
+      "dtype": "str",
+      "description": "Product category. Source: product_catalog.csv (joined on product_id = sku). Full coverage.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["bakery", "dairy", "drinks", "produce", "frozen"]
+    },
+    {
+      "name": "unit_price_eur",
+      "dtype": "float",
+      "description": "Catalogue unit price in euros. Source: product_catalog.csv (joined on product_id = sku).",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "brand",
+      "dtype": "str",
+      "description": "Product brand. Source: product_catalog.csv (joined on product_id = sku).",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "region",
+      "dtype": "str",
+      "description": "Store region. Source: store_directory.csv (joined on store_id = store_code). Orphan stores absent from the directory must be imputed (mode) before training.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["north", "south", "east", "west"]
+    },
+    {
+      "name": "store_size_sqm",
+      "dtype": "int",
+      "description": "Store sales-floor area in square metres. Source: store_directory.csv (joined on store_id = store_code). Orphan stores must be imputed (mean) before training.",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    },
+    {
+      "name": "store_type",
+      "dtype": "str",
+      "description": "Store format. Source: store_directory.csv (joined on store_id = store_code). Orphan stores must be imputed (mode) before training.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["flagship", "standard", "express"]
+    },
+    {
+      "name": "segment_name",
+      "dtype": "str",
+      "description": "Customer segment name. Source: customer_segments.csv (joined on segment_code). Full coverage.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["budget", "mainstream", "premium", "luxury"]
+    },
+    {
+      "name": "avg_income_eur",
+      "dtype": "int",
+      "description": "Average income for the customer segment. Source: customer_segments.csv (joined on segment_code).",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+- dataset_id: vic_elec
+  datetime_column: date
+  exogenous_columns:
+  - future_availability: unknown_future
+    name: temperature
+  - future_availability: known_future
+    name: holiday
+  expected_family: supervised
+  forecast_horizon: 14
+  frequency: D
+  problem_type: forecasting
+  series_id_columns: []
+  source: uci_url
+  source_id: https://raw.githubusercontent.com/tidyverts/tsibbledata/master/data-raw/vic_elec/VIC2015
+  target_column: demand

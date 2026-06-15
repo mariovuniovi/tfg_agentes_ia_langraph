@@ -1,0 +1,27 @@
+{
+  "problem_type": "forecasting",
+  "name": "small_monthly_revenue",
+  "description": "10 years of monthly retail store revenue (2014–2023). ~120 rows. Used as the SMALL dataset in the validator size stress-test.",
+  "target_column": "revenue_eur",
+  "datetime_column": "month",
+  "forecast_horizon": 12,
+  "frequency": "MS",
+  "columns": [
+    {
+      "name": "month",
+      "dtype": "datetime",
+      "description": "First day of the calendar month (YYYY-MM-DD).",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "revenue_eur",
+      "dtype": "int",
+      "description": "Total monthly revenue in euros.",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    }
+  ]
+}

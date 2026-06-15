@@ -93,7 +93,10 @@ def fetch_dataset(entry: dict[str, Any]) -> pd.DataFrame:
     if src == "uci_url":
         return _fetch_uci_url(entry)
 
-    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi, statsmodels, uci_url")
+    if src == "dominicks":
+        return _fetch_dominicks(entry)
+
+    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi, statsmodels, uci_url, dominicks")
 
 
 # ---------------------------------------------------------------------------
@@ -239,3 +242,37 @@ def _fetch_uci_url(entry: dict[str, Any]) -> pd.DataFrame:
     raise ValueError(f"No uci_url handler for dataset_id: {dataset_id!r}. "
                      f"Valid: metro_traffic_volume, beijing_pm25, "
                      f"appliances_energy, vic_elec")
+
+
+# ---------------------------------------------------------------------------
+# dominicks source — Dominick's Finer Foods scanner data (UChicago Booth).
+# Requires local movement CSV (wcoo.csv or similar) downloaded manually.
+# entry["source_id"]  : path to raw movement CSV
+# entry["store_id"]   : store number (default 62)
+# entry["upc"]        : UPC code (default 4400000720 — top-selling cookie)
+# Week 1 = 1989-09-14 per the Dominick's data manual.
+# ---------------------------------------------------------------------------
+
+def _fetch_dominicks(entry: dict[str, Any]) -> pd.DataFrame:
+    raw_path = entry["source_id"]
+    store_id = int(entry.get("store_id", 62))
+    upc = int(entry.get("upc", 4400000720))
+
+    chunks = []
+    for chunk in pd.read_csv(raw_path, chunksize=500_000,
+                             usecols=["STORE", "UPC", "WEEK", "MOVE", "PRICE", "SALE", "OK"]):
+        sub = chunk[(chunk["OK"] == 1) & (chunk["STORE"] == store_id) & (chunk["UPC"] == upc)]
+        if len(sub):
+            chunks.append(sub)
+
+    df = pd.concat(chunks).sort_values("WEEK").reset_index(drop=True)
+
+    # Convert numeric week to date (week 1 = 1989-09-14)
+    origin = pd.Timestamp("1989-09-14")
+    df["week"] = (origin + pd.to_timedelta((df["WEEK"].astype(int) - 1) * 7, unit="D")).dt.strftime("%Y-%m-%d")
+
+    df["promo"] = df["SALE"].notna().astype(int)
+    # Replace price=0 (data error) with forward-fill
+    df["PRICE"] = df["PRICE"].replace(0, float("nan")).ffill()
+
+    return df[["week", "MOVE", "PRICE", "promo"]].rename(columns={"MOVE": "sales", "PRICE": "price"})

@@ -1,0 +1,17 @@
+store_code,region,store_size_sqm,store_type
+ST01,east,654,express
+ST02,north,1073,flagship
+ST03,north,1090,flagship
+ST04,south,634,express
+ST05,west,1194,standard
+ST06,north,1378,standard
+ST07,west,288,flagship
+ST08,west,1638,flagship
+ST09,north,1905,standard
+ST10,north,1488,standard
+ST11,east,1168,express
+ST12,south,1651,standard
+ST13,south,462,express
+ST14,east,904,standard
+ST15,east,1968,express
+ST05,east,1194,standard

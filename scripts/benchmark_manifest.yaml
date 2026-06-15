@@ -154,7 +154,6 @@
   series_id_columns: []
   frequency: D
   forecast_horizon: 14
-  expected_family: supervised
   skip_models: [auto_arima]
   exogenous_columns:
     - { name: temp,       future_availability: unknown_future }
@@ -214,7 +213,6 @@
   series_id_columns: []
   frequency: H
   forecast_horizon: 24
-  expected_family: supervised
   skip_models: [auto_arima]
   exogenous_columns:
     - { name: T6,          future_availability: unknown_future }
@@ -235,11 +233,28 @@
   series_id_columns: []
   frequency: D
   forecast_horizon: 14
-  expected_family: supervised
   skip_models: [auto_arima]
   exogenous_columns:
     - { name: temperature, future_availability: unknown_future }
     - { name: holiday,     future_availability: known_future }
+
+# Dominick's Finer Foods — store 62, top-selling cookie UPC (4400000720)
+# 387 weekly obs; promo flag is known_future (planned promotions)
+- dataset_id: dominicks_cookies
+  source: dominicks
+  source_id: data/benchmarks/dominicks_cookies_raw.csv
+  store_id: 62
+  upc: 4400000720
+  problem_type: forecasting
+  target_column: sales
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  expected_family: supervised
+  exogenous_columns:
+    - { name: price, future_availability: unknown_future }
+    - { name: promo, future_availability: known_future }
 
 # ── Random walk (5): near-efficient financial series → naive wins ────────────
 # Fixed end: "2024-06-01" ensures reproducible snapshots.
@@ -266,7 +281,6 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
-  expected_family: random_walk
   exogenous_columns:
     - { name: vix,          future_availability: unknown_future }
     - { name: treasury_10y, future_availability: unknown_future }
@@ -298,7 +312,6 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
-  expected_family: random_walk
   exogenous_columns:
     - { name: nat_gas,   future_availability: unknown_future }
     - { name: gasoline,  future_availability: unknown_future }
@@ -330,7 +343,6 @@
   interval: 1wk
   start: "2005-01-01"
   end: "2024-06-01"
-  expected_family: random_walk
   exogenous_columns:
     - { name: silver,       future_availability: unknown_future }
     - { name: copper,       future_availability: unknown_future }
@@ -349,7 +361,6 @@
   series_id_columns: []
   frequency: W
   forecast_horizon: 13
-  expected_family: random_walk
 
 - dataset_id: fx_weekly
   source: local
@@ -360,7 +371,6 @@
   series_id_columns: []
   frequency: W
   forecast_horizon: 13
-  expected_family: random_walk
   exogenous_columns:
     - { name: gbpusd_close, future_availability: unknown_future }
     - { name: jpyusd_close, future_availability: unknown_future }

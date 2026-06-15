@@ -1,0 +1,71 @@
+- dataset_id: bike_sharing_daily
+  datetime_column: dteday
+  exogenous_columns:
+  - future_availability: unknown_future
+    name: temp
+  - future_availability: unknown_future
+    name: hum
+  - future_availability: unknown_future
+    name: windspeed
+  - future_availability: known_future
+    name: season
+  - future_availability: known_future
+    name: holiday
+  - future_availability: known_future
+    name: workingday
+  - future_availability: known_future
+    name: weekday
+  expected_family: supervised
+  forecast_horizon: 14
+  frequency: D
+  problem_type: forecasting
+  series_id_columns: []
+  skip_models:
+  - auto_arima
+  source: uci_url
+  source_id: https://archive.ics.uci.edu/ml/machine-learning-databases/00275/Bike-Sharing-Dataset.zip
+  target_column: cnt
+- dataset_id: appliances_energy
+  datetime_column: date
+  exogenous_columns:
+  - future_availability: unknown_future
+    name: T6
+  - future_availability: unknown_future
+    name: RH_6
+  - future_availability: unknown_future
+    name: T_out
+  - future_availability: unknown_future
+    name: RH_out
+  - future_availability: unknown_future
+    name: Windspeed
+  - future_availability: unknown_future
+    name: Visibility
+  - future_availability: unknown_future
+    name: Press_mm_hg
+  expected_family: supervised
+  forecast_horizon: 24
+  frequency: H
+  problem_type: forecasting
+  series_id_columns: []
+  skip_models:
+  - auto_arima
+  source: uci_url
+  source_id: https://archive.ics.uci.edu/ml/machine-learning-databases/00374/energydata_complete.csv
+  target_column: Appliances
+- dataset_id: vic_elec
+  datetime_column: date
+  exogenous_columns:
+  - future_availability: unknown_future
+    name: temperature
+  - future_availability: known_future
+    name: holiday
+  expected_family: supervised
+  forecast_horizon: 14
+  frequency: D
+  problem_type: forecasting
+  series_id_columns: []
+  skip_models:
+  - auto_arima
+  source: uci_url
+  source_id: https://raw.githubusercontent.com/tidyverts/tsibbledata/master/data-raw/vic_elec/VIC2015
+  target_column: demand

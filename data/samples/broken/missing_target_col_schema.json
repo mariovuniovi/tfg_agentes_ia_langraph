@@ -1,0 +1,40 @@
+{
+  "problem_type": "forecasting",
+  "name": "missing_target_col",
+  "description": "ERROR SCENARIO: Schema declares target_column='sales', but the CSV only contains 'month', 'feature_a', 'feature_b'. Expected: data_validator detects the missing column and raises a schema-mismatch error.",
+  "target_column": "sales",
+  "datetime_column": "month",
+  "forecast_horizon": 12,
+  "frequency": "MS",
+  "columns": [
+    {
+      "name": "month",
+      "dtype": "datetime",
+      "description": "First day of the calendar month.",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "sales",
+      "dtype": "float",
+      "description": "Monthly sales volume. COLUMN IS ABSENT FROM THE CSV — this is the injected error.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "feature_a",
+      "dtype": "float",
+      "description": "Auxiliary numeric feature.",
+      "required": false,
+      "nullable": true
+    },
+    {
+      "name": "feature_b",
+      "dtype": "int",
+      "description": "Auxiliary integer feature.",
+      "required": false,
+      "nullable": true
+    }
+  ]
+}

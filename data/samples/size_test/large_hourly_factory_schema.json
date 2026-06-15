@@ -1,0 +1,68 @@
+{
+  "problem_type": "forecasting",
+  "name": "large_hourly_factory",
+  "description": "Hourly electricity consumption of a manufacturing plant over ~14 months (~10,000 rows). Daily and weekly cycles plus a slow upward trend. Used as the LARGE dataset in the validator size stress-test.",
+  "target_column": "consumption_kwh",
+  "datetime_column": "timestamp",
+  "forecast_horizon": 24,
+  "frequency": "H",
+  "exogenous_columns": [
+    {
+      "name": "temperature_c",
+      "future_availability": "unknown_future"
+    },
+    {
+      "name": "is_weekend",
+      "future_availability": "known_future"
+    },
+    {
+      "name": "hour_of_day",
+      "future_availability": "known_future"
+    }
+  ],
+  "columns": [
+    {
+      "name": "timestamp",
+      "dtype": "datetime",
+      "description": "UTC timestamp at the start of the hour (YYYY-MM-DD HH:MM:SS).",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "consumption_kwh",
+      "dtype": "float",
+      "description": "Total electricity consumed by the plant during that hour in kilowatt-hours.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "temperature_c",
+      "dtype": "float",
+      "description": "Outdoor temperature at the factory site in degrees Celsius.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "hour_of_day",
+      "dtype": "int",
+      "description": "Hour of day (0–23).",
+      "required": true,
+      "nullable": false,
+      "min": 0,
+      "max": 23
+    },
+    {
+      "name": "is_weekend",
+      "dtype": "int",
+      "description": "1 if Saturday or Sunday, 0 otherwise.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": [
+        0,
+        1
+      ]
+    }
+  ]
+}

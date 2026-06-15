@@ -1,0 +1,17 @@
+- dataset_id: dominicks_cookies
+  datetime_column: week
+  exogenous_columns:
+  - future_availability: unknown_future
+    name: price
+  - future_availability: known_future
+    name: promo
+  expected_family: supervised
+  forecast_horizon: 13
+  frequency: W
+  problem_type: forecasting
+  series_id_columns: []
+  source: dominicks
+  source_id: data/benchmarks/dominicks_cookies_raw.csv
+  store_id: 62
+  target_column: sales
+  upc: 4400000720

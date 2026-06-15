@@ -1,0 +1,57 @@
+{
+  "problem_type": "forecasting",
+  "name": "medium_daily_bakery",
+  "description": "Daily units sold by a bakery chain over ~1,000 days (2021–2023). Trend + weekly seasonality. Used as the MEDIUM dataset in the validator size stress-test.",
+  "target_column": "units_sold",
+  "datetime_column": "date",
+  "forecast_horizon": 14,
+  "frequency": "D",
+  "exogenous_columns": [
+    {
+      "name": "is_weekend",
+      "future_availability": "known_future"
+    },
+    {
+      "name": "day_of_week",
+      "future_availability": "known_future"
+    }
+  ],
+  "columns": [
+    {
+      "name": "date",
+      "dtype": "datetime",
+      "description": "Calendar date (YYYY-MM-DD).",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "units_sold",
+      "dtype": "int",
+      "description": "Total bread/pastry units sold that day.",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    },
+    {
+      "name": "is_weekend",
+      "dtype": "int",
+      "description": "1 if Saturday or Sunday, 0 otherwise.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "day_of_week",
+      "dtype": "int",
+      "description": "ISO weekday index: 0 = Monday … 6 = Sunday.",
+      "required": true,
+      "nullable": false,
+      "min": 0,
+      "max": 6
+    }
+  ]
+}

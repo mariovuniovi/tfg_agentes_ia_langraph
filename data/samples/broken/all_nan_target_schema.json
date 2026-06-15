@@ -1,0 +1,26 @@
+{
+  "problem_type": "forecasting",
+  "name": "all_nan_target",
+  "description": "ERROR SCENARIO: 120-row monthly series where the target column 'revenue' contains entirely NaN values. Expected: data_validator detects 100% missing target and raises a validation error before training is attempted.",
+  "target_column": "revenue",
+  "datetime_column": "month",
+  "forecast_horizon": 12,
+  "frequency": "MS",
+  "columns": [
+    {
+      "name": "month",
+      "dtype": "datetime",
+      "description": "First day of the calendar month.",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "revenue",
+      "dtype": "float",
+      "description": "Monthly revenue in euros. ALL VALUES ARE NaN — this is the injected error.",
+      "required": true,
+      "nullable": false
+    }
+  ]
+}

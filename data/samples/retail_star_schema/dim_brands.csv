@@ -1,0 +1,11 @@
+brand_id,brand_name,country_of_origin,market_segment,founded_year
+1,ArcaVerde,ES,mid-range,1966
+2,NordPeak,DE,premium,1998
+3,SolMare,ES,premium,1990
+4,TerraNova,IT,premium,1950
+5,Brixon,FR,budget,1973
+6,Lumino,DE,budget,2001
+7,CedarLine,US,mid-range,1983
+8,Ravello,IT,mid-range,1952
+9,Fortico,ES,mid-range,1995
+10,Zephyr,FR,budget,1993
