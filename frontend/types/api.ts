@@ -6,8 +6,12 @@ export type PipelineEventType =
   | 'tool_call'
   | 'tool_result'
   | 'agent_reasoning'
+  | 'agent_thinking'
   | 'planner_context'
+  | 'planner_validation_error'
+  | 'planner_retry'
   | 'hitl_request'
+  | 'hitl_resolved'
   | 'audit_report'
   | 'training_complete'
   | 'deployment_complete'
@@ -19,6 +23,9 @@ export interface PipelineEvent {
   agent: string
   timestamp_ms: number
   data: Record<string, unknown>
+  // Monotonic index in the server-side event log; used to dedup replayed events
+  // delivered after a WebSocket reconnect.
+  seq?: number
 }
 
 export interface RunStatusResponse {

@@ -8,6 +8,8 @@ const DATA_VALIDATOR_TOOLS = new Set([
   'load_dataset', 'parse_datetime_column', 'merge_datasets', 'apply_column_mapping',
   'detect_temporal_gaps', 'check_missing_values', 'impute_missing_values',
   'validate_against_schema', 'check_data_quality',
+  // join discovery tools
+  'profile_raw_datasets', 'evaluate_join_candidates', 'execute_join_plan',
 ])
 
 const PLANNER_TOOLS = new Set([
@@ -85,7 +87,9 @@ export interface TokenUsageEventData {
   input_tokens: number
   output_tokens: number
   total_tokens: number
-  cached_input_tokens?: number
+  cached_input_tokens?: number | null
+  reasoning_tokens?: number | null
+  reasoning_effort?: string | null
   estimated_cost_usd: number | null   // null = model not in pricing table
   source?: 'langchain_stream_usage_metadata'
 }
@@ -97,6 +101,8 @@ export interface TokenUsageRow {
   inputTokens: number
   outputTokens: number
   totalTokens: number
+  reasoningTokens: number
+  reasoningEffort: string
   estimatedCostUsd: number | null     // null = at least one call had unknown pricing
 }
 
@@ -119,7 +125,8 @@ export function aggregateTokenUsage(events: PipelineEvent[]): TokenUsageSummary 
       prev.inputTokens += d.input_tokens
       prev.outputTokens += d.output_tokens
       prev.totalTokens += d.total_tokens
-      // If either side is null, the aggregate is null (unknown)
+      prev.reasoningTokens += d.reasoning_tokens ?? 0
+      if (d.reasoning_effort && !prev.reasoningEffort) prev.reasoningEffort = d.reasoning_effort
       prev.estimatedCostUsd =
         prev.estimatedCostUsd !== null && d.estimated_cost_usd !== null
           ? prev.estimatedCostUsd + d.estimated_cost_usd
@@ -128,7 +135,9 @@ export function aggregateTokenUsage(events: PipelineEvent[]): TokenUsageSummary 
       map.set(key, {
         node: d.node, model: d.model, calls: 1,
         inputTokens: d.input_tokens, outputTokens: d.output_tokens,
-        totalTokens: d.total_tokens, estimatedCostUsd: d.estimated_cost_usd,
+        totalTokens: d.total_tokens, reasoningTokens: d.reasoning_tokens ?? 0,
+        reasoningEffort: d.reasoning_effort ?? '',
+        estimatedCostUsd: d.estimated_cost_usd,
       })
     }
   }
@@ -183,6 +192,41 @@ const HITL_TYPE_TO_GATE: Record<string, string> = {
   deployer: 'deployment_approval',
 }
 
+/**
+ * Per-node active time derived from `routing` events.
+ *
+ * The custom supervisor emits `routing(next=X)` when node X *finishes* its turn —
+ * empirically its timestamp coincides with the end of X (e.g. `routing(next=planner)`
+ * fires together with `planner_context`). Therefore the duration of X is the span from
+ * the previous routing event (end of the prior phase) up to `routing(next=X)`. The first
+ * node has no preceding routing, so the run start (timestamp of the first event, i.e.
+ * `run_info`) is used as its origin.
+ *
+ * The earlier implementation charged each window to the *previously* active node, an
+ * off-by-one that attributed the human wait at the HITL gate to `data_validator` and the
+ * `executor` span to `planner`. Attributing each window to `routing.next` fixes it.
+ */
+function nodeActivityFromRouting(
+  events: PipelineEvent[],
+  targetNodes: Set<string>,
+): Map<string, { activations: number; totalMs: number }> {
+  const map = new Map<string, { activations: number; totalMs: number }>()
+  if (events.length === 0) return map
+  let prevMs = events[0].timestamp_ms   // run start (run_info is always the first event)
+  for (const e of events) {
+    if (e.type !== 'routing') continue
+    const node = (e.data as { next?: string }).next ?? ''
+    if (targetNodes.has(node)) {
+      const dur = Math.max(0, e.timestamp_ms - prevMs)
+      const prev = map.get(node)
+      if (prev) { prev.activations += 1; prev.totalMs += dur }
+      else map.set(node, { activations: 1, totalMs: dur })
+    }
+    prevMs = e.timestamp_ms
+  }
+  return map
+}
+
 export function buildToolDetailsViewModel(events: PipelineEvent[]): ToolDetailsViewModel {
   const cats = getNodeCategories(events)
   const agentSet = new Set(cats.agents)
@@ -215,23 +259,9 @@ export function buildToolDetailsViewModel(events: PipelineEvent[]): ToolDetailsV
     .map((name) => ({ name, tools: Array.from(agentTools.get(name)?.values() ?? []) }))
     .filter((s) => s.tools.length > 0)
 
-  // --- LLM nodes: measure time between routing-in and next routing event ---
-  const llmMap = new Map<string, LlmNodeRow>()
-  let activeNode: string | null = null
-  let activeStartMs = 0
-  for (const e of events) {
-    if (e.type !== 'routing') continue
-    const next = (e.data as { next?: string }).next ?? ''
-    if (activeNode && llmSet.has(activeNode)) {
-      const dur = e.timestamp_ms - activeStartMs
-      const prev = llmMap.get(activeNode)
-      if (prev) { prev.activations += 1; prev.totalMs += dur }
-      else llmMap.set(activeNode, { node: activeNode, activations: 1, totalMs: dur })
-    }
-    activeNode = next
-    activeStartMs = e.timestamp_ms
-  }
-  const llmNodes = Array.from(llmMap.values())
+  // --- LLM nodes: per-node active time from routing windows (see nodeActivityFromRouting) ---
+  const llmNodes: LlmNodeRow[] = Array.from(nodeActivityFromRouting(events, llmSet).entries())
+    .map(([node, a]) => ({ node, activations: a.activations, totalMs: a.totalMs }))
 
   // --- Human gates ---
   const gateMap = new Map<string, HitlStatus>()
@@ -251,6 +281,13 @@ export function buildToolDetailsViewModel(events: PipelineEvent[]): ToolDetailsV
   }
   // Mark approved once a post-approval routing away from the gate is seen
   for (const e of events) {
+    if (e.type === 'hitl_resolved') {
+      // Authoritative, immediate signal emitted the moment the human decides.
+      const raw = ((e.data as { gate?: string }).gate ?? '').toLowerCase()
+      const gate = HITL_TYPE_TO_GATE[raw] ?? raw
+      const decision = (e.data as { decision?: string }).decision
+      if (gate) gateMap.set(gate, decision === 'reject' ? 'rejected' : 'approved')
+    }
     if (e.type === 'routing') {
       const next = (e.data as { next?: string }).next ?? ''
       if (next === 'planner' || next === 'executor') {
@@ -315,23 +352,8 @@ export function aggregateToolUsage(events: PipelineEvent[]): ToolUsageRow[] {
 }
 
 export function aggregateLlmNodeActivity(events: PipelineEvent[], llmNodes: string[]): LlmActivityRow[] {
-  const set = new Set(llmNodes)
-  const map = new Map<string, LlmActivityRow>()
-  let activeNode: string | null = null
-  let activeStartMs = 0
-  for (const e of events) {
-    if (e.type !== 'routing') continue
-    const next = (e.data as { next?: string }).next ?? ''
-    if (activeNode && set.has(activeNode)) {
-      const dur = e.timestamp_ms - activeStartMs
-      const prev = map.get(activeNode)
-      if (prev) { prev.activations += 1; prev.total_ms += dur }
-      else map.set(activeNode, { node: activeNode, activations: 1, total_ms: dur })
-    }
-    activeNode = next
-    activeStartMs = e.timestamp_ms
-  }
-  return Array.from(map.values())
+  return Array.from(nodeActivityFromRouting(events, new Set(llmNodes)).entries())
+    .map(([node, a]) => ({ node, activations: a.activations, total_ms: a.totalMs }))
 }
 
 // ---------------------------------------------------------------------------
@@ -385,9 +407,30 @@ export function buildTimeline(events: PipelineEvent[]): TimelineRow[] {
         rows.push({ ts: t, text: `Planner selected ${cands.length} candidates`, agent: 'planner' })
         break
       }
+      case 'planner_validation_error': {
+        const attempt = (e.data as { attempt?: number }).attempt ?? 0
+        const willRetry = (e.data as { will_retry?: boolean }).will_retry
+        rows.push({
+          ts: t,
+          text: `Planner output failed validation (attempt ${attempt})${willRetry ? ' — retrying' : ''}`,
+          agent: 'planner',
+        })
+        break
+      }
+      case 'planner_retry': {
+        const attempt = (e.data as { attempt?: number }).attempt ?? 0
+        rows.push({ ts: t, text: `Planner retry started (attempt ${attempt})`, agent: 'planner' })
+        break
+      }
       case 'hitl_request': {
         const gate = (e.data as { type?: string }).type ?? ''
         rows.push({ ts: t, text: `${gate} approval requested`, agent: e.agent })
+        break
+      }
+      case 'hitl_resolved': {
+        const gate = (e.data as { gate?: string }).gate ?? ''
+        const decision = (e.data as { decision?: string }).decision
+        rows.push({ ts: t, text: `${gate} ${decision === 'reject' ? 'rejected' : 'approved'}`, agent: e.agent })
         break
       }
       case 'audit_report': {

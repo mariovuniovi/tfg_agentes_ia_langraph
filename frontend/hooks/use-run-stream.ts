@@ -23,8 +23,24 @@ export function useRunStream(runId: string | null) {
 
       ws.onmessage = (e) => {
         const event: PipelineEvent = JSON.parse(e.data as string)
-        const { appendEvent, setHITL, setStatus } = useRunStore.getState()
+        const store = useRunStore.getState()
+        // On reconnect the server replays the full event log from seq 0; skip events
+        // we have already processed so replays don't duplicate or re-fire side effects.
+        if (typeof event.seq === 'number' && event.seq <= store.lastSeq) return
+        const { appendEvent, setHITL, setStatus } = store
         appendEvent(event)
+        if (event.type === 'planner_validation_error') {
+          const attempt = (event.data.attempt as number) ?? 0
+          const willRetry = event.data.will_retry as boolean | undefined
+          toast.warning(`Planner output failed validation (attempt ${attempt})`, {
+            description: willRetry ? 'Retrying with corrective feedback…' : 'No attempts left.',
+          })
+        }
+        if (event.type === 'planner_retry') {
+          toast.info('Retrying the model planner', {
+            description: 'The previous plan did not pass deterministic validation.',
+          })
+        }
         if (event.type === 'hitl_request') {
           setHITL(event.data)
         }

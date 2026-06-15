@@ -13,6 +13,8 @@ interface NodeGroup {
   inputTokens: number
   outputTokens: number
   totalTokens: number
+  reasoningTokens: number
+  reasoningEffort: string
   estimatedCostUsd: number | null
 }
 
@@ -30,6 +32,8 @@ export function TokenCostCard() {
         prev.inputTokens += r.inputTokens
         prev.outputTokens += r.outputTokens
         prev.totalTokens += r.totalTokens
+        prev.reasoningTokens += r.reasoningTokens
+        if (r.reasoningEffort && !prev.reasoningEffort) prev.reasoningEffort = r.reasoningEffort
         prev.estimatedCostUsd =
           prev.estimatedCostUsd !== null && r.estimatedCostUsd !== null
             ? prev.estimatedCostUsd + r.estimatedCostUsd
@@ -42,6 +46,8 @@ export function TokenCostCard() {
           inputTokens: r.inputTokens,
           outputTokens: r.outputTokens,
           totalTokens: r.totalTokens,
+          reasoningTokens: r.reasoningTokens,
+          reasoningEffort: r.reasoningEffort,
           estimatedCostUsd: r.estimatedCostUsd,
         })
       }
@@ -87,6 +93,13 @@ export function TokenCostCard() {
                   Estimated cost:{' '}
                   <span className="font-mono font-semibold text-zinc-800">{formatCost(g.estimatedCostUsd)}</span>
                 </span>
+                {g.reasoningTokens > 0 && (
+                  <span className="col-span-2 text-sky-600">
+                    Reasoning:{g.reasoningEffort && <span className="ml-1 font-mono text-sky-500">{g.reasoningEffort}</span>}
+                    {' '}<span className="font-mono">{g.reasoningTokens.toLocaleString('en-US')} tokens</span>
+                    <span className="ml-2 text-[11px] text-sky-400">(included in output)</span>
+                  </span>
+                )}
               </div>
             </div>
           ))}

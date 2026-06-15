@@ -14,8 +14,12 @@ const TYPE_COLORS: Record<PipelineEventType, string> = {
   tool_call: 'text-zinc-500',
   tool_result: 'text-zinc-400',
   agent_reasoning: 'text-violet-500',
+  agent_thinking: 'text-sky-500',
   planner_context: 'text-violet-600',
+  planner_validation_error: 'font-semibold text-amber-700',
+  planner_retry: 'font-semibold text-amber-600',
   hitl_request: 'font-semibold text-amber-700',
+  hitl_resolved: 'font-semibold text-emerald-700',
   audit_report: 'text-violet-600',
   training_complete: 'text-emerald-600',
   deployment_complete: 'font-semibold text-emerald-600',
@@ -179,6 +183,10 @@ export function EventLog() {
                     const t = e.type
                     if (t === 'routing') return `→ ${(e.data as { next?: string }).next ?? ''}`
                     if (t === 'tool_call' || t === 'tool_result') return String((e.data as { tool_name?: string }).tool_name ?? '')
+                    if (t === 'agent_thinking') {
+                      const c = String((e.data as { content?: string }).content ?? '')
+                      return c.length > 120 ? c.slice(0, 120) + '…' : c
+                    }
                     if (t === 'run_complete') {
                       const err = (e.data as { error?: string }).error
                       return err ? `Error: ${err.slice(0, 80)}` : 'Done'

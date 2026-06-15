@@ -85,7 +85,7 @@ export function DatasetApprovalCard({ runId, interrupt, onApprove, isPending, ma
 
       {(tab === 'head' || tab === 'tail') && (
         <div className="overflow-x-auto rounded border border-[var(--color-border)]">
-          <table className="w-full text-xs">
+          <table className="min-w-max text-xs">
             <thead className="bg-zinc-50">
               <tr>{cols.map((c) => (<th key={c.name} className="border-b border-[var(--color-border)] px-2 py-1 text-left font-medium text-zinc-500">{c.name}<span className="ml-1 text-zinc-400">{c.dtype}</span></th>))}</tr>
             </thead>

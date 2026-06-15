@@ -42,13 +42,37 @@ describe('aggregateToolUsage', () => {
 })
 
 describe('aggregateLlmNodeActivity', () => {
-  it('measures duration between routing-in and next routing-out', () => {
+  // `routing(next=X)` marks the END of node X; X's duration is the span from the
+  // previous routing event (end of the prior phase) to routing(next=X). The first
+  // node uses the run start (first event) as its origin.
+  it('attributes each routing window to the node that just finished', () => {
     const events = [
-      ev('routing', 'controller', { next: 'planner' }, 1000),
-      ev('routing', 'controller', { next: 'executor' }, 24400),
+      ev('run_info', 'system', {}, 0),
+      ev('routing', 'controller', { next: 'data_validator' }, 10000),   // DV ran [0, 10000]
+      ev('routing', 'controller', { next: 'dataset_approval' }, 15000), // HITL wait [10000, 15000]
+      ev('routing', 'controller', { next: 'planner' }, 40000),          // planner ran [15000, 40000]
+      ev('routing', 'controller', { next: 'executor' }, 50000),         // executor ran [40000, 50000]
+      ev('routing', 'controller', { next: 'report_writer' }, 56000),    // report ran [50000, 56000]
     ]
-    const rows: LlmActivityRow[] = aggregateLlmNodeActivity(events, ['planner'])
-    expect(rows[0]).toMatchObject({ node: 'planner', activations: 1, total_ms: 23400 })
+    const rows: LlmActivityRow[] = aggregateLlmNodeActivity(
+      events, ['data_validator', 'planner', 'report_writer'],
+    )
+    const byNode = Object.fromEntries(rows.map((r) => [r.node, r]))
+    expect(byNode.data_validator).toMatchObject({ activations: 1, total_ms: 10000 })
+    expect(byNode.planner).toMatchObject({ activations: 1, total_ms: 25000 })
+    expect(byNode.report_writer).toMatchObject({ activations: 1, total_ms: 6000 })
+  })
+
+  it('does not charge the HITL-gate wait to data_validator (regression)', () => {
+    const events = [
+      ev('run_info', 'system', {}, 0),
+      ev('routing', 'controller', { next: 'data_validator' }, 2000),     // DV ran [0, 2000]
+      ev('routing', 'controller', { next: 'dataset_approval' }, 90000),  // 88s human wait — NOT DV
+      ev('routing', 'controller', { next: 'planner' }, 95000),
+    ]
+    const dv = aggregateLlmNodeActivity(events, ['data_validator', 'planner'])
+      .find((r) => r.node === 'data_validator')!
+    expect(dv.total_ms).toBe(2000)
   })
 })
 

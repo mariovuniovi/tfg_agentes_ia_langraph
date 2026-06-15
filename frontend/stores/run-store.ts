@@ -11,6 +11,7 @@ interface RunState {
   runId: string | null
   status: RunStatus | 'idle'
   events: PipelineEvent[]
+  lastSeq: number
   interruptValue: Record<string, unknown> | null
   hitlPending: boolean
   stagedFiles: File[]
@@ -31,6 +32,7 @@ const initial = {
   runId: null,
   status: 'idle' as const,
   events: [],
+  lastSeq: -1,
   interruptValue: null,
   hitlPending: false,
   stagedFiles: [] as File[],
@@ -41,7 +43,11 @@ const initial = {
 export const useRunStore = create<RunState>((set) => ({
   ...initial,
   setRunId: (id) => set({ runId: id, status: 'running' }),
-  appendEvent: (event) => set((s) => ({ events: [...s.events, event] })),
+  appendEvent: (event) =>
+    set((s) => ({
+      events: [...s.events, event],
+      lastSeq: typeof event.seq === 'number' ? event.seq : s.lastSeq,
+    })),
   setHITL: (value) => set({ hitlPending: true, interruptValue: value, status: 'awaiting_approval' }),
   clearHITL: () => set({ hitlPending: false, interruptValue: null, status: 'running' }),
   setStatus: (status) => set({ status }),
