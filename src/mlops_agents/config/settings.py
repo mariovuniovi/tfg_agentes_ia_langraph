@@ -17,21 +17,11 @@ class Settings(BaseSettings):
 
     # LLM — OpenAI API
     openai_api_key: str = ""
-    openai_model: str = "gpt-5-mini"   # default / fallback model
-
-    # Per-agent model overrides
-    openai_model_data_validator: str = "gpt-5-mini"
-    openai_model_planner: str = "gpt-5-mini"
-    openai_model_report_writer: str = "gpt-5-mini"
+    openai_model: str = "gpt-5.4-mini"   # fallback when no YAML config found
 
     # MLflow
     mlflow_tracking_uri: str = "sqlite:///./mlflow.db"
     mlflow_experiment_name: str = "mlops-agents"
-
-    # LangSmith (optional tracing)
-    langchain_tracing_v2: bool = False
-    langchain_api_key: str = ""
-    langchain_project: str = "mlops-multi-agent"
 
     # Application
     log_level: str = "INFO"

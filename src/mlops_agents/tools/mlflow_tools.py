@@ -7,7 +7,6 @@ query results; the deployment agent uses them to register models.
 
 import json
 import pickle
-from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
@@ -115,7 +114,6 @@ def register_model(run_id: str, model_name: str = MLFLOW_REGISTERED_MODEL_NAME) 
     Returns:
         JSON with registered model name and version.
     """
-    client = _get_client()
     model_uri = f"runs:/{run_id}/model"
     mv = mlflow.register_model(model_uri, model_name)
     logger.info(f"Registered model '{model_name}' version {mv.version}")

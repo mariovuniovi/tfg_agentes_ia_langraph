@@ -24,7 +24,7 @@ from mlops_agents.utils.llm import get_llm
 def build_data_agent():
     """Build and return the data validation react agent."""
     return create_agent(
-        model=get_llm("data_validator"),
+        model=get_llm("data_agent"),
         tools=[
             load_dataset,
             merge_datasets,

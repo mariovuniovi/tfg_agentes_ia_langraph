@@ -1,14 +1,13 @@
 """Migration adds five JSON columns; inserting a record populates them."""
 import json
 import sqlite3
-from pathlib import Path
 
 from mlops_agents.experience.pool import ExperiencePool
 
 
 def test_migration_adds_five_columns(tmp_path):
     db = tmp_path / "test.db"
-    pool = ExperiencePool(db, audit_dir=tmp_path / "audit")
+    _pool = ExperiencePool(db, audit_dir=tmp_path / "audit")
     conn = sqlite3.connect(db)
     cols = {row[1] for row in conn.execute("PRAGMA table_info(experiences)")}
     conn.close()

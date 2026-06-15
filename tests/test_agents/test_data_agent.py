@@ -2,7 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
 
 
 @patch("mlops_agents.agents.data_agent.get_llm")

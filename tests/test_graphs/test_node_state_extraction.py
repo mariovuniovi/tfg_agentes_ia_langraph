@@ -637,7 +637,7 @@ def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
         os.unlink(tmp_path)
 
     assert command.update.get("problem_type") == "classification"
-    assert command.update.get("task_metadata") == {"target_column": "target"}
+    assert (command.update.get("task_metadata") or {}).get("target_column") == "target"
 
 
 def test_data_validator_node_aborts_on_contract_violation():
@@ -800,7 +800,7 @@ def test_data_validator_node_reads_schema_json_from_state():
         os.unlink(tmp_path)
 
     assert command.update.get("problem_type") == "classification"
-    assert command.update.get("task_metadata") == {"target_column": "target"}
+    assert (command.update.get("task_metadata") or {}).get("target_column") == "target"
 
 
 def test_data_validator_node_aborts_when_schema_json_empty():

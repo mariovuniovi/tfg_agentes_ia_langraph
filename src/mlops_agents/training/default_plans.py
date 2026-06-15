@@ -25,7 +25,6 @@ def default_training_plan(problem_type: str, dataset_profile: DatasetProfile) ->
         TrainingPlanCandidate(
             priority=i + 1,
             model_key=m.model_key,
-            initial_hyperparameters=m.default_params,
             reason="default plan: registry-eligible",
         )
         for i, m in enumerate(eligible)

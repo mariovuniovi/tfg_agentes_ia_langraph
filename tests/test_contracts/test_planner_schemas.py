@@ -95,13 +95,11 @@ def test_candidate_risks_populated():
 
 
 def test_candidate_preserves_existing_fields():
-    """Existing fields (initial_hyperparameters, search_space_override, etc.) still work."""
+    """search_space_override and requested_trials still work."""
     spec = CandidateSpec(
         model_key="ridge", priority=2,
-        initial_hyperparameters={"alpha": 1.0},
         requested_trials=10,
     )
-    assert spec.initial_hyperparameters == {"alpha": 1.0}
     assert spec.requested_trials == 10
 
 

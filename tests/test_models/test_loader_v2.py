@@ -1,4 +1,4 @@
-from mlops_agents.models.loader import get_model, get_models_for, ModelSpec
+from mlops_agents.models.loader import get_model
 
 def test_modelspec_has_supports_exogenous_field():
     spec = get_model("ets")  # statistical forecasting model

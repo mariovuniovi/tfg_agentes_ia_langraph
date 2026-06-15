@@ -16,7 +16,13 @@ RETRIEVAL_WEIGHTS: dict[str, int] = {
 }
 
 MAX_SCORE_BY_PROBLEM_TYPE: dict[str, int] = {
-    "classification": 13, "regression": 11, "forecasting": 29,
+    # Achievable maximum per problem type: sum of RETRIEVAL_WEIGHTS for fields
+    # that the profiler actually sets (non-null). Fields only set for other
+    # problem types (e.g. n_classes for classification, n_series for forecasting)
+    # are never populated and must not inflate the denominator.
+    "classification": 11,  # n_rows+n_features+missing+n_cat+n_num+n_classes+class_balance
+    "regression": 9,       # n_rows+n_features+missing+n_cat+n_num+target_distribution
+    "forecasting": 27,     # all forecasting fields (excludes n_classes/class_balance/target_distribution)
 }
 
 

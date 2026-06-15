@@ -91,8 +91,14 @@ def evaluate_join_candidates(candidates_json: str, raw_paths_json: str) -> str:
     """
     from mlops_agents.contracts.join_discovery import JoinCandidateEvaluation
 
-    candidates: list[dict] = json.loads(candidates_json)
-    raw_paths: dict[str, str] = json.loads(raw_paths_json)
+    try:
+        candidates: list[dict] = json.loads(candidates_json)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"candidates_json is not valid JSON: {e}"})
+    try:
+        raw_paths: dict[str, str] = json.loads(raw_paths_json)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"raw_paths_json is not valid JSON: {e}"})
 
     if len(candidates) > settings.data_validator_max_join_candidates:
         return json.dumps({
@@ -262,9 +268,18 @@ def execute_join_plan(
         JoinPlan, BaseDatasetSelection, SelectedJoin, RejectedJoinCandidate, JoinCandidateEvaluation,
     )
 
-    selections: dict = json.loads(selections_json)
-    eval_data: dict = json.loads(evaluations_json)
-    raw_paths: dict[str, str] = json.loads(raw_paths_json)
+    try:
+        selections: dict = json.loads(selections_json)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"selections_json is not valid JSON: {e}"})
+    try:
+        eval_data: dict = json.loads(evaluations_json)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"evaluations_json is not valid JSON: {e}. Pass the exact string returned by evaluate_join_candidates."})
+    try:
+        raw_paths: dict[str, str] = json.loads(raw_paths_json)
+    except json.JSONDecodeError as e:
+        return json.dumps({"error": f"raw_paths_json is not valid JSON: {e}"})
 
     # Build evaluation lookup by candidate_id
     eval_by_id: dict[str, dict] = {e["candidate_id"]: e for e in eval_data.get("evaluations", [])}

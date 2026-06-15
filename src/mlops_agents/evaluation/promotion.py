@@ -69,15 +69,20 @@ def _get_client() -> MlflowClient:
     return MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
 
 
-def _fetch_current_champion(metric: str, ascending: bool) -> dict[str, Any]:
-    """Return the top run's metrics dict for the given metric/direction, or {} if none."""
+def _fetch_current_champion(metric: str, ascending: bool, dataset_name: str = "") -> dict[str, Any]:
+    """Return the top run's metrics dict for the given metric/direction, or {} if none.
+
+    Filters by dataset_name tag so runs from different datasets never compete.
+    """
     client = _get_client()
     experiment = client.get_experiment_by_name(settings.mlflow_experiment_name)
     if experiment is None:
         return {}
     direction = "ASC" if ascending else "DESC"
+    filter_string = f"tags.dataset_name = '{dataset_name}'" if dataset_name else ""
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
+        filter_string=filter_string,
         order_by=[f"metrics.{metric} {direction}"],
         max_results=1,
     )
@@ -95,7 +100,8 @@ def evaluate_promotion(state: dict[str, Any]) -> dict[str, Any]:
     problem_type = state["problem_type"]
     metric, ascending = _metric_for_problem_type(problem_type)
     candidate = dict(state.get("training_metrics") or {})
-    champion = _fetch_current_champion(metric, ascending)
+    dataset_name = (state.get("task_metadata") or {}).get("name", "")
+    champion = _fetch_current_champion(metric, ascending, dataset_name)
     passed = _apply_thresholds(problem_type, candidate, champion)
     thresholds = _thresholds_for(problem_type)
 

@@ -1,5 +1,6 @@
 """planner_node — entry point, retry orchestration, validation."""
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Literal
 
@@ -7,9 +8,11 @@ import pandas as pd
 from langchain.agents.structured_output import StructuredOutputError
 from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.config import get_stream_writer
 from langgraph.types import Command
 
 from mlops_agents.config.settings import settings
+from mlops_agents.contracts.outputs import PlannerStateUpdate
 from mlops_agents.contracts.training import ForecastingSettings
 from mlops_agents.planning.agent import build_planner_agent
 from mlops_agents.planning.context import build_planner_validation_context
@@ -25,7 +28,6 @@ from mlops_agents.planning.validation import (
     _collect_all_refs,
     detect_soft_conflicts,
 )
-from mlops_agents.contracts.outputs import PlannerStateUpdate
 from mlops_agents.prompts import get_prompt
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.training.exog_policy import resolve_exog_strategies
@@ -38,6 +40,20 @@ logger = get_logger(__name__)
 
 class PlannerError(Exception):
     """Raised when the planner agent fails after the retry attempt."""
+
+
+def _emit_planner_event(payload: dict[str, Any]) -> None:
+    """Best-effort custom stream event; no-op outside a LangGraph streaming context.
+
+    Used to surface validation failures / retries to the UI in real time, since the
+    retry loop happens inside a single node invocation (no intermediate state update).
+    """
+    try:
+        writer = get_stream_writer()
+        if writer is not None:
+            writer(payload)
+    except Exception:
+        pass
 
 
 def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
@@ -92,6 +108,11 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
         if attempt == 1:
             messages.append(build_retry_message(last_error))
             retry_used = True
+            _emit_planner_event({
+                "kind": "planner_retry",
+                "attempt": attempt + 1,
+                "previous_error": last_error,
+            })
 
         try:
             result = agent.invoke(
@@ -118,6 +139,12 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
         except (PlannerValidationError, OutputParserException, StructuredOutputError, ValueError) as exc:
             last_error = str(exc)
             logger.warning(f"[planner] attempt {attempt + 1} failed ({type(exc).__name__}): {last_error[:200]}")
+            _emit_planner_event({
+                "kind": "planner_validation_error",
+                "attempt": attempt + 1,
+                "error": last_error,
+                "will_retry": attempt == 0,
+            })
             if attempt == 1:
                 raise PlannerError(f"Planner failed after retry: {last_error}") from exc
 

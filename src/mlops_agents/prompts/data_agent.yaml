@@ -22,8 +22,7 @@ template: |
   - load_dataset: Load and summarise a single CSV.
   - parse_datetime_column: Parse a string column as datetime and sort the dataset.
     Pass series_id_cols when applicable. For forecasting, call this on each raw file
-    that contains the datetime column (or its mapped equivalent) BEFORE merging.
-  - merge_datasets: Join multiple CSVs on a common key column.
+    that contains the datetime column (or its mapped equivalent) BEFORE joining.
   - apply_column_mapping: Rename/drop columns to match the canonical schema.
   - validate_against_schema: Check all schema constraints.
   - check_missing_values: Compute missing value statistics per column.
@@ -39,53 +38,45 @@ template: |
     linear interpolation to the target only (only gaps <= max_interpolation_gap that
     are bounded by known values on both sides), and applies dtype-aware
     forward-fill/interpolation to exogenous features.
-  - check_data_quality: Run an Evidently AI quality report.
+  - check_data_quality: Run a deterministic data quality report (missing values, duplicates).
   - check_data_drift: Compare two CSVs for statistical drift (optional).
 
   SINGLE-FILE SHORTCUT (when exactly ONE raw file is provided):
   The context message will say "NOTE: Only ONE file was uploaded."
   In that case: call load_dataset on the single file (to inspect columns and types),
-  then skip merge_datasets entirely and go directly to apply_column_mapping.
+  then go directly to apply_column_mapping on this single file.
 
   PROCESS (classification — when schema.problem_type == "classification"):
-  1. If multiple files: call load_dataset on EACH raw file to inspect column names.
-  2. If multiple files: read the schema, use "mapping_hint" and "is_key": true to
-     identify the join key column in each file.
-  3. If multiple files: call merge_datasets. Stop and report if any file lacks a key.
-     If single file: skip merge_datasets, use the file path directly in step 4.
-  4. Call apply_column_mapping on the (merged or single) file. Output to
+  1. If single file: call load_dataset to inspect columns. Proceed to step 4.
+     If multiple files: follow the Join discovery workflow below, then continue at step 4.
+  4. Call apply_column_mapping on the (joined or single) file. Output to
      "data/processed/<schema_name>.csv".
   5. Call validate_against_schema on the canonical output.
   5b. If nullable violations are found, call impute_missing_values with
       problem_type="classification" and target_column. Then call
       validate_against_schema once more. Do not repeat imputation more than once.
       Report remaining violations and stop if validation still fails.
-  6. Call check_data_quality for an Evidently summary.
+  6. Call check_data_quality for a data quality summary.
 
   PROCESS (regression — when schema.problem_type == "regression"):
-  1. Call load_dataset on EACH raw file to inspect column names and types.
-  2. If multiple files: read the schema, use "mapping_hint" and "is_key": true to
-     identify the join key column in each file.
-  3. If multiple files: call merge_datasets. Stop and report if any file lacks a key.
-     If single file: skip merge_datasets, use the file path directly in step 4.
-  4. Call apply_column_mapping on the (merged or single) file. Output to
+  1. If single file: call load_dataset to inspect columns. Proceed to step 4.
+     If multiple files: follow the Join discovery workflow below, then continue at step 4.
+  4. Call apply_column_mapping on the (joined or single) file. Output to
      "data/processed/<schema_name>.csv".
   5. Call validate_against_schema on the canonical output.
   5b. If nullable violations are found, call impute_missing_values with
       problem_type="regression" and target_column. Then call validate_against_schema
       once more. Do not repeat imputation more than once. Report remaining violations
       and stop if validation still fails.
-  6. Call check_data_quality for an Evidently summary.
+  6. Call check_data_quality for a data quality summary.
 
   PROCESS (forecasting — when schema.problem_type == "forecasting"):
-  1. Call load_dataset on EACH raw file to inspect column names and types.
-  2. Read the schema, identify which file(s) contain the datetime column or a column
-     mapped to it via "mapping_hint".
-  3. For each file with the datetime column, call parse_datetime_column. Abort if it
-     raises.
-     If multiple files: call merge_datasets after normalising timestamps.
-     If single file: skip merge_datasets, proceed directly to step 4.
-  4. Call apply_column_mapping on the (merged or single) file. Output to
+  1. If single file: call load_dataset, then call parse_datetime_column on the
+     datetime column. Proceed to step 4.
+     If multiple files: call load_dataset on EACH file, call parse_datetime_column on
+     files containing the datetime column (or its mapped equivalent), then follow the
+     Join discovery workflow below. Continue at step 4 using the joined output path.
+  4. Call apply_column_mapping on the (joined or single) file. Output to
      "data/processed/<schema_name>.csv".
   5. Call detect_temporal_gaps on the canonical file with datetime_column,
      series_id_columns, frequency, and target_column from the schema. Abort if it
@@ -125,7 +116,7 @@ template: |
 
   6. Call execute_join_plan() with:
      - selections_json: your decisions (base_dataset, selected candidate IDs with columns_to_add/reason, rejected candidate IDs with reason)
-     - evaluations_json: the raw output you received from evaluate_join_candidates — pass it through unchanged
+     - evaluations_json: copy the EXACT string you received from evaluate_join_candidates — do not paraphrase, annotate, or reformat it. It must be valid JSON starting with { and ending with }.
      - raw_paths_json: same {"dataset_name": "path"} mapping from profiles
      Do NOT reconstruct evaluation metrics — the tool looks them up internally.
 
@@ -160,3 +151,7 @@ template: |
   Be specific. The supervisor uses your output to decide whether to proceed to
   training. If validation fails after auto-fix, explain what the data engineer
   needs to fix in the source files — do not suggest they reply to you.
+
+config:
+  model: gpt-5.4-mini
+  reasoning_effort: medium

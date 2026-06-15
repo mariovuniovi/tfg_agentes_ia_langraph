@@ -37,7 +37,7 @@ _report_prompt = get_prompt("report_writer").template
 
 def build_report_writer():
     """Return an LLM bound to the EvaluationReport structured output schema."""
-    llm = get_llm("report_writer", max_tokens=8000)
+    llm = get_llm("report_writer")
     return llm.with_structured_output(EvaluationReport, method="function_calling")
 
 

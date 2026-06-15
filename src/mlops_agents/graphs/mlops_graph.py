@@ -23,18 +23,26 @@ from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.types import Command
+from openai import APITimeoutError
 
-from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.agents.registry import get_agent
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.config.settings import settings
-from mlops_agents.contracts.outputs import AuditStateUpdate, DataValidationStateUpdate, DeploymentStateUpdate, EvaluationStateUpdate, PlannerErrorStateUpdate, TrainingStateUpdate
+from mlops_agents.contracts.outputs import (
+    AuditStateUpdate,
+    DataValidationStateUpdate,
+    DeploymentStateUpdate,
+    EvaluationStateUpdate,
+    PlannerErrorStateUpdate,
+    TrainingStateUpdate,
+)
 from mlops_agents.contracts.training import TrainingPlan
 from mlops_agents.deployment.deployer import run_deployer as run_deployer_module
 from mlops_agents.evaluation.promotion import evaluate_promotion
 from mlops_agents.evaluation.report_writer import run_report_writer
 from mlops_agents.graphs.approval_nodes import dataset_approval_node, deployment_approval_node
 from mlops_agents.graphs.workflow_controller import workflow_controller
+from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.utils.logging import get_logger
 
@@ -242,7 +250,21 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
         ))
 
     agent = get_agent("data_validator")
-    result = agent.invoke({"messages": agent_messages})
+    try:
+        result = agent.invoke({"messages": agent_messages})
+    except APITimeoutError as exc:
+        # Transient LLM timeout (the client already retried max_retries times). Return a
+        # soft failure WITHOUT error_message so the workflow_controller re-dispatches the
+        # validator within its attempt budget, instead of crashing the whole run.
+        logger.warning(f"[data_validator] LLM timed out — routing back for retry: {exc}")
+        return Command(
+            update=DataValidationStateUpdate(
+                validation_passed=False, schema_json=schema_json
+            ).to_update(messages=[HumanMessage(
+                content="Data validation timed out; retrying.", name="data_validator"
+            )]),
+            goto="workflow_controller",
+        )
     final_message = result["messages"][-1].content
 
     quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")
@@ -288,7 +310,23 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
             pass
 
     problem_type: str = schema_data.get("problem_type", "")
-    task_metadata: dict[str, Any] = {"target_column": schema_data.get("target_column", "")}
+    # Identifier columns (schema unique:true) are row keys, not predictors. Exclude the
+    # structural columns (target / datetime / series id) so the datetime index is never
+    # treated as a droppable id. The executor drops these from tabular feature matrices.
+    _structural = {
+        schema_data.get("target_column", ""),
+        schema_data.get("datetime_column", ""),
+        *(schema_data.get("series_id_columns", []) or []),
+    }
+    id_columns = [
+        c["name"] for c in schema_data.get("columns", [])
+        if c.get("unique") is True and c.get("name") not in _structural
+    ]
+    task_metadata: dict[str, Any] = {
+        "target_column": schema_data.get("target_column", ""),
+        "name": schema_data.get("name", "unknown"),
+        "id_columns": id_columns,
+    }
     if problem_type == "forecasting":
         task_metadata.update({
             "datetime_column": schema_data.get("datetime_column", ""),

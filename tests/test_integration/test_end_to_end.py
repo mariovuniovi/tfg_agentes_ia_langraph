@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 from langchain_core.messages import HumanMessage
@@ -54,10 +53,10 @@ def iris_training_plan() -> dict:
         "metric_to_optimize": None,
         "candidates": [
             {"priority": 1, "model_key": "logistic_regression",
-             "initial_hyperparameters": {}, "search_space_override": None,
+             "search_space_override": None,
              "requested_trials": None, "reason": ""},
             {"priority": 2, "model_key": "random_forest_classifier",
-             "initial_hyperparameters": {}, "search_space_override": None,
+             "search_space_override": None,
              "requested_trials": None, "reason": ""},
         ],
         "models_not_recommended": [],

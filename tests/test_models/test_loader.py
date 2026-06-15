@@ -1,6 +1,5 @@
 """Unit tests for the model registry loader."""
 
-from pathlib import Path
 
 import pytest
 from pydantic import ValidationError

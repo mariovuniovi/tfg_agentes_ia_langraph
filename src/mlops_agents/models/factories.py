@@ -7,56 +7,80 @@ by string name from registry.yaml.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
+from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OrdinalEncoder
+
+
+def _tabular_pipeline(estimator: Any) -> Pipeline:
+    """Wrap a tabular estimator so string/categorical features are encoded before fit.
+
+    Object-dtype columns are ordinal-encoded (categories unseen at predict time map to
+    -1); numeric columns pass through unchanged. This keeps the executor's fit/predict
+    code untouched and makes the saved champion self-contained — it encodes raw
+    categorical input at inference. Identifier columns are dropped upstream (in the
+    executor) and never reach this pipeline.
+    """
+    pre = ColumnTransformer(
+        transformers=[(
+            "cat",
+            OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+            make_column_selector(dtype_include="object"),
+        )],
+        remainder="passthrough",
+    )
+    return Pipeline([("pre", pre), ("model", estimator)])
 
 
 def build_logistic_regression(params: dict[str, Any]):
-    return LogisticRegression(**params)
+    return _tabular_pipeline(LogisticRegression(**params))
 
 
 def build_random_forest_classifier(params: dict[str, Any]):
-    return RandomForestClassifier(**params)
+    return _tabular_pipeline(RandomForestClassifier(**params))
 
 
 def build_lightgbm_classifier(params: dict[str, Any]):
     from lightgbm import LGBMClassifier
-    return LGBMClassifier(**{**params, "verbosity": -1})
+    return _tabular_pipeline(LGBMClassifier(**{**params, "verbosity": -1}))
 
 
 def build_xgboost_classifier(params: dict[str, Any]):
     from xgboost import XGBClassifier
-    return XGBClassifier(**{**params, "verbosity": 0})
+    return _tabular_pipeline(XGBClassifier(**{**params, "verbosity": 0}))
 
 
 def build_catboost_classifier(params: dict[str, Any]):
     from catboost import CatBoostClassifier
-    return CatBoostClassifier(**{**params, "verbose": 0})
+    return _tabular_pipeline(CatBoostClassifier(**{**params, "verbose": 0}))
 
 
 def build_ridge(params: dict[str, Any]):
-    return Ridge(**params)
+    return _tabular_pipeline(Ridge(**params))
 
 
 def build_random_forest_regressor(params: dict[str, Any]):
-    return RandomForestRegressor(**params)
+    return _tabular_pipeline(RandomForestRegressor(**params))
 
 
 def build_lightgbm_regressor(params: dict[str, Any]):
     from lightgbm import LGBMRegressor
-    return LGBMRegressor(**{**params, "verbosity": -1})
+    return _tabular_pipeline(LGBMRegressor(**{**params, "verbosity": -1}))
 
 
 def build_xgboost_regressor(params: dict[str, Any]):
     from xgboost import XGBRegressor
-    return XGBRegressor(**{**params, "verbosity": 0})
+    return _tabular_pipeline(XGBRegressor(**{**params, "verbosity": 0}))
 
 
 def build_catboost_regressor(params: dict[str, Any]):
     from catboost import CatBoostRegressor
-    return CatBoostRegressor(**{**params, "verbose": 0})
+    return _tabular_pipeline(CatBoostRegressor(**{**params, "verbose": 0}))
 
 
 _FREQ_TO_SEASON = {"H": 24, "D": 7, "W": 52, "MS": 12, "M": 12, "QS": 4, "YS": 1}

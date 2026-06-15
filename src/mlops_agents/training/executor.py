@@ -939,6 +939,16 @@ def run_training_plan(
     )
     train_pool = pd.read_csv(train_pool_path)
 
+    # Drop identifier columns (schema unique:true, excluding target/datetime/series_id)
+    # from tabular features — they are row keys, not predictors. Forecasting keeps its
+    # temporal index untouched.
+    id_cols: list[str] = []
+    if plan.problem_type in ("classification", "regression"):
+        id_cols = [c for c in (task_metadata.get("id_columns") or []) if c in train_pool.columns]
+        if id_cols:
+            train_pool = train_pool.drop(columns=id_cols)
+            logger.info(f"[executor] dropped id columns from features: {id_cols}")
+
     # XGBoost and some other models require numeric class labels.
     # Encode the target in-place so all candidate runs and the champion retrain see integers.
     # Keep the encoder so we can apply the same transform to the test set later.
@@ -956,7 +966,9 @@ def run_training_plan(
     candidate_results: list[dict] = []
     ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
+    dataset_name = task_metadata.get("name", "unknown")
     with mlflow.start_run(run_name=f"pipeline_{ts}") as parent:
+        mlflow.set_tag("dataset_name", dataset_name)
         parent_run_id = parent.info.run_id
 
         for cand in sorted(plan.candidates, key=lambda c: c.priority):
@@ -1019,7 +1031,7 @@ def run_training_plan(
         # available metric (StatsForecast models use temporal splits, not X/y pairs).
         if plan.problem_type in ("classification", "regression"):
             _test_df = pd.read_csv(test_path)
-            _X_test = _test_df.drop(columns=[target_column])
+            _X_test = _test_df.drop(columns=[target_column, *id_cols], errors="ignore")
             _y_test = _test_df[target_column]
             if label_encoder is not None:
                 _y_test = pd.Series(label_encoder.transform(_y_test), index=_y_test.index)

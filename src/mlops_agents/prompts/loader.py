@@ -25,3 +25,12 @@ def get_prompt(name: str) -> PromptTemplate:
         template=data["template"],
         input_variables=data.get("input_variables", []),
     )
+
+
+def get_agent_config(name: str) -> dict:
+    """Return the config dict from a prompt YAML, or {} if absent."""
+    path = PROMPTS_DIR / f"{name}.yaml"
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data.get("config", {})

@@ -7,8 +7,7 @@ right MLflow API calls are made with the expected arguments.
 
 import json
 import pickle
-from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------

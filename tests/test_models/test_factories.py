@@ -1,6 +1,7 @@
 """Unit tests for model factories."""
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from mlops_agents.models.factories import FACTORY_REGISTRY
@@ -9,8 +10,11 @@ from mlops_agents.models.factories import FACTORY_REGISTRY
 @pytest.fixture
 def tabular_classification_xy():
     rng = np.random.default_rng(42)
-    X = rng.normal(size=(60, 4))
-    y = (X[:, 0] + X[:, 1] > 0).astype(int)
+    Xa = rng.normal(size=(60, 4))
+    y = (Xa[:, 0] + Xa[:, 1] > 0).astype(int)
+    # Factories wrap estimators in a sklearn Pipeline whose preprocessor selects
+    # columns by dtype, so features must be a DataFrame (as in the executor).
+    X = pd.DataFrame(Xa, columns=[f"f{i}" for i in range(4)])
     return X, y
 
 
@@ -68,8 +72,9 @@ def test_catboost_classifier_factory(tabular_classification_xy):
 @pytest.fixture
 def tabular_regression_xy():
     rng = np.random.default_rng(42)
-    X = rng.normal(size=(60, 4))
-    y = X[:, 0] + 0.5 * X[:, 1] + rng.normal(scale=0.1, size=60)
+    Xa = rng.normal(size=(60, 4))
+    y = Xa[:, 0] + 0.5 * Xa[:, 1] + rng.normal(scale=0.1, size=60)
+    X = pd.DataFrame(Xa, columns=[f"f{i}" for i in range(4)])
     return X, y
 
 
@@ -169,7 +174,6 @@ def test_auto_arima_factory(panel_dataframe):
 
 def _check_supervised_forecaster_fits_and_predicts(factory_name: str, params: dict, panel):
     """skforecast wants a wide series_dict from the long panel."""
-    import pandas as pd
     factory = FACTORY_REGISTRY[factory_name]
     forecaster = factory({"task_metadata": {"forecast_horizon": 6}, "params": params})
     series_dict = {

@@ -1,7 +1,6 @@
 """End-to-end test: executor on iris classification."""
 import json
 from pathlib import Path
-import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import load_iris

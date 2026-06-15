@@ -1,5 +1,4 @@
 """Tests for trial budget allocation."""
-import pytest
 from mlops_agents.contracts.training import TrainingPlanCandidate, TrialBudget
 from mlops_agents.training.trial_budget import allocate_trials
 

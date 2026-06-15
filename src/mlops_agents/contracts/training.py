@@ -71,7 +71,6 @@ class CandidateSpec(BaseModel):
 
     priority: int = Field(ge=1)
     model_key: str
-    initial_hyperparameters: dict[str, Any] = Field(default_factory=dict)
     search_space_override: dict[str, SearchParamOverride] | None = None
     requested_trials: int | None = None
     reason: str = ""

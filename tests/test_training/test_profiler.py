@@ -1,7 +1,6 @@
 """Tests for build_dataset_profile."""
 
 import pandas as pd
-import pytest
 
 from mlops_agents.training.profiler import build_dataset_profile
 

@@ -1,6 +1,4 @@
 """build_planner_context moved to mlops_agents.planning.context as build_planner_validation_context."""
-import pytest
-from pathlib import Path
 from mlops_agents.planning.context import build_planner_validation_context
 from mlops_agents.models.loader import get_models_for
 

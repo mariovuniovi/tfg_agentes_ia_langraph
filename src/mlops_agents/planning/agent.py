@@ -10,7 +10,7 @@ def build_planner_agent(tools: list):
     """Build the planner ReAct agent. Tools must be closure-bound by build_planner_tools(...)
     in the caller so the agent never sees raw profile/task_metadata in tool args."""
     return create_agent(
-        model=get_llm("planner", max_tokens=16000),
+        model=get_llm("planner"),
         tools=tools,
         system_prompt=get_prompt("planner").template,
         response_format=PlannerOutput,

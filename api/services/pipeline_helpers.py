@@ -62,6 +62,33 @@ def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict
 _LANGRAPH_INTERNAL_NODES = frozenset({"model", "tools", "__start__", "unknown"})
 
 
+def _extract_reasoning_text(blocks: list) -> str:
+    """Extract reasoning summary text from responses/v1 content blocks."""
+    parts: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "reasoning":
+            for summary in block.get("summary", []):
+                if isinstance(summary, dict) and summary.get("text"):
+                    parts.append(summary["text"])
+    return " ".join(parts)
+
+
+def _extract_output_text(blocks: list) -> str:
+    """Extract plain output text from responses/v1 content blocks."""
+    parts: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type", "")
+        if btype in ("output_text", "text"):
+            text = block.get("text", "")
+            if text:
+                parts.append(text)
+    return "".join(parts)
+
+
 def parse_stream_event(
     chunk: tuple,
     node_hint: str | None = None,
@@ -89,11 +116,31 @@ def parse_stream_event(
                 data={"tool_name": tool_name, "arguments": tool_calls[0].get("args", {})},
             )
         elif message_chunk.content:
+            content = message_chunk.content
+            # responses/v1 format: content is a list of typed blocks
+            if isinstance(content, list):
+                reasoning_text = _extract_reasoning_text(content)
+                output_text = _extract_output_text(content)
+                if reasoning_text:
+                    return PipelineEvent(
+                        type="agent_thinking",
+                        agent=agent,
+                        timestamp_ms=now_ms,
+                        data={"content": reasoning_text},
+                    )
+                if output_text:
+                    return PipelineEvent(
+                        type="agent_reasoning",
+                        agent=agent,
+                        timestamp_ms=now_ms,
+                        data={"content": output_text},
+                    )
+                return None
             return PipelineEvent(
                 type="agent_reasoning",
                 agent=agent,
                 timestamp_ms=now_ms,
-                data={"content": message_chunk.content},
+                data={"content": content},
             )
         elif message_chunk.usage_metadata:
             usage = message_chunk.usage_metadata
@@ -103,17 +150,19 @@ def parse_stream_event(
             input_t: int = usage.get("input_tokens", 0)
             output_t: int = usage.get("output_tokens", 0)
             cached_t: int = (usage.get("input_token_details") or {}).get("cache_read", 0)
+            reasoning_t: int = (usage.get("output_token_details") or {}).get("reasoning", 0)
             return PipelineEvent(
                 type="token_usage",
                 agent=agent,
                 timestamp_ms=now_ms,
                 data={
                     "node": agent,
-                    "model": model_name,  # may be "" if response_metadata lacked model_name; fixed in pipeline.py
+                    "model": model_name,
                     "input_tokens": input_t,
                     "output_tokens": output_t,
                     "total_tokens": usage.get("total_tokens", input_t + output_t),
                     "cached_input_tokens": cached_t if cached_t else None,
+                    "reasoning_tokens": reasoning_t if reasoning_t else None,
                     "estimated_cost_usd": estimate_cost(model_name, input_t, output_t, cached_t) if model_name else None,
                     "source": "langchain_stream_usage_metadata",
                 },

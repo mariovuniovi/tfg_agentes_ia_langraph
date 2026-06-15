@@ -41,7 +41,6 @@ def test_training_plan_candidate_minimal():
     c = TrainingPlanCandidate(priority=1, model_key="lightgbm_classifier")
     assert c.priority == 1
     assert c.model_key == "lightgbm_classifier"
-    assert c.initial_hyperparameters == {}
     assert c.search_space_override is None
     assert c.reason == ""
 

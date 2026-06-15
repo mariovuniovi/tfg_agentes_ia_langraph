@@ -2,29 +2,24 @@
 
 from langchain_openai import ChatOpenAI
 from mlops_agents.config.settings import settings
+from mlops_agents.prompts.loader import get_agent_config
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def _make_llm(model: str, temperature: float, max_tokens: int) -> ChatOpenAI:
-    return ChatOpenAI(
-        model=model,
-        api_key=settings.openai_api_key,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        max_retries=3,
-    )
+def get_llm(agent: str = "") -> ChatOpenAI:
+    """Return the LLM for a named worker agent.
 
-
-def get_llm(agent: str = "", temperature: float = 0, max_tokens: int = 4000) -> ChatOpenAI:
-    """Return the LLM for a named worker agent. Pass agent="" to get the default model."""
-    model_map = {
-        "data_validator": settings.openai_model_data_validator,
-        "planner":        settings.openai_model_planner,
-        "report_writer":  settings.openai_model_report_writer,
-    }
-    model = model_map.get(agent, settings.openai_model)
-    label = agent if agent else "default"
-    logger.info(f"LLM init — agent={label} model={model}")
-    return _make_llm(model, temperature, max_tokens)
+    Model and optional reasoning_effort are read from the agent's prompt YAML
+    config block. Falls back to settings.openai_model if no YAML config found.
+    """
+    config = get_agent_config(agent) if agent else {}
+    model = config.get("model", settings.openai_model)
+    kwargs: dict = {"model": model, "api_key": settings.openai_api_key, "max_retries": 3}
+    if reasoning_effort := config.get("reasoning_effort"):
+        kwargs["use_responses_api"] = True
+        kwargs["output_version"] = "responses/v1"
+        kwargs["reasoning"] = {"effort": reasoning_effort, "summary": "auto"}
+    logger.info(f"LLM init — agent={agent or 'default'} model={model}")
+    return ChatOpenAI(**kwargs)

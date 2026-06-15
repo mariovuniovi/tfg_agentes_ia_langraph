@@ -1,7 +1,6 @@
 """Tests for ExperiencePool insert and query."""
 import json
 import sqlite3
-import pytest
 from mlops_agents.experience.pool import ExperiencePool
 from mlops_agents.experience.schema import ExperienceRecord
 

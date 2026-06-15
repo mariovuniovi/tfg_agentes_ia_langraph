@@ -1,6 +1,5 @@
 """Tests for in-memory RunStore."""
 import asyncio
-import pytest
 from api.services.run_store import RunEntry, create_entry, get_entry
 
 

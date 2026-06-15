@@ -4,10 +4,9 @@ from typing import Any
 
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.planner import (
-    ExperienceSummary, PlannerValidationContext,
+    PlannerValidationContext,
 )
 from mlops_agents.experience.pool import ExperiencePool
-from mlops_agents.experience.retrieval import derive_relevance_tier
 from mlops_agents.knowledge.reader import match_rules
 from mlops_agents.models.loader import get_models_for
 from mlops_agents.experience.retrieval import to_experience_summary  # moved out of agents/planner in Task 2.3

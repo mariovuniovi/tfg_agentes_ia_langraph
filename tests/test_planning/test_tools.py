@@ -1,9 +1,8 @@
 import pytest
-from mlops_agents.planning.tools import build_planner_tools, _view_to_tool_dict
+from mlops_agents.planning.tools import build_planner_tools
 from mlops_agents.planning.trace import ToolTrace
 from mlops_agents.config.settings import settings
-import mlops_agents.experience.pool as pool_mod
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from mlops_agents.contracts.training import ExogStrategySettings, ForecastingSettings, ValidationStrategy
 from mlops_agents.training.executor import _build_series_dict, _build_test_exog

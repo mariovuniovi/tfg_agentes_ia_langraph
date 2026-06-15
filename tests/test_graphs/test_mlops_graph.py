@@ -173,7 +173,7 @@ def _make_executor_state(tmp_path, problem_type="classification"):
         "problem_type": problem_type,
         "metric_to_optimize": None,
         "candidates": [
-            {"priority": 1, "model_key": "logistic_regression", "initial_hyperparameters": {},
+            {"priority": 1, "model_key": "logistic_regression",
              "search_space_override": None, "requested_trials": None, "reason": ""},
         ],
         "models_not_recommended": [],
@@ -230,6 +230,8 @@ def test_executor_node_injects_problem_type_into_task_metadata(tmp_path, monkeyp
     mock_result.champion_metrics = {"macro_f1": 0.9}
     mock_result.champion_candidate = {"model_key": "logistic_regression"}
     mock_result.experience_record_path = str(tmp_path / "exp.json")
+    mock_result.forecast_chart_png = None
+    mock_result.selection_score = None
 
     def capturing_run(plan, processed_dataset_path, target_column, task_metadata, **kwargs):
         captured["task_metadata"] = task_metadata

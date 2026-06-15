@@ -1,5 +1,4 @@
 """Tests for default_training_plan."""
-import pytest
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.training.default_plans import default_training_plan
 

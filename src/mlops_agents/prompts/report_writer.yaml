@@ -30,3 +30,6 @@ template: |
       describe the divergence factually as a possible dataset-specific behavior.
 
   Output a structured EvaluationReport with all required fields populated.
+
+config:
+  model: gpt-5.4-nano

@@ -1,4 +1,5 @@
 """Runs router: pipeline execution, WebSocket streaming, HITL approval."""
+import asyncio
 from uuid import uuid4
 
 import pandas as pd
@@ -75,12 +76,24 @@ async def pipeline_ws(websocket: WebSocket, run_id: str):
         await websocket.close(code=4004)
         return
     await websocket.accept()
+    # Deliver from the authoritative append-only log (entry.events) via a cursor,
+    # using entry.queue only as a "new event arrived" doorbell. This makes reconnects
+    # replay missed events and never drops an in-flight event when a transient send
+    # fails on a stale socket (e.g. during the executor's long blocking training).
+    # Each event carries its index as `seq` so the client can dedup replayed events.
+    cursor = 0
     try:
         while True:
-            event = await entry.queue.get()
-            await websocket.send_json(event)
-            if event.get("type") == "run_complete":
-                break
+            while cursor < len(entry.events):
+                event = entry.events[cursor]
+                await websocket.send_json({**event, "seq": cursor})
+                cursor += 1
+                if event.get("type") == "run_complete":
+                    return
+            try:
+                await asyncio.wait_for(entry.queue.get(), timeout=1.0)
+            except TimeoutError:
+                pass
     except WebSocketDisconnect:
         pass
 

@@ -51,6 +51,48 @@ async def test_pipeline_task_queues_routing_event(mock_graph, tmp_path):
     assert events[0]["data"]["next"] == "executor"
 
 
+def _evaluation_chunk(passed: bool):
+    return ("ns", "updates", {"evaluation": {"evaluation_passed": passed}})
+
+
+def _report_writer_chunk():
+    return ("ns", "updates", {"report_writer": {
+        "evaluation_report_audit": {
+            "summary": "Candidate below threshold",
+            "champion_model": "ridge",
+        },
+    }})
+
+
+@pytest.mark.asyncio
+async def test_audit_report_reflects_real_evaluation_verdict(mock_graph, tmp_path):
+    """audit_report.evaluation_passed must come from the evaluation node, not default True.
+
+    The EvaluationReport audit dict carries no evaluation_passed field, so the
+    event must read the deterministic verdict captured when the evaluation node
+    streamed (here: failed thresholds → False).
+    """
+    csv = tmp_path / "data.csv"
+    csv.write_text("feature_1,feature_2,target\n1.0,0.5,0\n")
+
+    async def fake_astream(*a, **kw):
+        yield _evaluation_chunk(False)
+        yield _report_writer_chunk()
+        yield _run_complete_chunk()
+
+    mock_graph.astream = fake_astream
+
+    with patch("api.services.pipeline.graph", mock_graph):
+        run_id = "test-audit-verdict"
+        entry = create_entry(run_id, {"configurable": {"thread_id": run_id}})
+        await pipeline_task(run_id, [str(csv)])
+
+    audit_events = [e for e in entry.events if e["type"] == "audit_report"]
+    assert len(audit_events) == 1
+    assert audit_events[0]["data"]["evaluation_passed"] is False
+    assert audit_events[0]["data"]["champion_model"] == "ridge"
+
+
 @pytest.mark.asyncio
 async def test_pipeline_task_queues_run_complete(mock_graph, tmp_path):
     csv = tmp_path / "data.csv"

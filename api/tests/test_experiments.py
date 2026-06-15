@@ -71,7 +71,7 @@ def test_get_runs_empty():
 
 
 # ── Router-level tests ─────────────────────────────────────────────────────────
-from datetime import datetime, timezone
+from datetime import timezone
 from httpx import AsyncClient, ASGITransport
 from api.main import app
 

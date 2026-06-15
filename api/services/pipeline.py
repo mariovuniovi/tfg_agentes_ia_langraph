@@ -1,9 +1,8 @@
 """Async background task: runs the LangGraph pipeline and feeds events to RunStore."""
 import asyncio
+import math
 import time
 from typing import Any
-
-_STREAM_TIMEOUT = 300.0  # seconds before a hung LLM call is declared a failure
 
 from langgraph.types import Command
 
@@ -13,9 +12,29 @@ from api.services.pipeline_helpers import (
     parse_stream_event,
     reset_tool_start_times,
 )
-from mlops_agents.graphs.mlops_graph import graph
 from mlops_agents.agents.taxonomy import NODE_CATEGORIES
+from mlops_agents.graphs.mlops_graph import graph
 from mlops_agents.observability.pricing import estimate_cost
+
+_STREAM_TIMEOUT = 600.0  # seconds before a hung LLM call is declared a failure
+
+
+def _json_safe(obj: Any) -> Any:
+    """Recursively replace NaN/Inf with None.
+
+    NaN and Infinity are not valid JSON: ``json.dumps`` emits the bare tokens
+    ``NaN``/``Infinity`` which the browser's ``JSON.parse`` rejects, silently
+    dropping the message (e.g. a dataset preview with null rows would never
+    render the approval card). Convert them to JSON ``null`` before they leave
+    the backend.
+    """
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
 
 
 def _build_planner_ctx_event(rec: dict[str, Any]) -> dict[str, Any]:
@@ -161,6 +180,11 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
     # Accumulate per-agent reasoning tokens; emit one event per complete LLM turn.
     _reasoning_buf: dict[str, str] = {}
 
+    # Real deterministic promotion verdict, captured from the evaluation node's state
+    # update as it streams by. The EvaluationReport audit dict carries no
+    # evaluation_passed field, so the audit_report event must read it from here.
+    _eval_verdict: dict[str, bool] = {}
+
     async def _flush_reasoning() -> None:
         for buf_key, content in list(_reasoning_buf.items()):
             if content:
@@ -180,16 +204,42 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
 
     async def _stream(source: Any) -> None:
         async for chunk in graph.astream(
-            source, config, stream_mode=["updates", "messages"], subgraphs=True
+            source, config, stream_mode=["updates", "messages", "custom"], subgraphs=True
         ):
             namespace, mode, data = chunk
+
+            if mode == "custom":
+                # Real-time signals emitted from inside a node (e.g. planner validation
+                # failures / retries) via get_stream_writer(). Forward them as events.
+                if isinstance(data, dict) and data.get("kind") in (
+                    "planner_validation_error", "planner_retry"
+                ):
+                    await _flush_reasoning()
+                    custom_event: dict = {
+                        "type": data["kind"],
+                        "agent": "planner",
+                        "timestamp_ms": time.time() * 1000,
+                        "data": {k: v for k, v in data.items() if k != "kind"},
+                    }
+                    entry.events.append(custom_event)
+                    await entry.queue.put(custom_event)
+                continue
 
             if mode == "updates":
                 await _flush_reasoning()
 
+                # Remember the deterministic promotion verdict the moment the
+                # evaluation node emits it (it streams before report_writer).
+                for _node_update in data.values():
+                    if isinstance(_node_update, dict) and _node_update.get("evaluation_passed") is not None:
+                        _eval_verdict["passed"] = bool(_node_update["evaluation_passed"])
+
                 if "__interrupt__" in data:
                     interrupt_list = data["__interrupt__"]
                     interrupt_val = interrupt_list[0].value if interrupt_list else {}
+                    # Strip NaN/Inf (e.g. null rows in a dataset preview) so the HITL
+                    # payload is valid JSON and the approval card renders client-side.
+                    interrupt_val = _json_safe(interrupt_val)
                     entry.status = "awaiting_approval"
                     entry.interrupt_value = interrupt_val
                     hitl_agent = interrupt_val.get("type", "deployer")
@@ -267,9 +317,10 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                     audit = rw.get("evaluation_report_audit")
                     if isinstance(audit, dict) and audit:
                         from mlops_agents.evaluation.champion import resolve_champion_model_name
-                        # evaluation_passed lives INSIDE the audit dict
-                        # (report_writer.py copies it through from prior state)
-                        evaluation_passed = bool(audit.get("evaluation_passed", True))
+                        # The deterministic verdict is set by the evaluation node, not the
+                        # audit LLM — read the value captured upstream (default True only
+                        # if no evaluation update was ever seen, e.g. no champion baseline).
+                        evaluation_passed = _eval_verdict.get("passed", True)
                         champion = resolve_champion_model_name({**rw})
                         audit_event: dict = {
                             "type": "audit_report",
@@ -361,6 +412,24 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
             entry.hitl_event.clear()
             await entry.hitl_event.wait()
             entry.status = "running"
+
+            # Emit an explicit resolution event the moment the decision arrives, so the
+            # UI marks the gate approved/rejected immediately — instead of inferring it
+            # from a downstream routing event that may be minutes away (slow next node).
+            gate_type = (entry.interrupt_value or {}).get("type", "")
+            resolved_event: dict = {
+                "type": "hitl_resolved",
+                "agent": gate_type or "controller",
+                "timestamp_ms": time.time() * 1000,
+                "data": {
+                    "gate": gate_type,
+                    "decision": entry.hitl_decision,
+                    "comment": entry.hitl_comment,
+                },
+            }
+            entry.events.append(resolved_event)
+            await entry.queue.put(resolved_event)
+
             resume = {
                 "approved": entry.hitl_decision == "approve",
                 "comment": entry.hitl_comment,
@@ -369,17 +438,30 @@ async def pipeline_task(run_id: str, dataset_paths: list[str], schema_json: str 
                 _stream(Command(resume=resume)), timeout=_STREAM_TIMEOUT
             )
 
-        complete_event: dict = {
-            "type": "run_complete",
-            "agent": "controller",
-            "timestamp_ms": time.time() * 1000,
-            "data": {},
-        }
-        entry.events.append(complete_event)
-        await entry.queue.put(complete_event)
-        entry.status = "complete"
+        # The graph can end in an error state (planner failed after retry, data
+        # validation exhausted its attempts, …) which leaves error_message set in
+        # state. Surface that as a failed run instead of a silent "complete".
+        final_error = ""
+        try:
+            snapshot = await graph.aget_state(config)
+            final_error = (snapshot.values or {}).get("error_message", "") if snapshot else ""
+        except Exception:
+            final_error = ""
 
-    except asyncio.TimeoutError:
+        if final_error:
+            await _emit_error(f"Pipeline did not complete end-to-end: {final_error}")
+        else:
+            complete_event: dict = {
+                "type": "run_complete",
+                "agent": "controller",
+                "timestamp_ms": time.time() * 1000,
+                "data": {},
+            }
+            entry.events.append(complete_event)
+            await entry.queue.put(complete_event)
+            entry.status = "complete"
+
+    except TimeoutError:
         await _emit_error("Pipeline timed out — the LLM API may be unresponsive")
 
     except Exception as exc:
