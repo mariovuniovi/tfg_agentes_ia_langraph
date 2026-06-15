@@ -23,7 +23,7 @@ Desde el punto de vista del usuario, el sistema recibe un dataset CSV junto con 
  ┌───────────────────────────────────────┐
  │         Interfaz web (Next.js)        │
  └──────────────────┬────────────────────┘
-                    │  HTTP / SSE
+                    │  HTTP / WebSocket
  ┌──────────────────▼────────────────────┐
  │         API REST (FastAPI)            │
  └──────────────────┬────────────────────┘
@@ -207,9 +207,46 @@ A continuación se describe la secuencia completa de ejecución del grafo, desde
 
 Las fases principales del flujo son:
 
-\textbf{Fase 1 --- Validación del dataset.} El agente de validación recibe el dataset CSV y el esquema JSON. Utilizando su conjunto de herramientas deterministas, mapea el esquema de entrada al esquema objetivo, ejecuta operaciones de limpieza, detecta problemas de calidad (valores ausentes, tipos incorrectos, duplicados, fugas de información temporal en datasets de predicción) y produce el dataset canónico junto con un informe de validación. El agente puede ejecutar múltiples rondas de herramientas antes de concluir si los datos presentan problemas que requieren decisiones encadenadas.
+\textbf{Fase 1 --- Validación e integración del dataset.}
+El comportamiento del agente de validación depende del número de ficheros cargados.
 
-\textbf{Fase 2 --- Aprobación del dataset (HITL gate 1).} El grafo se suspende y presenta al operador el informe de validación y una vista previa del dataset procesado. Si el operador aprueba, el flujo continúa hacia el planificador. Si rechaza con un comentario, el controlador inyecta dicho comentario como retroalimentación en el estado y redirige al agente de validación para que intente un enfoque alternativo, hasta un máximo configurable de intentos.
+Cuando el operador proporciona un único fichero CSV, el agente lo carga con \texttt{load\_dataset}, aplica el mapeo de columnas al esquema canónico, ejecuta los controles de calidad (valores ausentes, tipos incorrectos, duplicados, fugas temporales en problemas de predicción) y produce el dataset procesado.
+
+Cuando se proporcionan múltiples ficheros, el agente ejecuta adicionalmente un subproceso de descubrimiento de join agentico, descrito en la figura~\ref{fig:join-discovery-flow}. Antes de que el bucle ReAct comience, el nodo determinista \texttt{\_build\_data\_validator\_context} invoca \texttt{profile\_raw\_datasets} —una función Python sin llamadas a modelos— que calcula perfiles compactos de cada fichero (tipos de columna, tasa de nulos, cardinalidad, rango de valores, filas de muestra) e inyecta toda esta información en el mensaje inicial del agente. El agente recibe así el contexto estructural de los ficheros sin haber llamado a ninguna herramienta. A continuación, el bucle ReAct sigue cuatro pasos: (1) el agente selecciona el \emph{dataset base}, cuyo número de filas define la cardinalidad final del dataset canónico; (2) propone un conjunto reducido de candidatos de join, razonando sobre los perfiles inyectados; (3) llama a \texttt{evaluate\_join\_candidates}, herramienta determinista que mide cobertura, contención, cardinalidad y riesgo de explosión de filas para cada candidato propuesto; y (4) produce un \texttt{JoinPlan} estructurado —joins seleccionados con su justificación, candidatos rechazados con motivo explícito, advertencias— y lo ejecuta mediante \texttt{execute\_join\_plan}, que materializa el join izquierdo con deduplicación de clave derecha. El fichero resultante se trata como un único dataset canónico para el resto del pipeline.
+
+\begin{figure}[H]
+\centering
+\begin{Verbatim}[fontsize=\small]
+  data_validator_node (determinista, antes del bucle)
+  |
+  +-- _build_data_validator_context()
+        profile_raw_datasets() → perfiles compactos
+        inyectados en el HumanMessage inicial del agente
+
+  data_validator (bucle ReAct)
+  |
+  +-- selección del dataset base
+  |     razonamiento sobre perfiles en contexto inicial
+  |
+  +-- propuesta de candidatos (≤ 20 pares semánticamente plausibles)
+  |
+  +-- evaluate_join_candidates()      [herramienta determinista]
+  |     cobertura, contención, cardinalidad, riesgo de explosión
+  |
+  +-- selección del JoinPlan
+  |     joins aceptados + candidatos rechazados + advertencias
+  |
+  +-- execute_join_plan()             [herramienta determinista]
+  |     left join con deduplicación de clave derecha
+  |
+  +-- apply_column_mapping → validate_against_schema → ...
+\end{Verbatim}
+\caption{Subproceso de descubrimiento de join agentico dentro del nodo \texttt{data\_validator}. Los pasos deterministas enmarcan el bucle de razonamiento del agente, que sólo propone candidatos y toma la decisión final; las métricas de calidad del join son siempre calculadas por código determinista.}
+\label{fig:join-discovery-flow}
+\end{figure}
+
+\textbf{Fase 2 --- Aprobación del dataset (HITL gate 1).}
+El grafo se suspende y presenta al operador tres elementos: el informe de validación (advertencias, estadísticas de calidad, decisiones de limpieza), una vista previa del dataset canónico procesado, y, cuando se ejecutó descubrimiento de join, el \texttt{JoinPlan} auditado —columnas de join empleadas, métricas de cobertura y cardinalidad por candidato, candidatos rechazados con motivo—. Esta información permite al operador verificar no sólo que el dataset resultante es correcto, sino también que las decisiones de integración del agente son razonables. Si el operador aprueba, el flujo continúa hacia el planificador. Si rechaza con un comentario, el controlador inyecta dicho comentario como retroalimentación en el estado y redirige al agente de validación para que intente un enfoque alternativo, hasta un máximo configurable de intentos.
 
 \textbf{Fase 3 --- Planificación de modelos.} El planificador actúa como un agente ReAct con cuatro herramientas deterministas. Comienza invocando \texttt{list\_available\_models} para obtener los modelos válidos del registro para el tipo de problema, a continuación llama a \texttt{retrieve\_similar\_experiences} para recuperar las experiencias pasadas más similares del \emph{pool} y a \texttt{retrieve\_ml\_knowledge} para obtener las reglas expertas aplicables. Si necesita información adicional sobre un modelo concreto, puede invocar \texttt{inspect\_model\_details} hasta un máximo de tres veces. Concluido el bucle de herramientas, el agente produce un \texttt{PlannerOutput} que incluye los candidatos con su prioridad y justificación de evidencia, los modelos descartados con motivo explícito, y un análisis de las experiencias y reglas consultadas. Una cadena de cuatro validadores deterministas (integridad del plan, exhaustividad del registro, coherencia de las referencias de evidencia, resolución de conflictos declarados) rechaza el plan y desencadena un reintento automático si alguna verificación falla.
 

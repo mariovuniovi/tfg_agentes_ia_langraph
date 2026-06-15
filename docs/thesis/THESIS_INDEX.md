@@ -8,7 +8,7 @@
 | 3 | Estudio de Alternativas | Alternativas a LangGraph, Alternativas al proveedor del modelo, Alternativas al almacén de experiencias, Alternativas al sistema de seguimiento de experimentos, Alternativas al stack de interfaz de usuario | cap03_alternativas.tex | done |
 | 4 | Arquitectura | Visión general del sistema, Patrón controlador determinista y agentes especializados, Diseño del estado compartido, Flujo de ejecución end-to-end, Puertas de aprobación humana, Pool de experiencias y base de conocimiento estático, Infraestructura de despliegue, Tipos de nodos y contratos de ejecución | cap04_arquitectura.tex + cap04_nodos.tex | done |
 | 5 | Desarrollo e Implementación | Agente de validación de datos, Agente de entrenamiento, Agente de evaluación, Agente de despliegue, Pool de experiencia, API REST y frontend, Contenerización | — | pending |
-| 6 | Resultados | Métricas de rendimiento del pipeline, Evaluación del pool de experiencia (benchmarks), Análisis del comportamiento agéntico | — | pending |
+| 6 | Resultados | Introducción, Evaluación del pool de experiencias (benchmarks), Comportamiento agéntico: casos de estudio, Coste agéntico y supervisión humana | cap06_resultados.tex | done |
 | 7 | Conclusiones y Trabajo Futuro | Conclusiones, Limitaciones, Escalabilidad del proyecto, Trabajo futuro | — | pending |
 
 ## Terminology (ES)
@@ -29,6 +29,24 @@
 | tool trace | traza de herramientas |
 | validation context | contexto de validación |
 | experience record | registro de experiencia |
+| join discovery | descubrimiento de join agéntico |
+| nRMSE | error normalizado (RMSE / media objetivo × 100) |
+| benchmark run | ejecución de benchmark |
+| regime | régimen (estadístico / supervisado / paseo aleatorio) |
+| join plan | plan de join |
+| join candidate | candidato de join |
+| base dataset | dataset base |
+| SMAPE | SMAPE (error porcentual absoluto medio simétrico) |
+| reasoning tokens | tokens de razonamiento |
+| capacity check | chequeo de capacidad |
+| retry (planner) | reintento (planner\_status=retry\_ok) |
+| LLM share | cuota LLM |
+| left coverage | cobertura izquierda (fracción de filas de hechos con correspondencia) |
+| containment (FK⊊PK) | contención (FK subconjunto de PK) |
+| orphan foreign key | clave foránea huérfana |
+| referential integrity | integridad referencial |
+| ordinal encoding | codificación ordinal |
+| id column drop | descarte de columnas identificadoras |
 
 ## Cross-references
 | Label | Introduced in | Description |
@@ -48,7 +66,8 @@
 | sec:vision-general | cap04 | Visión general del sistema y sus cuatro capas |
 | sec:patron-supervisor | cap04 | Patrón controlador determinista + agentes especializados |
 | sec:estado-compartido | cap04 | AgentState TypedDict y contrato del dataset |
-| sec:flujo-ejecucion | cap04 | Flujo end-to-end del grafo (8 fases) |
+| sec:flujo-ejecucion | cap04 | Flujo end-to-end del grafo (8 fases) + descubrimiento de join agentico en Fase 1 |
+| fig:join-discovery-flow | cap04 | Subproceso de descubrimiento de join dentro de data\_validator |
 | sec:hitl-gates | cap04 | Dos puertas HITL: dataset\_approval y deployment\_approval |
 | sec:experience-pool | cap04 | SQLite pool, DatasetProfile, recuperación por similitud, ml\_rules.yaml |
 | sec:infraestructura | cap04 | Docker compose: mlflow, api, frontend; separación de almacenamiento |
@@ -78,3 +97,30 @@
 | lst:similarity | cap04_experience_pool | Fragmento del cálculo de similitud ponderada |
 | lst:workflow-controller | cap04 | Extracto del workflow\_controller |
 | lst:hitl-gate | cap04 | Patrón del nodo dataset\_approval\_node |
+| sec:resultados | cap06 | Sección raíz del capítulo de Resultados |
+| sec:pool-evaluacion | cap06 | Evaluación del pool de experiencias (benchmark) |
+| sec:pool-forecasting | cap06 | Resultados benchmark pronóstico (11 datasets) |
+| sec:pool-clasif-regr | cap06 | Resultados benchmark clasificación y regresión (12 datasets) |
+| tab:pool-forecasting | cap06 | Tabla de 11 datasets de pronóstico con RMSE y nRMSE |
+| tab:pool-classification | cap06 | Tabla de 7 datasets de clasificación con macro-F1 |
+| tab:pool-regression | cap06 | Tabla de 5 datasets de regresión con RMSE |
+| sec:casos-estudio | cap06 | Comportamiento agéntico: seis casos de estudio interactivos |
+| sec:caso-retrieval | cap06 | Recuperación de experiencias (sim 1,00 y 0,83) y razonamiento del planificador |
+| sec:caso-joins | cap06 | Descubrimiento de 3 joins multi-tabla en Grid Demand |
+| sec:caso-exog | cap06 | Adaptación de familia de modelos con exógenas (bakery) |
+| sec:caso-robustez | cap06 | Robustez del controlador ante 3 entradas malformadas |
+| sec:caso-generalidad | cap06 | Generalidad del sistema (remite a clasificación/regresión 6.1) |
+| sec:caso-joins-imperfectos | cap06 | Joins imperfectos + categóricas en regresión (retail_sales: cobertura parcial, FK huérfanas, dedup, imputación, id-drop) |
+| tab:joins-imperfectos | cap06 | Tabla de 3 joins de retail_sales (cobertura, contención, acción) |
+| fig:cap06-join-imperfecto | cap06 | Plan de join imperfecto de retail_sales en la puerta de aprobación (captura UI) |
+| sec:coste-agente | cap06 | Coste agéntico y supervisión humana |
+| sec:coste-desglose | cap06 | Desglose de tiempo/coste por nodo (4 ejecuciones) |
+| sec:coste-tamano | cap06 | Coste agéntico independiente del tamaño del dataset (mecanismo + caveat columnas) |
+| lst:load-dataset | cap06 | Resumen de 451 caracteres que recibe el LLM (muestra de 3 filas fija) |
+| sec:coste-variabilidad | cap06 | Coste estocástico: decisión estable, coste variable |
+| sec:coste-hitl | cap06 | Tiempo de supervisión humana en las puertas HITL |
+| tab:casos-resumen | cap06 | Resumen de los 4 casos de pronóstico (sim, campeón, SMAPE) |
+| tab:robustez | cap06 | Escenarios de error forzado y mensajes del controlador |
+| tab:coste-desglose | cap06 | Tiempo de cómputo por nodo y coste USD por ejecución |
+| tab:variabilidad | cap06 | 4 repeticiones de la panadería: coste variable |
+| fig:cap06-join-plan | cap06 | Plan de join inferido para Grid Demand (captura UI) |

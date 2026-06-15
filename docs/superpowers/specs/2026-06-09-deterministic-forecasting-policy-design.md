@@ -6,7 +6,7 @@
 
 ## Problem
 
-Two deterministic decisions are currently made by the **LLM planner**, and it gets them wrong:
+Two deterministic decisions are currently made by the **LLM planner**, and it gets them wrong: 
 
 1. **Validation strategy.** `planner.yaml` tells the LLM "if history is very_short/short → prefer single_split." On the 3-year `grid_demand` run (156 obs, bucketed `short`) the planner chose `single_split` — a single 8-point validation window. A flat `naive` forecast then won the champion bake-off on that one lucky window, despite seasonality being detected. Yet multi-fold backtesting is trivially affordable here (≈5 folds). It was skipped purely because of the coarse `short` label.
 

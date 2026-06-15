@@ -961,16 +961,30 @@ git commit -m "feat(ui): show held-out test metrics + validation selection line;
 
 **Files:** none (operational step performed at deploy time).
 
-- [ ] **Step 1: Clear the historical MLflow runs so the gate baseline is test-based**
+- [ ] **Step 1: Clear the historical MLflow RUNS so the gate baseline is test-based**
 
-Because the promotion gate (`_fetch_current_champion`) ranks runs by the logged `rmse`, old runs that logged *validation* rmse must be cleared so new *test*-based runs aren't compared against them. Once, at rollout, delete the runs in the `mlops-agents` experiment (or rename the experiment to a fresh name in `settings.mlflow_experiment_name`).
+Because the promotion gate (`_fetch_current_champion`) ranks runs by the logged `rmse`, old runs that logged *validation* rmse must be cleared so new *test*-based runs aren't compared against them.
 
-Option A — delete via MLflow UI: open the MLflow server (http://localhost:5000), select the `mlops-agents` experiment, delete its runs.
+IMPORTANT: delete the **runs**, NOT the experiment. `MlflowClient.delete_experiment` only *soft-deletes* and keeps the name reserved, after which `mlflow.set_experiment("mlops-agents")` raises `Cannot set a deleted experiment ... as the active experiment` and every pipeline run fails. Soft-deleting the runs is enough — `_fetch_current_champion` uses `search_runs` (ACTIVE_ONLY view), so soft-deleted runs are excluded from the comparison while the experiment stays usable.
 
-Option B — delete the experiment programmatically (run against the same tracking URI the app uses):
+Run against the same tracking URI the app uses (restores the experiment if a previous attempt soft-deleted it, then clears runs):
 
 ```bash
-uv run python -c "from mlflow.tracking import MlflowClient; c=MlflowClient('http://localhost:5000'); e=c.get_experiment_by_name('mlops-agents'); c.delete_experiment(e.experiment_id) if e else print('no experiment')"
+uv run python -c "
+from mlflow.tracking import MlflowClient
+from mlflow.entities import ViewType
+c = MlflowClient('http://localhost:5000')
+e = next((x for x in c.search_experiments(view_type=ViewType.ALL) if x.name=='mlops-agents'), None)
+if e is None:
+    print('no experiment named mlops-agents')
+else:
+    if e.lifecycle_stage == 'deleted':
+        c.restore_experiment(e.experiment_id); print('restored experiment', e.experiment_id)
+    runs = c.search_runs([e.experiment_id], run_view_type=ViewType.ALL)
+    for r in runs:
+        c.delete_run(r.info.run_id)
+    print('soft-deleted', len(runs), 'runs')
+"
 ```
 
 Expected: the next forecasting run finds no champion → `evaluation_passed = True` (auto-passes), and subsequent runs compare test-vs-test.

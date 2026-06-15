@@ -1,0 +1,730 @@
+% ============================================================
+%  Capítulo 6 — Resultados
+% ============================================================
+
+\section{Resultados}
+\label{sec:resultados}
+
+Este capítulo valida empíricamente las cuatro afirmaciones centrales de la
+arquitectura propuesta: (i)~el controlador determinista orquesta el flujo de forma
+robusta; (ii)~el agente planificador selecciona modelos de forma adaptativa a partir
+del \textit{pool} de experiencias; (iii)~el \textit{pool} acumula priors empíricos
+que mejoran decisiones futuras; y (iv)~las puertas de supervisión humana son
+suficientemente ligeras porque los agentes producen planes de alta calidad.
+
+Si bien el sistema admite tres tipos de problema —clasificación, regresión y
+pronóstico de series temporales—, el núcleo técnico de esta tesis es el pronóstico.
+Es en este dominio donde la selección adaptativa de modelos resulta más valiosa: la
+diversidad de regímenes (estadístico, supervisado con variables exógenas,
+paseo~aleatorio) hace que ningún modelo único sea óptimo para todos los casos, y donde el
+\textit{pool} aporta el mayor valor diferencial respecto a un enfoque sin memoria.
+La clasificación y la regresión se incluyen para demostrar que la arquitectura es
+agnóstica al dominio, pero su tratamiento en este capítulo es secundario.
+
+La estructura del capítulo es la siguiente.
+La Sección~\ref{sec:pool-evaluacion} evalúa la calidad del \textit{pool} de
+experiencias a partir del conjunto de benchmarks ejecutado antes de las pruebas con
+usuario.
+La Sección~\ref{sec:casos-estudio} presenta seis casos de estudio a través del
+pipeline completo en modo interactivo, cada uno diseñado para validar un aspecto
+específico del comportamiento agéntico.
+Finalmente, la Sección~\ref{sec:coste-agente} cuantifica el coste temporal y de
+tokens de los componentes agénticos frente a los deterministas.
+
+% ============================================================
+\subsection{Evaluación del \textit{pool} de experiencias}
+\label{sec:pool-evaluacion}
+% ============================================================
+
+Antes de ejecutar cualquier experimento interactivo, el sistema se inicializó con 23
+registros de experiencia obtenidos mediante el ejecutor de benchmarks
+(\texttt{run\_benchmark.py}), que procesa cada \textit{dataset} con la misma pila
+determinista que utiliza el pipeline de producción.
+En el momento de escritura de esta tesis, el \textit{pool} contiene: 11 registros de
+pronóstico, 7 de clasificación y 5 de regresión.
+Los benchmarks se ejecutaron con 4 ensayos de optimización de Optuna por modelo,
+usando validación cruzada en ventana expandida para pronóstico y validación cruzada
+estratificada de 5 particiones para clasificación y regresión.
+
+Las subsecciones siguientes presentan los resultados por tipo de problema.
+
+% ── 6.1.1  Pronóstico ──────────────────────────────────────────────────────
+
+\subsubsection{Pronóstico de series temporales}
+\label{sec:pool-forecasting}
+
+La Tabla~\ref{tab:pool-forecasting} recoge los 11 \textit{datasets} de pronóstico
+del \textit{pool}.
+Para cada uno se indica la frecuencia temporal, el horizonte de predicción, el número
+de observaciones, el modelo seleccionado como campeón por el ejecutor de
+entrenamiento, el error cuadrático medio sobre el conjunto de validación (RMSE) y el
+error normalizado nRMSE = $\text{RMSE} / \bar{y} \times 100$, que permite comparar
+la magnitud del error de forma adimensional entre series de escalas muy distintas.
+La columna \textit{Régimen} indica si el \textit{dataset} tiene una etiqueta de
+familia esperada en el manifiesto de benchmarks, y la columna \textit{Conc.}\ señala
+si el modelo campeón pertenece a dicha familia.
+
+\begin{table}[H]
+\centering
+\caption{Resultados del benchmark de pronóstico (11 \textit{datasets}).
+ ETS = suavizado exponencial automático; ARIMA = AutoARIMA;
+ SVR = máquinas de vectores de soporte para regresión;
+ BA = bosque aleatorio; XGB = XGBoost; ET = \textit{Extra Trees}; GBM =
+ \textit{Gradient Boosting}.
+ nRMSE = $\text{RMSE}/\bar{y}\times 100$.
+ {\checkmark} = familia campeón concuerda con la etiqueta esperada;
+ {\ding{55}} = discrepancia; {---} = sin etiqueta esperada.}
+\label{tab:pool-forecasting}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrrrrll}
+\toprule
+\textbf{Dataset} & \textbf{Frec.} & \textbf{H} & \textbf{Filas}
+  & \textbf{Modelo campeón} & \textbf{Familia}
+  & \textbf{RMSE} & \textbf{nRMSE\,(\%)}
+  & \textbf{Régimen} & \textbf{Conc.} \\
+\midrule
+\multicolumn{10}{l}{\textit{Régimen estadístico (etiquetados)}} \\[2pt]
+Air Passengers         & MS  & 12 &    144 & AutoARIMA       & Estadístico &   23,56 &  8,4 & Estadístico & \checkmark \\
+CO$_2$ Mauna Loa       & MS  &  6 &    526 & ETS             & Estadístico &    0,33 &  0,1 & Estadístico & \checkmark \\
+Manchas solares        & YS  &  3 &    309 & SVR             & ML~sup.     &    9,55 & 19,2 & Estadístico & \ding{55}  \\
+Río Nilo               & YS  &  3 &    100 & SVR             & ML~sup.     &  114,53 & 12,5 & Estadístico & \ding{55}  \\
+\midrule
+\multicolumn{10}{l}{\textit{Régimen supervisado (etiquetado)}} \\[2pt]
+Metro Minneapolis      &  D  & 14 &  1.860 & Bosque Aleatorio & ML~sup.     &  240,72 &  7,4 & Supervisado & \checkmark \\
+\midrule
+\multicolumn{10}{l}{\textit{Sin etiqueta esperada}} \\[2pt]
+Electricidad Victoria  &  D  & 14 &  4.807 & ETS             & Estadístico & 27.488  &  9,9 & ---         & ---        \\
+S\&P~500               &  W  & 13 &  1.011 & XGBoost         & ML~sup.     &  177,98 &  7,9 & ---         & ---        \\
+Petróleo WTI           &  W  & 13 &  1.013 & ETS             & Estadístico &    5,56 &  7,7 & ---         & ---        \\
+Oro + Macro            &  W  & 13 &  1.013 & Bosque Aleatorio & ML~sup.     &   65,26 &  5,0 & ---         & ---        \\
+Bitcoin (BTC)          &  W  & 13 &    335 & Extra Trees     & ML~sup.     & 4.483   & 18,5 & ---         & ---        \\
+EUR/USD                &  W  & 13 &    335 & GBM             & ML~sup.     &    0,02 &  1,6 & ---         & ---        \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Análisis por régimen.}
+De los cinco \textit{datasets} con etiqueta de familia esperada, tres coinciden con la
+predicción (60\,\%), y dos —Manchas Solares y Río Nilo— presentan discrepancia: el
+modelo campeón elegido en validación es SVR en lugar de un método estadístico clásico.
+Este resultado no es un fallo del sistema sino un hallazgo legítimo: ambas series son
+cortas (100–309 observaciones), carecen de variables exógenas y presentan
+irregularidades no capturables por ETS ni AutoARIMA en el horizonte de validación;
+el SVR, al no asumir ninguna estructura paramétrica, consigue una generalización
+marginalmente superior en estas condiciones.
+El \textit{pool} almacena el campeón real, no el esperado; las etiquetas de régimen
+son únicamente un prior para el planificador, no una restricción.
+
+Los cinco \textit{datasets} financieros (S\&P~500, Petróleo, Oro, Bitcoin,
+EUR/USD) no tienen etiqueta esperada porque su comportamiento es ambiguo en el
+histórico: la hipótesis del mercado eficiente predice que modelos naive deberían ganar,
+pero en el backtesting con ventana histórica de hasta 19 años, los modelos de árboles
+y ETS logran capturar autocorrelaciones residuales.
+El \textit{pool} registra fielmente estos campeones sin forzar ninguna clasificación
+a priori.
+
+Todos los valores nRMSE se encuentran por debajo del 20\,\%, salvo Manchas Solares
+(19,2\,\%) y Bitcoin (18,5\,\%), que son series de gran variabilidad intrínseca.
+El nRMSE más bajo corresponde a CO$_2$ Mauna Loa (0,1\,\%), cuya tendencia lineal
++ ciclo anual es casi perfectamente capturable por ETS.
+
+% ── 6.1.2  Clasificación y regresión ───────────────────────────────────────
+
+\subsubsection{Clasificación y regresión}
+\label{sec:pool-clasif-regr}
+
+Las Tablas~\ref{tab:pool-classification} y~\ref{tab:pool-regression} recogen los
+resultados del benchmark para los tipos de problema secundarios.
+Su inclusión en el \textit{pool} garantiza que el sistema responda de forma coherente
+cuando el usuario sube un \textit{dataset} tabular no temporal, demostrando que la
+arquitectura agente–planificador–ejecutor es agnóstica al dominio.
+
+\begin{table}[H]
+\centering
+\caption{Resultados del benchmark de clasificación (7 \textit{datasets}).
+ Métrica: macro-F1 sobre el conjunto de validación (5-fold).
+ RL = regresión logística; BA = bosque aleatorio; LGBM = LightGBM.}
+\label{tab:pool-classification}
+\small
+\begin{tabular}{llrll}
+\toprule
+\textbf{Dataset} & \textbf{Dominio} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{macro-F1} \\
+\midrule
+Iris                  & Botánica           &     150 & Regresión Logística & 0,966 \\
+Vino                  & Enología           &     178 & Bosque Aleatorio    & 0,980 \\
+Cáncer de mama        & Medicina           &     569 & LightGBM            & 0,972 \\
+Enfermedad cardíaca   & Medicina           &     303 & Bosque Aleatorio    & 0,839 \\
+Titanic               & Histórico          &     891 & Bosque Aleatorio    & 0,977 \\
+Renta adultos         & Socioeconómico     & 48.842  & LightGBM            & 0,750 \\
+Marketing bancario    & Financiero         & 45.211  & LightGBM            & 0,749 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Resultados del benchmark de regresión (5 \textit{datasets}).
+ Métrica: RMSE sobre el conjunto de validación (5-fold).}
+\label{tab:pool-regression}
+\small
+\begin{tabular}{llrll}
+\toprule
+\textbf{Dataset} & \textbf{Dominio} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{RMSE} \\
+\midrule
+Diabetes              & Medicina           &     442 & Ridge     & 55,38 \\
+Eficiencia energética & Ingeniería         &     768 & Ridge     &  5,20 \\
+Resistencia hormigón  & Construcción       &   1.030 & CatBoost  &  4,52 \\
+Alquiler bicicletas   & Transporte         & 17.389  & CatBoost  & 38,25 \\
+Vivienda California   & Inmobiliario       & 20.640  & LightGBM  &  0,45 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los resultados de clasificación reflejan el comportamiento esperado de las reglas
+estáticas del planificador: los \textit{datasets} muy pequeños (Iris, Enfermedad
+cardíaca) eligen modelos de baja complejidad (Regresión Logística, Bosque Aleatorio),
+mientras que los conjuntos medianos con miles de instancias (Renta adultos, Marketing
+bancario) favorecen LightGBM.
+Las métricas inferiores en estos últimos (macro-F1 $\approx 0{,}75$) se deben al
+desbalanceo de clases —la clase positiva representa el 11\,\% en Marketing bancario—
+y no a un defecto del sistema de selección.
+En regresión destaca que Ridge gana en los dos \textit{datasets} más pequeños
+(Diabetes, Eficiencia energética), confirmando la regla de regularización para
+conjuntos con pocas muestras.
+
+% ============================================================
+\subsection{Comportamiento agéntico: casos de estudio}
+\label{sec:casos-estudio}
+% ============================================================
+
+Mientras que la Sección~\ref{sec:pool-evaluacion} evalúa el \textit{pool} de forma
+agregada y determinista, esta sección examina el sistema \emph{en funcionamiento}:
+seis casos de estudio a través del pipeline interactivo completo, cada uno diseñado para
+validar un aspecto distinto del comportamiento agéntico. Todas las ejecuciones se
+realizaron con los modelos \texttt{gpt-5.4-mini} (validador y planificador) y
+\texttt{gpt-5.4-nano} (informe de auditoría) sobre la capa gratuita de GitHub~Models.
+La Tabla~\ref{tab:casos-resumen} resume las cuatro ejecuciones de pronóstico; las
+métricas de error son SMAPE (\textit{Symmetric Mean Absolute Percentage Error}),
+adimensional y comparable entre escalas.
+
+\begin{table}[H]
+\centering
+\caption{Resumen de los casos de estudio de pronóstico.
+ Sim.\ = similitud de la experiencia recuperada más relevante;
+ RMSE y SMAPE sobre el conjunto de prueba retenido.
+ RF = \textit{Random Forest}; XGB = XGBoost.}
+\label{tab:casos-resumen}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lllrlll}
+\toprule
+\textbf{Caso} & \textbf{Dataset} & \textbf{Frec./Filas}
+  & \textbf{Sim.} & \textbf{Experiencia top}
+  & \textbf{Campeón} & \textbf{SMAPE} \\
+\midrule
+6.2.1 & Revenue mensual    & MS / 120 & 1,00 & Air Passengers      & AutoARIMA & 1,9\,\% \\
+6.2.1 & Air Passengers     & MS / 144 & 0,83 & Air Passengers      & AutoARIMA & 4,0\,\% \\
+6.2.2 & Grid Demand        & W / 156  & 0,82 & Air Passengers      & AutoARIMA & 2,4\,\% \\
+6.2.3 & Bakery diario      & D / 1.000& 0,89 & Gold Macro (RF)     & ETS       & 3,4\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ── 6.2.1  Recuperación del pool ────────────────────────────────────────────
+
+\subsubsection{Recuperación de experiencias y razonamiento del planificador}
+\label{sec:caso-retrieval}
+
+El primer caso valida las afirmaciones~(ii) y~(iii): el \textit{pool} es consultado
+realmente por el planificador y la función de similitud identifica priors relevantes.
+Se ejecutaron dos \textit{datasets} mensuales distintos. El primero, un conjunto
+sintético de ingresos mensuales (\texttt{small\_monthly\_revenue}, 120 observaciones),
+produjo un perfil de \textit{dataset} idéntico en cubos al de Air~Passengers, de modo
+que la herramienta \texttt{retrieve\_experiences} devolvió esa experiencia con
+similitud~\textbf{1,00}. El segundo, el propio Air~Passengers cargado a través de la
+interfaz, recuperó su experiencia homónima del \textit{pool} con similitud~0,83 —no~1,00
+porque la ejecución interactiva incorpora un \textit{join} con contexto de aviación que
+altera ligeramente el perfil.
+
+En ambos casos el planificador citó la experiencia recuperada como evidencia primaria y
+recomendó el mismo conjunto conservador de candidatos estadísticos —AutoARIMA, ETS,
+\textit{seasonal\_naive} y \textit{naive}—, y el ejecutor seleccionó AutoARIMA como
+campeón, coincidiendo con el modelo ganador del benchmark original
+(Tabla~\ref{tab:pool-forecasting}). El análisis del planificador para el caso de
+ingresos mensuales ilustra el patrón de razonamiento:
+
+\begin{quote}\small\itshape
+``El registro y las reglas favorecen modelos estadísticos bajo histórico corto, y la
+experiencia de mayor relevancia también seleccionó AutoARIMA como mejor. Recomiendo por
+tanto un conjunto conservador de candidatos estadísticos\ldots\ Rechazo los modelos
+supervisados con \textit{lag} porque la regla de histórico corto los penaliza, aunque
+algunas experiencias de similitud media favorecieron métodos de árboles en otros
+\textit{datasets}.''
+\end{quote}
+
+Este fragmento evidencia el mecanismo central del sistema: la decisión no es una
+alucinación del modelo, sino una síntesis trazable de tres fuentes —el registro de
+modelos, las reglas estáticas y la experiencia empírica recuperada— que el planificador
+pondera explícitamente, incluyendo el reconocimiento del conflicto con experiencias que
+favorecieron otras familias.
+
+% ── 6.2.2  Joins ────────────────────────────────────────────────────────────
+
+\subsubsection{Descubrimiento de \textit{joins} multi-tabla}
+\label{sec:caso-joins}
+
+El caso de Grid~Demand valida la afirmación~(i) sobre la robustez del agente de
+validación y, en particular, su capacidad de descubrimiento de \textit{joins}. Se
+cargaron cuatro ficheros simultáneamente: la serie base de demanda eléctrica semanal
+(\texttt{grid\_demand}, 156~filas, con la variable objetivo \texttt{demand\_mwh} y el
+índice temporal) y tres tablas secundarias —registro de calendario, mezcla de
+generación y datos meteorológicos—. Ninguna comparte el nombre de la columna clave: la
+serie base usa \texttt{timestamp\_week}, mientras que las secundarias usan
+\texttt{week\_start\_date}, \texttt{week\_ref} y \texttt{obs\_date} respectivamente.
+
+El agente de validación, sin intervención humana, infirió los tres \textit{joins} de
+tipo \textsc{left} uno-a-uno, los evaluó (cobertura del 100\,\%, multiplicador de filas
+$1{,}00\times$, riesgo bajo) y los ejecutó, materializando un \textit{dataset} de
+156~filas $\times$ 8~columnas con cinco variables exógenas añadidas
+(Figura~\ref{fig:cap06-join-plan}). El plan de \textit{join} se presenta al revisor
+humano en la puerta de aprobación con su nivel de confianza (``alta'') y la justificación
+de cada candidato, materializando la afirmación~(iv): el humano \emph{confirma}, no
+diseña.
+
+\begin{figure}[H]
+\centering
+% Fuente: resultados/grid_demand/join_plan.png
+\includegraphics[width=\textwidth]{figuras/cap06/grid_demand_join_plan.png}
+\caption{Plan de \textit{join} inferido para Grid~Demand, tal como se presenta en la
+ puerta de aprobación del \textit{dataset}. El agente descubre tres \textit{joins}
+ uno-a-uno con cobertura total y riesgo bajo, alineando claves con nombres distintos
+ (\texttt{timestamp\_week} $\leftrightarrow$ \texttt{week\_start\_date},
+ \texttt{week\_ref}, \texttt{obs\_date}).}
+\label{fig:cap06-join-plan}
+\end{figure}
+
+Pese a disponer de variables exógenas tras el \textit{join}, el planificador mantuvo un
+plan conservador (AutoARIMA, ETS, \textit{seasonal\_naive}, \textit{naive}) porque el
+histórico es corto (156~observaciones $<$ 200): el sistema prioriza la regla de
+histórico corto sobre la disponibilidad de exógenas, y AutoARIMA resultó campeón.
+
+% ── 6.2.3  Exógenas ─────────────────────────────────────────────────────────
+
+\subsubsection{Adaptación de familia de modelos con variables exógenas}
+\label{sec:caso-exog}
+
+El caso de la panadería diaria (\texttt{medium\_daily\_bakery}, 1.000~observaciones)
+valida la afirmación~(ii) en su forma más exigente: que la selección de modelos
+\emph{cambia de familia} cuando la señal de los datos lo justifica. A diferencia de los
+casos anteriores, este \textit{dataset} combina un histórico medio con variables
+exógenas de calendario de valor futuro conocido (\texttt{is\_weekend},
+\texttt{day\_of\_week}).
+
+La recuperación del \textit{pool} devolvió como experiencias más similares conjuntos en
+los que ganaron modelos supervisados —Gold~Macro (\textit{Random Forest}, sim.~0,89),
+S\&P~500 (XGBoost, sim.~0,89) y Metro~Minneapolis (\textit{Random Forest}, sim.~0,82)—.
+En consecuencia, y a diferencia de los casos puramente estadísticos, el planificador
+\emph{amplió} el conjunto de candidatos para incluir \texttt{random\_forest\_forecaster}
+y \texttt{xgboost\_forecaster} junto a ETS y AutoARIMA. Esto demuestra que el cambio de
+familia no está codificado de forma rígida, sino que emerge de la combinación de la
+disponibilidad de exógenas en el perfil y de los priors supervisados recuperados.
+
+El resultado final es matizado y honesto: aunque el planificador ofreció candidatos
+supervisados, el campeón empírico en validación fue ETS (RMSE~16,71; SMAPE~3,4\,\%),
+que capturó la estacionalidad semanal del consumo de la panadería mejor que los modelos
+de árboles en este horizonte. El sistema entrena todos los candidatos y deja que la
+validación cruzada decida; el valor del planificador no es acertar siempre el campeón,
+sino \emph{acotar} el espacio de búsqueda a candidatos plausibles.
+
+% ── 6.2.4  Robustez del controlador ─────────────────────────────────────────
+
+\subsubsection{Robustez del controlador ante entradas malformadas}
+\label{sec:caso-robustez}
+
+Este caso valida la afirmación~(i): el controlador determinista alcanza siempre un
+estado terminal limpio e informativo, sin caídas ni corrupción silenciosa. Se
+inyectaron tres tipos de fallo y se observó dónde los detecta el sistema
+(Tabla~\ref{tab:robustez}).
+
+\begin{table}[H]
+\centering
+\caption{Escenarios de error forzado y comportamiento observado del controlador.
+ Todos alcanzan un estado terminal limpio con un mensaje informativo.}
+\label{tab:robustez}
+\small
+\begin{tabular}{p{3.0cm}p{3.4cm}p{6.4cm}}
+\toprule
+\textbf{Fallo inyectado} & \textbf{Detectado en} & \textbf{Mensaje al usuario (verbatim)} \\
+\midrule
+Columna objetivo 100\,\% NaN
+  & \texttt{data\_validator} (semántico)
+  & \textit{``Data validation failed after auto-fix attempt''} \\
+\addlinespace
+Columna objetivo declarada pero ausente
+  & \texttt{data\_validator} (contrato de esquema)
+  & \textit{``target\_column `sales' not found in dataset''} \\
+\addlinespace
+15 filas para horizonte 12
+  & \texttt{planner} (chequeo de capacidad)
+  & \textit{``Forecasting capacity check failed: need $\geq$ 60 observations for horizon 12, have 15''} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los tres escenarios son detectados en \emph{etapas distintas} del pipeline, lo que
+demuestra una defensa en profundidad: el contrato de esquema (puramente determinista)
+captura la columna ausente antes incluso de invocar al agente; el agente de validación
+captura el objetivo degenerado (todo~NaN) tras intentar la auto-reparación; y el
+planificador captura la insuficiencia de histórico en su chequeo de capacidad, ya
+superada la puerta de aprobación del \textit{dataset}. En los tres casos el controlador
+enruta a \texttt{END} con \texttt{error\_message} establecido, y el pipeline emite un
+evento \texttt{run\_complete} con el prefijo \textit{``Pipeline did not complete
+end-to-end''} en lugar de un falso éxito. Ningún escenario produjo una excepción no
+gestionada ni dejó artefactos corruptos en el \textit{pool}.
+
+% ── 6.2.5  Generalidad ──────────────────────────────────────────────────────
+
+\subsubsection{Generalidad del sistema}
+\label{sec:caso-generalidad}
+
+Aunque el foco de este capítulo es el pronóstico, la arquitectura agente–planificador–
+ejecutor es agnóstica al dominio. La evidencia ya se presentó en la
+Sección~\ref{sec:pool-clasif-regr}: ante \textit{datasets} tabulares no temporales, el
+mismo planificador aplica reglas distintas —selecciona Regresión Logística o Bosque
+Aleatorio para conjuntos pequeños y LightGBM para los de decenas de miles de filas— sin
+proponer nunca un modelo de pronóstico. El cambio de tipo de problema se propaga desde
+el esquema cargado por el usuario a través del estado compartido, y ni el controlador ni
+el ejecutor requieren modificación. Las mejoras introducidas en el dominio de pronóstico
+no degradan el comportamiento en clasificación o regresión.
+El caso siguiente hace concreta esta generalidad con una ejecución de regresión que, a
+diferencia de los \textit{datasets} tabulares limpios del \textit{benchmark}, ejercita
+el camino completo de ingeniería de datos sobre fuentes multi-tabla con integridad
+referencial imperfecta.
+
+% ── 6.2.6  Joins imperfectos y características categóricas ───────────────────
+
+\subsubsection{Joins imperfectos y características categóricas en regresión}
+\label{sec:caso-joins-imperfectos}
+
+Este último caso es el más exigente para el agente de validación porque concentra en una
+sola subida los tres frentes que un escenario multi-tabla real plantea: integridad
+referencial imperfecta, características categóricas que requieren imputación y
+codificación, y columnas identificadoras que no deben convertirse en variables
+predictoras. Es además un problema de regresión, por lo que materializa de forma concreta
+la generalidad argumentada en la Sección~\ref{sec:caso-generalidad}.
+
+Se cargaron cuatro ficheros: una tabla de hechos de ventas minoristas
+(\texttt{retail\_sales}, 320~filas, objetivo \texttt{revenue\_eur}) y tres tablas de
+dimensión —catálogo de productos, directorio de tiendas y segmentos de cliente— cuyas
+claves tienen nombres distintos de los de la tabla de hechos
+(\texttt{product\_id}$\,\leftrightarrow\,$\texttt{sku},
+\texttt{store\_id}$\,\leftrightarrow\,$\texttt{store\_code},
+\texttt{segment\_code}$\,\leftrightarrow\,$\texttt{segment\_code}). El descubrimiento de
+\textit{joins} alineó las tres claves de forma semántica y reportó, para cada una, las
+métricas que distinguen tres regímenes de integridad referencial muy distintos
+(Tabla~\ref{tab:joins-imperfectos}).
+
+\begin{table}[H]
+\centering
+\caption{\textit{Joins} descubiertos en \texttt{retail\_sales}.
+ \textit{Cobertura izq.}\ = fracción de filas de la tabla de hechos con correspondencia;
+ \textit{Contención} = relación entre el conjunto de claves foráneas (FK) y el de claves
+ primarias (PK) de la dimensión.}
+\label{tab:joins-imperfectos}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lllll}
+\toprule
+\textbf{Dimensión} & \textbf{Clave (hecho\,$\leftrightarrow$\,dim.)}
+  & \textbf{Cobertura izq.} & \textbf{Contención} & \textbf{Acción} \\
+\midrule
+Producto  & \texttt{product\_id}$\,\leftrightarrow\,$\texttt{sku}
+          & 100\,\%   & FK\,$\subsetneq$\,PK (40/60) & \textit{Join} limpio \\
+Tienda    & \texttt{store\_id}$\,\leftrightarrow\,$\texttt{store\_code}
+          & 71,6\,\%  & parcial + huérfanas          & \textit{Join} + imputación + dedup. \\
+Segmento  & \texttt{segment\_code}$\,\leftrightarrow\,$\texttt{segment\_code}
+          & 100\,\%   & FK\,$\subsetneq$\,PK (4/6)    & \textit{Join} limpio \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La distinción que el sistema establece es clave. Las dimensiones de producto y segmento
+presentan \emph{contención}: la dimensión contiene más claves de las que la tabla de
+hechos utiliza (40 de 60~SKU; 4 de 6~segmentos), pero \emph{todas} las filas de hechos
+encuentran correspondencia (cobertura izquierda del 100\,\%). Es el caso benigno
+FK\,$\subsetneq$\,PK: un \textit{join} \textsc{left} limpio sin valores nulos. El
+directorio de tiendas, en cambio, es el caso problemático: solo cubre el 71,6\,\% de las
+filas (229 de 320), dejando 91~filas \emph{huérfanas} cuyos atributos de tienda
+(\texttt{region}, \texttt{store\_size\_sqm}, \texttt{store\_type}) quedan nulos tras el
+\textit{join}; además contiene una clave duplicada (\texttt{ST05} aparece dos veces), que
+el descubrimiento señala como riesgo de cardinalidad y resuelve deduplicando la dimensión
+para que el multiplicador de filas se mantenga en $1{,}00\times$ y la tabla de hechos no
+se infle. Que el sistema separe estos dos regímenes —cobertura parcial benigna frente a
+claves foráneas huérfanas— descansa en reportar por separado la cobertura izquierda y la
+contención, y en aplicar un umbral de aviso (cobertura $<$ 80\,\%) que solo dispara la
+alerta sobre el \textit{join} de tiendas.
+
+El plan de \textit{join}, con su cobertura y su nivel de riesgo por candidato, se presenta
+al revisor en la puerta de aprobación del \textit{dataset} (Figura~\ref{fig:cap06-join-imperfecto}),
+de nuevo bajo el principio de que el humano \emph{confirma} la integridad imperfecta
+detectada, no la diagnostica.
+
+\begin{figure}[H]
+\centering
+% Fuente: captura de la tarjeta de aprobación del dataset (run retail_sales_partial_join)
+\includegraphics[width=\textwidth]{figuras/cap06/retail_join_imperfecto.png}
+\caption{Plan de \textit{join} para \texttt{retail\_sales} en la puerta de aprobación. El
+ agente reporta la cobertura parcial del directorio de tiendas (71,6\,\%) y las filas
+ huérfanas resultantes, junto a los dos \textit{joins} limpios de producto y segmento.}
+\label{fig:cap06-join-imperfecto}
+\end{figure}
+
+Tras la aprobación, la cadena determinista resolvió los tres frentes sin intervención
+adicional. Primero, el agente de validación \emph{imputó} las 91~filas huérfanas —los
+atributos categóricos \texttt{region} y \texttt{store\_type} con la moda, y el numérico
+\texttt{store\_size\_sqm} con la media— y revalidó el \textit{dataset} con éxito.
+Segundo, el ejecutor \emph{descartó} la columna \texttt{txn\_id}: marcada como
+\texttt{unique:\,true} en el esquema y no estructural (ni objetivo, ni índice temporal),
+es un identificador puro que no debe filtrarse como ruido de alta cardinalidad al modelo.
+Tercero, el \textit{pipeline} del modelo \emph{codificó} de forma ordinal las columnas
+categóricas restantes (\texttt{category}, \texttt{brand}, \texttt{region},
+\texttt{store\_type}, \texttt{segment\_name}) antes del ajuste, dejando intactas las
+numéricas. El orden importa: la imputación de cadenas precede a la codificación, de modo
+que el codificador nunca recibe nulos.
+
+El campeón seleccionado en validación fue Ridge (RMSE~285,26; MAE~210,32; R$^2 \approx
+0{,}50$ sobre el conjunto de prueba retenido). Es relevante que la puerta de evaluación
+determinista \emph{retuviera} la promoción: con R$^2 = 0{,}50 < 0{,}70$ (umbral aplicado),
+el sistema no ofreció la puerta de despliegue y alcanzó un estado terminal limpio sin
+promover el modelo. Esto no es un fallo sino la conducta honesta esperada: el objetivo
+sintético tiene una señal aprendible limitada por construcción, y el sistema declina
+promover un modelo por debajo del umbral en lugar de enmascararlo. Las cuatro pestañas de
+la interfaz —\textit{dataset}, planificador, modelo y auditoría— se completaron en verde,
+documentando un recorrido íntegro pese a la decisión de no promover.
+
+En conjunto, este caso ejercita toda la superficie de ingeniería de datos que una subida
+multi-tabla real presenta —emparejamiento semántico de claves con nombres distintos, tres
+regímenes de integridad referencial en una sola subida, cardinalidad con clave duplicada,
+mezcla de características categóricas y numéricas, e higiene de identificadores— y la
+columna vertebral determinista la resolvió en su totalidad sin más intervención humana que
+la única puerta de confirmación. Es la evidencia más completa de la afirmación~(i): la
+robustez del controlador y del agente de validación no se limita a entradas malformadas
+(Sección~\ref{sec:caso-robustez}), sino que abarca la integridad referencial parcial,
+el escenario más común y silencioso en datos tabulares del mundo real.
+
+% ============================================================
+\subsection{Coste agéntico y supervisión humana}
+\label{sec:coste-agente}
+% ============================================================
+
+La inteligencia agéntica tiene un coste en tiempo y en \textit{tokens}. Esta sección lo
+cuantifica a partir de la instrumentación del propio sistema (tarjeta de coste y
+\textit{EventLog}) y argumenta que el compromiso es favorable.
+
+% ── 6.3.1  Desglose ─────────────────────────────────────────────────────────
+
+\subsubsection{Desglose de coste por nodo}
+\label{sec:coste-desglose}
+
+La Tabla~\ref{tab:coste-desglose} desglosa, para tres casos de pronóstico
+representativos —Revenue, Grid y Bakery—, el
+tiempo de cómputo por nodo (excluyendo las pausas de revisión humana en las puertas
+HITL) y el coste monetario estimado. El tiempo se mide a partir de las marcas temporales
+del \textit{EventLog}; el coste, a partir del recuento de \textit{tokens} y la tabla de
+precios local (\texttt{gpt-5.4-mini}: \$0,75/\$4,50 por millón de \textit{tokens} de
+entrada/salida; \texttt{gpt-5.4-nano}: \$0,20/\$1,25). Se omite Air~Passengers del
+desglose porque no aporta un régimen de coste distinto: en su variante con \textit{join}
+coincide con Grid y en su variante de fichero único con Revenue. Su aportación específica
+—la validación de la recuperación del \textit{pool}— se documenta en
+la Sección~\ref{sec:caso-retrieval}.
+
+\begin{table}[H]
+\centering
+\caption{Desglose de tiempo de cómputo (segundos) y coste por ejecución. Los nodos
+ \texttt{executor}, \texttt{evaluation} y \texttt{deployer} son deterministas; el resto
+ son agénticos (LLM). El tiempo excluye las pausas humanas en las puertas HITL.
+ Las tres columnas promedian 3 ejecuciones; los tiempos por nodo
+ se reconstruyen a partir de las marcas de tiempo de los eventos del \textit{run}.}
+\label{tab:coste-desglose}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Nodo} & \textbf{Tipo}
+  & \textbf{Revenue} & \textbf{Grid} & \textbf{Bakery} \\
+\midrule
+\texttt{data\_validator} & LLM    & 23,6 & 44,2 & 16,9 \\
+\texttt{planner}         & LLM    & 60,9 & 55,4 & 120,9 \\
+\texttt{executor}        & Determ.& 17,3 & 20,7 & 95,9 \\
+\texttt{evaluation}      & Determ.& 0,1 & 0,1 & 0,1 \\
+\texttt{report\_writer}  & LLM    & 5,6 & 7,7 & 6,5 \\
+\midrule
+\textbf{Total cómputo}   &        & 107,5 & 128,1 & 240,1 \\
+\textbf{Cuota LLM}       &        & 84\,\% & 84\,\% & 60\,\% \\
+\midrule
+\textbf{Coste (USD)}     &        & 0,091 & 0,175 & 0,137 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tres observaciones se desprenden de la tabla. Primero, el coste monetario por ejecución
+completa es muy bajo —entre \$0,09 y \$0,18—, dominado por el agente de validación
+(cuyo histórico de mensajes crece con cada ronda de herramientas) y por el planificador.
+Segundo, la cuota del tiempo de cómputo atribuible a los nodos LLM oscila entre el 60\,\%
+y el 84\,\%: un pipeline determinista tradicional solo pagaría la fracción restante
+(\texttt{executor}\,+\,\texttt{evaluation}). Ese sobrecoste agéntico compra exactamente
+las cuatro capacidades que justifican la arquitectura: selección adaptativa de modelos,
+acumulación de experiencia, informes de auditoría en lenguaje natural y las puertas de
+supervisión humana. Tercero, el tiempo del \texttt{executor} \emph{sí} escala con la
+complejidad: 95,9~s en la panadería (1.000~filas y candidatos supervisados de árboles)
+frente a 17--21~s en Revenue y Grid, de histórico corto y candidatos estadísticos.
+
+\paragraph{Reintentos del agente como factor de inflación.}
+Las cifras de un nodo agéntico pueden además inflarse por \emph{reintentos}: cuando la
+salida estructurada de un agente no supera la validación determinista de su esquema, el
+nodo se reejecuta dentro de su presupuesto de intentos. Es ilustrativo el caso de la
+panadería, cuya columna promedia 3 ejecuciones: en 2 de ellas el planificador reintentó
+—su salida citaba una evidencia de tipo \texttt{dataset\_profile} con \texttt{source\_id}
+no nulo, rechazada por el validador— y ese reintento prácticamente \textbf{duplica tanto
+el tiempo como el coste} de ese nodo, de $\sim$77~s y \$0,07 sin reintento a $\sim$140~s
+y \$0,12 con él. El reintento es, por tanto, el principal factor de variabilidad de coste
+entre ejecuciones de un mismo \textit{dataset}, por encima del tamaño o el tipo de
+problema. Conviene subrayar que el reintento no es un fallo del sistema sino su garantía
+de integridad funcionando: la validación determinista nunca acepta una salida malformada,
+y prefiere pagar un segundo intento a propagar un plan inválido aguas abajo.
+
+\paragraph{Nota honesta sobre la latencia.}
+Los tiempos de los nodos LLM están acotados por la latencia de la API y los límites de
+la capa gratuita de GitHub~Models (150 peticiones diarias por modelo), no por el cómputo
+propio del sistema. En un nivel de pago, las fases agénticas serían considerablemente más
+rápidas; las cifras de la Tabla~\ref{tab:coste-desglose} deben leerse como una cota
+superior conservadora.
+
+% ── 6.3.2  Independencia del tamaño ─────────────────────────────────────────
+
+\subsubsection{Independencia del coste agéntico respecto al tamaño del dataset}
+\label{sec:coste-tamano}
+
+Una propiedad de diseño con consecuencias importantes para la escalabilidad es que el
+coste en \textit{tokens} de los nodos agénticos es \emph{prácticamente independiente del
+número de filas} del \textit{dataset}. La evidencia más limpia es el agente de
+validación: procesó un \textit{dataset} de 120~filas con 36.557 \textit{tokens} de
+entrada y uno de 1.000~filas con 32.360 —ocho veces más datos y, de hecho, ligeramente
+\emph{menos} \textit{tokens}—.
+
+La razón es estructural: los agentes \textbf{nunca reciben los datos en bruto}. El CSV
+completo lo procesan herramientas deterministas (pandas) sobre disco, y al modelo solo
+llegan resúmenes compactos. La salida íntegra que la herramienta \texttt{load\_dataset}
+envió al LLM para el \textit{dataset} de 1.000~filas ocupó 451~caracteres:
+
+\begin{lstlisting}[caption={Resumen que recibe el LLM para un dataset de 1.000
+ filas: recuentos, nombres de columna, tipos y una muestra fija de tres filas.},
+ label=lst:load-dataset, basicstyle=\footnotesize\ttfamily, breaklines=true]
+{"row_count": 1000, "column_count": 4,
+ "column_names": ["date","units_sold","is_weekend","day_of_week"],
+ "dtypes": {"date":"object","units_sold":"int64", ...},
+ "head": [ {3 filas de muestra} ]}
+\end{lstlisting}
+
+El recuento de filas es un único entero y la muestra (\texttt{head}) tiene un tamaño
+fijo de tres filas, sea el \textit{dataset} de 120 o de 10~millones de filas. El
+planificador, análogamente, no ve filas: opera sobre el \emph{perfil} discretizado del
+\textit{dataset} (frecuencia, estacionalidad y tendencia detectadas, tramo de longitud de
+histórico, etc.), también de tamaño constante. Es el principio ``determinista primero''
+hecho coste: los datos pesados permanecen en Python y el LLM solo ve una abstracción
+compacta e independiente del volumen.
+
+En consecuencia, lo que sí mueve el recuento de \textit{tokens} no es el tamaño del
+\textit{dataset} sino la \emph{complejidad agéntica}: el número de rondas de herramientas
+—cada ronda reenvía el historial de mensajes acumulado—, el número de ficheros y
+\textit{joins} (el agente de validación de Grid~Demand alcanzó 140.176 \textit{tokens} de
+entrada por sus cuatro ficheros y diez rondas) y los reintentos del planificador (la
+Sección~\ref{sec:coste-variabilidad} lo cuantifica). El único efecto del propio
+\textit{dataset} es lineal y débil en el número de \emph{columnas} —que alarga las listas
+de nombres y tipos—, nunca en el número de filas.
+
+Combinada con la Sección~\ref{sec:coste-desglose}, esta propiedad permite caracterizar el
+coste total del pipeline como la suma de dos términos de naturaleza opuesta: un
+\textbf{sobrecoste agéntico aproximadamente constante} (validación, planificación y
+auditoría, $\sim$150~s e independiente del tamaño) y un \textbf{coste de entrenamiento
+determinista que escala con los datos} ($O(\text{filas}\times\text{particiones}\times
+\text{ensayos}\times\text{modelos})$, como en cualquier sistema de AutoML). La inteligencia
+agéntica, por tanto, añade un coste fijo que no se degrada con la escala; el cuello de
+botella en \textit{datasets} grandes reside en el núcleo determinista de entrenamiento,
+compartido por cualquier \textit{pipeline} de ML, y no en la capa de agentes —que incluso
+lo alivia al podar el conjunto de candidatos—.
+
+% ── 6.3.3  Variabilidad ─────────────────────────────────────────────────────
+
+\subsubsection{Variabilidad del coste agéntico}
+\label{sec:coste-variabilidad}
+
+Una propiedad inesperada y relevante de los componentes agénticos es que su coste
+\emph{no es determinista}, aun cuando la decisión sí lo es. La Tabla~\ref{tab:variabilidad}
+recoge cuatro ejecuciones del mismo \textit{dataset} (la panadería) con el mismo modelo
+y la misma configuración: la familia de candidatos y el campeón seleccionado se mantienen
+estables entre repeticiones, pero la duración del planificador varía entre 84 y 131~s y
+sus \textit{tokens} de salida entre 12,8k y 26,3k.
+
+\begin{table}[H]
+\centering
+\caption{Cuatro repeticiones de la panadería: decisión estable, coste variable.
+ \textit{Tokens} de salida del planificador (incluyen los de razonamiento).}
+\label{tab:variabilidad}
+\small
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Ejecución} & \textbf{Validador (s)} & \textbf{Planner (s)}
+  & \textbf{Tokens salida planner} & \textbf{Reintento} \\
+\midrule
+1 & 13,6 & 130,6 & 15,4k & no \\
+2 & 4,1  & 84,3  & 14,5k & no \\
+3 & 20,0 & 91,0  & 26,3k & sí \\
+4 & 12,2 & 120,3 & 12,8k & no \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Esta variabilidad tiene dos fuentes. La primera es intrínseca a los modelos de
+razonamiento: los \textit{tokens} de razonamiento privado (la cadena de pensamiento
+oculta) constituyen más de la mitad de la salida del planificador y su volumen fluctúa
+entre ejecuciones aunque la respuesta final sea equivalente; la inferencia en
+\textit{hardware} compartido no es además bit-reproducible ni siquiera a temperatura
+cero. La segunda fuente es discreta: si la salida del planificador no supera la
+validación determinista de estructura (las comprobaciones \texttt{\_check\_*}), el nodo
+reintenta con realimentación correctiva, duplicando aproximadamente el trabajo. La
+ejecución~3 de la Tabla~\ref{tab:variabilidad} es precisamente un caso de reintento
+(\texttt{retry\_ok}), lo que explica su mayor recuento de \textit{tokens}. La conclusión
+para el diseño es importante: la \emph{decisión} del sistema es estable y reproducible
+—gracias a la recuperación determinista del \textit{pool} y a las reglas—, mientras que
+su \emph{coste} es estocástico y dominado por el razonamiento del planificador.
+
+% ── 6.3.4  HITL ─────────────────────────────────────────────────────────────
+
+\subsubsection{Supervisión humana en las puertas HITL}
+\label{sec:coste-hitl}
+
+El sistema interrumpe la ejecución en dos puertas de aprobación humana: tras la
+validación del \textit{dataset} (incluido el plan de \textit{join}) y antes de promover
+el modelo al registro. El argumento central de la afirmación~(iv) es que el coste de
+esta supervisión escala \emph{inversamente} con la calidad de las decisiones del agente:
+cuando el plan es correcto, la tarea del humano es confirmar —una revisión de segundos—,
+no diseñar.
+
+Las marcas temporales del \textit{EventLog} respaldan este argumento. En la puerta de
+aprobación del \textit{dataset}, la pausa humana observada osciló entre los 20~s de la
+panadería —donde el plan de validación era trivialmente correcto— y varios minutos en
+los casos con \textit{join} (Air~Passengers, Grid~Demand), donde el revisor inspeccionó
+el plan de \textit{join} inferido antes de aprobarlo. Esta diferencia es la evidencia
+empírica del mecanismo: el humano dedica más tiempo precisamente cuando hay una decisión
+no trivial que verificar (un \textit{join} multi-tabla), y casi ninguno cuando el agente
+no ha tomado decisiones discutibles.
+
+De aquí se sigue la principal limitación honesta del enfoque y su conexión con el
+trabajo futuro. Para \textit{datasets} genuinamente distintos de todo lo presente en el
+\textit{pool} —dominios nuevos, frecuencias inusuales, estructuras exógenas no vistas—,
+el plan del planificador es menos fiable y el humano debe invertir más tiempo en la
+puerta. El incentivo, por tanto, es seguir poblando el \textit{pool} de experiencias:
+más priors implican planes mejores, puertas más ligeras y, en el límite, una operación
+progresivamente más automática para los perfiles de \textit{dataset} comunes.
