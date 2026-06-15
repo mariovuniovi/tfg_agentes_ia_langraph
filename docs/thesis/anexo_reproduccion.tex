@@ -154,11 +154,15 @@ cd frontend && npm install && npm run dev
 \label{anexo:repro-pool}
 
 El planificador recupera \textit{priors} de un \textit{pool} de experiencias previas.
-Para poblarlo con los \textit{datasets} de \textit{benchmark} (Anexo~\ref{anexo:datasets})
-se ejecuta el \textit{runner} \textit{offline}, que descarga los conjuntos públicos
+Dicho \textit{pool} se distribuye \textbf{ya sembrado} con el repositorio: la base de
+datos \texttt{storage/mlops\_metadata.db} contiene los \texttt{ExperienceRecord} de los
+\textit{datasets} de \textit{benchmark} (Anexo~\ref{anexo:datasets}), por lo que la
+aplicación dispone de \textit{priors} desde el primer arranque sin ningún paso adicional.
+
+Solo es necesario regenerarlo si se desea reconstruir el \textit{pool} desde cero. En ese
+caso, el \textit{runner} \textit{offline} descarga los conjuntos públicos
 (\texttt{scikit-learn} / OpenML / Yahoo~Finance / CSV locales), entrena el ejecutor sobre
-cada uno y registra un \texttt{ExperienceRecord} en
-\texttt{storage/mlops\_metadata.db}:
+cada uno y reescribe la base de datos:
 
 \begin{lstlisting}[language=bash]
 uv run python scripts/run_benchmark.py --trials 8

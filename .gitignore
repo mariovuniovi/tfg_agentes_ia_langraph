@@ -76,7 +76,9 @@ data/working/
 catboost_info/
 /models/
 experience_pool/
-storage/
+# Pool DB ships seeded as a reproducibility fixture; other runtime writes stay ignored
+storage/*
+!storage/mlops_metadata.db
 
 # SP4 — benchmark split outputs (CSVs commit, splits do not)
 data/benchmarks/_splits/
