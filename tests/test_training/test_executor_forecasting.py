@@ -122,62 +122,67 @@ def test_executor_fallback_resolves_multifold_validation(air_passengers_csv, tmp
 # frequency (daily->7, weekly->52, ...) so seasonal models stay correct & fast.
 # ---------------------------------------------------------------------------
 
+from mlops_agents.contracts.training import ValidationStrategy  # noqa: E402
 from mlops_agents.models.loader import get_model  # noqa: E402
-from mlops_agents.training.executor import _narrow_seasonality_to_freq  # noqa: E402
+from mlops_agents.training.executor import _min_fold_train_len, _narrow_seasonality_to_freq  # noqa: E402
 
 
 def _season_choices(spec):
     return list(spec.params["season_length"].choices)
 
 
-def test_narrow_seasonality_daily_keeps_only_weekly_period():
+def test_narrow_seasonality_applies_model_grid_and_does_not_mutate():
     sp = get_model("auto_arima").search_space
-    assert _season_choices(sp) == [4, 7, 12, 24, 52]  # full grid in registry
-    narrowed = _narrow_seasonality_to_freq(sp, "D")
-    assert _season_choices(narrowed) == [7]
-    # original spec is not mutated
-    assert _season_choices(sp) == [4, 7, 12, 24, 52]
+    out = _narrow_seasonality_to_freq(sp, "D", "auto_arima", 10000)
+    assert _season_choices(out) == [1, 7]
+    assert _season_choices(sp) == [4, 7, 12, 24, 52]  # original registry spec untouched
 
 
-def test_narrow_seasonality_weekly_keeps_yearly_period():
-    sp = get_model("auto_arima").search_space
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "W")) == [52]
-
-
-def test_narrow_seasonality_handles_pandas_alias_variants():
-    sp = get_model("auto_arima").search_space
-    # month-start / month-end / plain month all collapse to monthly -> 12
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "MS")) == [12]
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "ME")) == [12]
-    # weekday-anchored weekly -> 52 (this is what the data actually carries)
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "W-MON")) == [52]
-    # lowercase hourly -> 24 (emitted by the generators) — must NOT fall back to
-    # the full grid, which would reintroduce the pathological m=52 hourly fit
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "h")) == [24]
-    # yearly data has no intra-year seasonal cycle; enforce non-seasonal m=1 even
-    # though the historical registry grid does not list 1.
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "YS")) == [1]
-
-
-def test_narrow_seasonality_frequency_policy_wins_over_override():
-    # Overrides are applied first by the executor. Frequency narrowing must still
-    # be authoritative, otherwise a daily override like [52] reintroduces the
-    # slow/wrong AutoARIMA fit we are trying to prevent.
-    overridden = narrow_search_space(
-        "auto_arima",
-        {"season_length": SearchParamOverride(choices=[52])},
-    )
-    assert _season_choices(overridden) == [52]
-    assert _season_choices(_narrow_seasonality_to_freq(overridden, "D")) == [7]
+def test_narrow_seasonality_seasonal_naive_gets_rich_grid():
+    sp = get_model("seasonal_naive").search_space
+    out = _narrow_seasonality_to_freq(sp, "W", "seasonal_naive", 10000)
+    assert _season_choices(out) == [1, 4, 13, 52]
 
 
 def test_narrow_seasonality_unknown_freq_keeps_full_grid():
     sp = get_model("ets").search_space
-    assert _season_choices(_narrow_seasonality_to_freq(sp, None)) == [4, 7, 12, 24, 52]
-    assert _season_choices(_narrow_seasonality_to_freq(sp, "weird")) == [4, 7, 12, 24, 52]
+    out = _narrow_seasonality_to_freq(sp, None, "ets", 1000)
+    assert _season_choices(out) == [4, 7, 12, 24, 52]
+
+
+def test_narrow_seasonality_frequency_policy_wins_over_override():
+    overridden = narrow_search_space("auto_arima", {"season_length": SearchParamOverride(choices=[52])})
+    assert _season_choices(overridden) == [52]
+    # daily data: frequency grid replaces the (wrong) override
+    assert _season_choices(_narrow_seasonality_to_freq(overridden, "D", "auto_arima", 10000)) == [1, 7]
 
 
 def test_narrow_seasonality_noop_when_no_season_length_param():
-    # A model without a season_length categorical is returned unchanged.
     sp = get_model("random_forest_forecaster").search_space
-    assert _narrow_seasonality_to_freq(sp, "D") is sp
+    assert _narrow_seasonality_to_freq(sp, "D", "random_forest_forecaster", 10000) is sp
+
+
+def test_min_fold_train_len_rolling_uses_window():
+    vs = ValidationStrategy(type="rolling_window", n_folds=5, horizon=8, step_size=8, window_size=70)
+    assert _min_fold_train_len(vs, 1000) == 70
+
+
+def test_min_fold_train_len_expanding_uses_first_fold():
+    # first fold trains on train_pool_len - (k-1)*horizon
+    vs = ValidationStrategy(type="expanding_window", n_folds=5, horizon=8, step_size=8)
+    assert _min_fold_train_len(vs, 200) == 200 - 4 * 8  # 168
+
+
+def test_min_fold_train_len_single_split_uses_full_pool():
+    vs = ValidationStrategy(type="single_split", n_folds=1, horizon=8)
+    assert _min_fold_train_len(vs, 200) == 200
+
+
+def test_narrow_seasonality_prunes_season_unestimable_in_rolling_fold():
+    # full pool (104 weekly rows) would keep 52, but each rolling fold sees only 70
+    # rows -> 52 (needs >=104) must be dropped; 13 (>=26) and 4 kept.
+    sp = get_model("seasonal_naive").search_space
+    vs = ValidationStrategy(type="rolling_window", n_folds=5, horizon=8, step_size=8, window_size=70)
+    prune_n = _min_fold_train_len(vs, 104)
+    out = _narrow_seasonality_to_freq(sp, "W", "seasonal_naive", prune_n)
+    assert _season_choices(out) == [1, 4, 13]

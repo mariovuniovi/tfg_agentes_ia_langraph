@@ -24,8 +24,9 @@ from mlops_agents.contracts.training import (
     TrainingPlanCandidate,
     TrainingResult,
     TrialBudget,
+    ValidationStrategy,
 )
-from mlops_agents.forecasting.seasonality import canonical_season_length
+from mlops_agents.forecasting.seasonality import max_season_length, season_length_grid
 from mlops_agents.models.factories import FACTORY_REGISTRY
 from mlops_agents.models.loader import SearchSpaceSpec, get_model
 from mlops_agents.models.search_spaces import build_suggest_fn
@@ -54,24 +55,40 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 GRID_SAMPLER_MAX_COMBOS = 50
 
 
-def _narrow_seasonality_to_freq(spec: SearchSpaceSpec, freq: str | None) -> SearchSpaceSpec:
-    """Restrict a categorical season_length grid to the period matching the data
-    frequency (e.g. daily -> 7, weekly -> 52).
+def _narrow_seasonality_to_freq(
+    spec: SearchSpaceSpec, freq: str | None, model_key: str, n_obs: int
+) -> SearchSpaceSpec:
+    """Replace a categorical season_length grid with the model's frequency-aware,
+    length-pruned candidate periods (see seasonality.season_length_grid).
 
     Known frequencies are authoritative even after a planner/user search-space
-    override: if the data is daily, season_length becomes 7 even if an override
-    had narrowed the grid to [52]. Unknown frequencies, non-categorical spaces,
-    and models without season_length keep their original search space.
+    override. Unknown frequencies, non-categorical spaces, and models without a
+    season_length parameter keep their original search space.
     """
     param = spec.params.get("season_length")
-    season_length = canonical_season_length(freq)
-    if season_length is None or param is None or param.type != "categorical":
+    grid = season_length_grid(model_key, freq, n_obs)
+    if grid is None or param is None or param.type != "categorical":
         return spec
-    if param.choices == [season_length]:
+    if list(param.choices) == grid:
         return spec
     new_params = dict(spec.params)
-    new_params["season_length"] = param.model_copy(update={"choices": [season_length]})
+    new_params["season_length"] = param.model_copy(update={"choices": grid})
     return spec.model_copy(update={"params": new_params})
+
+
+def _min_fold_train_len(vs: ValidationStrategy, train_pool_len: int) -> int:
+    """Smallest training set any validation fold will use.
+
+    Season pruning must use this, not the full pool: a capped rolling window (or the
+    first expanding fold) can be far shorter than the pool, so a period the pool
+    could nominally estimate may be unestimable in the folds that actually run.
+    """
+    if vs.type == "rolling_window" and vs.window_size:
+        return vs.window_size
+    if vs.type == "expanding_window":
+        return train_pool_len - (vs.n_folds - 1) * vs.horizon
+    return train_pool_len  # single_split
+
 
 # ---------------------------------------------------------------------------
 # Metrics
@@ -687,7 +704,8 @@ def _run_candidate_forecasting(
         narrow_search_space(candidate.model_key, candidate.search_space_override)
         if candidate.search_space_override else spec.search_space
     )
-    narrowed = _narrow_seasonality_to_freq(narrowed, freq)
+    prune_n = _min_fold_train_len(vs, len(pool))
+    narrowed = _narrow_seasonality_to_freq(narrowed, freq, candidate.model_key, prune_n)
     suggest_fn = build_suggest_fn(narrowed)
 
     def objective(trial: optuna.Trial) -> float:
