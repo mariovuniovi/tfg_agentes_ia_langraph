@@ -59,10 +59,13 @@ def test_rolling_window_size_clamps_to_horizon_when_capacity_tight():
     assert w == 10
 
 
-def test_rolling_window_size_ignores_season_length_in_mvp():
+def test_rolling_window_size_incorporates_season_length():
+    # season_length=None → base = max(30, 0, 50) = 50
     w1 = resolve_rolling_window_size(total_history=200, horizon=10, n_folds=3, season_length=None)
+    assert w1 == 50
+    # season_length=52 → base = max(30, 2*52=104, 50) = 104
     w2 = resolve_rolling_window_size(total_history=200, horizon=10, n_folds=3, season_length=52)
-    assert w1 == w2
+    assert w2 == 104
 
 
 # ─── validate_forecasting_plan ─────────────────────────────────────
@@ -181,3 +184,29 @@ def test_resolve_high_drift_uses_rolling_window():
     vs = resolve_validation_strategy(_vmeta(drift="high"), n_obs=156)
     assert vs.type == "rolling_window"
     assert vs.n_folds == 5
+
+
+# ─── season-aware rolling window (Task 4) ──────────────────────────
+
+from mlops_agents.training.validation_policy import (  # noqa: E402
+    resolve_rolling_window_size,
+    resolve_validation_strategy,
+)
+
+
+def test_resolve_rolling_window_size_is_season_aware():
+    # window must cover >= 2 seasonal cycles (2*168 = 336 dominates 3*horizon and floor)
+    assert resolve_rolling_window_size(10000, 24, 5, 168) == 336
+
+
+def test_long_series_uses_bounded_rolling_window():
+    vs = resolve_validation_strategy({"forecast_horizon": 24, "frequency": "h"}, n_obs=10000)
+    assert vs.type == "rolling_window"
+    assert vs.window_size == 336          # 2 * hourly max season (168)
+    assert vs.window_size < 1000          # bounded, not ~10k
+
+
+def test_medium_series_keeps_expanding_window():
+    vs = resolve_validation_strategy({"forecast_horizon": 14, "frequency": "D"}, n_obs=1000)
+    assert vs.type == "expanding_window"
+    assert vs.window_size is None

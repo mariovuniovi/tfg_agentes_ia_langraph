@@ -594,7 +594,7 @@ def _run_candidate_forecasting(
     if vs.type == "rolling_window" and vs.window_size is None:
         vs = vs.model_copy(update={
             "window_size": resolve_rolling_window_size(
-                len(pool), horizon, vs.n_folds, season_length=None,
+                len(pool), horizon, vs.n_folds, season_length=max_season_length(freq),
             )
         })
         forecasting_settings = forecasting_settings.model_copy(update={"validation_strategy": vs})
