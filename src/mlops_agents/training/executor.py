@@ -627,8 +627,11 @@ def _run_candidate_forecasting(
             cand_val = pool.loc[val_idx].reset_index(drop=True)
 
             if is_stat:
-                # statsforecast path: ignores exog (existing behavior)
-                sf = factory({"task_metadata": task_metadata, "params": params})
+                # statsforecast path: ignores exog (existing behavior). series_length is
+                # the fold's actual training size, so the AutoARIMA approximation gate
+                # reflects this fit (small bounded windows -> exact; long fits -> CSS).
+                fit_metadata = {**task_metadata, "series_length": len(cand_train)}
+                sf = factory({"task_metadata": fit_metadata, "params": params})
                 sf.fit(_to_sf_format(cand_train, target, dt_col, sid_cols))
                 fcst = sf.predict(h=horizon)
                 model_col = [c for c in fcst.columns if c not in ("unique_id", "ds")][0]
@@ -787,15 +790,16 @@ def _retrain_forecasting(
     sid_cols = task_metadata.get("series_id_columns") or []
     train_pool = train_pool.copy()
     train_pool[dt_col] = pd.to_datetime(train_pool[dt_col])
+    fit_metadata = {**task_metadata, "series_length": len(train_pool)}
     path = models_dir / f"champion_{champion['model_key']}.pkl"
     if _is_statsforecast_model(champion["model_key"]):
-        sf = factory({"task_metadata": task_metadata, "params": champion["best_params"]})
+        sf = factory({"task_metadata": fit_metadata, "params": champion["best_params"]})
         sf.fit(_to_sf_format(train_pool, target, dt_col, sid_cols))
         with path.open("wb") as f:
             pickle.dump(sf, f)
         return path
 
-    forecaster = factory({"task_metadata": task_metadata, "params": champion["best_params"]})
+    forecaster = factory({"task_metadata": fit_metadata, "params": champion["best_params"]})
     freq = task_metadata.get("frequency")
     series_dict = _build_series_dict(train_pool, dt_col, target, sid_cols, freq)
     if not sid_cols:

@@ -235,3 +235,29 @@ def test_svr_forecaster_factory(panel_dataframe):
         {"lags": 12, "C": 1.0, "epsilon": 0.1, "kernel": "rbf"},
         panel_dataframe,
     )
+
+
+def test_arima_use_approximation_threshold():
+    from mlops_agents.models.factories import arima_use_approximation
+    assert arima_use_approximation(10000) is True
+    assert arima_use_approximation(501) is True
+    assert arima_use_approximation(500) is False
+    assert arima_use_approximation(120) is False
+
+
+def test_build_auto_arima_approximation_is_length_conditional():
+    from mlops_agents.models.factories import build_auto_arima
+    long = build_auto_arima(
+        {"task_metadata": {"frequency": "h", "series_length": 10000}, "params": {"season_length": 24}}
+    )
+    assert long.models[0].approximation is True
+    short = build_auto_arima(
+        {"task_metadata": {"frequency": "MS", "series_length": 120}, "params": {"season_length": 12}}
+    )
+    assert short.models[0].approximation is False
+
+
+def test_build_auto_arima_defaults_to_exact_when_length_unknown():
+    from mlops_agents.models.factories import build_auto_arima
+    sf = build_auto_arima({"task_metadata": {"frequency": "D"}, "params": {"season_length": 7}})
+    assert sf.models[0].approximation is False

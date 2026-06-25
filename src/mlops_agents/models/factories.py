@@ -18,6 +18,16 @@ from sklearn.preprocessing import OrdinalEncoder
 
 from mlops_agents.forecasting.seasonality import default_season_length
 
+_ARIMA_APPROX_MIN_OBS = 500  # above this, exact ARIMA order search is too slow -> use CSS approximation
+
+
+def arima_use_approximation(n_obs: int) -> bool:
+    """Use AutoARIMA's fast CSS order search only when the series is long enough that
+    exact search is too slow AND CSS order selection ~= exact-MLE selection. Short and
+    medium series keep the exact search, where it is cheap and more accurate.
+    """
+    return n_obs > _ARIMA_APPROX_MIN_OBS
+
 
 def _tabular_pipeline(estimator: Any) -> Pipeline:
     """Wrap a tabular estimator so string/categorical features are encoded before fit.
@@ -113,9 +123,16 @@ def build_ets(spec: dict[str, Any]):
 def build_auto_arima(spec: dict[str, Any]):
     from statsforecast import StatsForecast
     from statsforecast.models import AutoARIMA
-    freq = spec["task_metadata"]["frequency"]
+    task_metadata = spec["task_metadata"]
+    freq = task_metadata["frequency"]
     season_length = spec["params"].get("season_length", default_season_length(freq))
-    return StatsForecast(models=[AutoARIMA(season_length=season_length)], freq=freq, n_jobs=1)
+    # Length-gated CSS approximation for the order search; final order is full MLE.
+    # series_length is injected by the executor; absent (ad-hoc callers) -> exact.
+    approximation = arima_use_approximation(task_metadata.get("series_length", 0))
+    return StatsForecast(
+        models=[AutoARIMA(season_length=season_length, approximation=approximation)],
+        freq=freq, n_jobs=1,
+    )
 
 
 def _split_lags_from_params(params: dict[str, Any]) -> tuple[int, dict[str, Any]]:
