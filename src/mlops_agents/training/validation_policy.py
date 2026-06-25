@@ -7,7 +7,7 @@ ValueError or NotImplementedError on capacity / leakage / type violations.
 """
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.contracts.training import TrainingPlan, ValidationStrategy

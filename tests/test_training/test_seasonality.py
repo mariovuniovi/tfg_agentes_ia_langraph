@@ -32,7 +32,7 @@ def test_unknown_frequency_has_no_canonical_period_but_default_is_nonseasonal():
     assert default_season_length("weird") == 1
 
 
-from mlops_agents.forecasting.seasonality import max_season_length, season_length_grid
+from mlops_agents.forecasting.seasonality import max_season_length, season_length_grid  # noqa: E402
 
 
 def test_season_length_grid_tiers_by_model_family():

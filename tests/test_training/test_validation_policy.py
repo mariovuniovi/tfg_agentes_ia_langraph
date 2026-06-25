@@ -188,12 +188,6 @@ def test_resolve_high_drift_uses_rolling_window():
 
 # ─── season-aware rolling window (Task 4) ──────────────────────────
 
-from mlops_agents.training.validation_policy import (  # noqa: E402
-    resolve_rolling_window_size,
-    resolve_validation_strategy,
-)
-
-
 def test_resolve_rolling_window_size_is_season_aware():
     # window must cover >= 2 seasonal cycles (2*168 = 336 dominates 3*horizon and floor)
     assert resolve_rolling_window_size(10000, 24, 5, 168) == 336
