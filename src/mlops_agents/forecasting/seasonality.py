@@ -86,3 +86,51 @@ def canonical_season_length(freq: Any | None) -> int | None:
 def default_season_length(freq: Any | None) -> int:
     """Return the canonical period, falling back to non-seasonal length 1."""
     return canonical_season_length(freq) or DEFAULT_SEASON_LENGTH
+
+
+# Candidate seasonal periods per model-family "tier", keyed by base frequency unit.
+# seasonal_naive fits are ~free -> richest grid; ETS is moderate -> skip huge m;
+# AutoARIMA is the most expensive per fit -> tightest grid. 1 = non-seasonal floor.
+_SEASON_GRID_BY_TIER: dict[str, dict[str, list[int]]] = {
+    "rich":   {"H": [1, 24, 168], "D": [1, 7, 30], "W": [1, 4, 13, 52], "M": [1, 3, 12], "Q": [1, 4], "Y": [1]},
+    "modest": {"H": [1, 24],      "D": [1, 7],     "W": [1, 13, 52],    "M": [1, 3, 12], "Q": [1, 4], "Y": [1]},
+    "tight":  {"H": [1, 24],      "D": [1, 7],     "W": [1, 52],        "M": [1, 12],    "Q": [1, 4], "Y": [1]},
+}
+
+_MODEL_GRID_TIER: dict[str, str] = {
+    "seasonal_naive": "rich",
+    "ets": "modest",
+    "auto_arima": "tight",
+}
+
+_MIN_CYCLES = 2  # need >= 2 full seasonal cycles to estimate a period
+
+
+def season_length_grid(model_key: str, freq: Any | None, n_obs: int) -> list[int] | None:
+    """Candidate seasonal periods for ``model_key`` at frequency ``freq``.
+
+    The grid is chosen by model family (cost), then pruned to periods estimable
+    from ``n_obs`` observations (``m == 1`` or ``n_obs >= 2*m``). The non-seasonal
+    period 1 is always retained as a floor. Returns ``None`` for unknown
+    frequencies so the caller keeps the model's original search space.
+    """
+    unit = normalize_frequency(freq)
+    if unit is None:
+        return None
+    tier = _MODEL_GRID_TIER.get(model_key, "tight")
+    grid = _SEASON_GRID_BY_TIER[tier].get(unit)
+    if grid is None:
+        return None
+    pruned = [m for m in grid if m == 1 or n_obs >= _MIN_CYCLES * m]
+    return pruned or [1]
+
+
+def max_season_length(freq: Any | None) -> int | None:
+    """Largest seasonal period any model might request at this frequency.
+
+    Used to size the validation window so it can support every candidate's
+    seasonality. Returns ``None`` for unknown frequencies.
+    """
+    unit = normalize_frequency(freq)
+    grid = _SEASON_GRID_BY_TIER["rich"].get(unit) if unit else None
+    return max(grid) if grid else None
