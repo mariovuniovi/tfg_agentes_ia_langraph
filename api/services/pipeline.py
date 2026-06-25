@@ -16,7 +16,7 @@ from mlops_agents.agents.taxonomy import NODE_CATEGORIES
 from mlops_agents.graphs.mlops_graph import graph
 from mlops_agents.observability.pricing import estimate_cost
 
-_STREAM_TIMEOUT = 600.0  # seconds before a hung LLM call is declared a failure
+_STREAM_TIMEOUT = 1000.0  # seconds before a hung LLM call is declared a failure
 
 
 def _json_safe(obj: Any) -> Any:

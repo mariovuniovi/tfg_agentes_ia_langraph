@@ -4,10 +4,13 @@ This module only ever sees training-window history. The executor cannot
 construct val_exog for unknown_future columns through any other path.
 """
 from __future__ import annotations
-from typing import Callable, Literal
+
+from collections.abc import Callable
+from typing import Literal
 
 import pandas as pd
 
+from mlops_agents.forecasting.seasonality import default_season_length
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -66,7 +69,7 @@ def _try_statistical(
 def _fit_ets(history: pd.Series, horizon: int, freq: str | None) -> object:
     from statsforecast.models import AutoETS
 
-    season_length = _season_length_for_freq(freq)
+    season_length = default_season_length(freq)
     m = AutoETS(season_length=season_length)
     m.fit(history.values.astype(float))
     return m.predict(h=horizon)["mean"]
@@ -75,30 +78,10 @@ def _fit_ets(history: pd.Series, horizon: int, freq: str | None) -> object:
 def _fit_auto_arima(history: pd.Series, horizon: int, freq: str | None) -> object:
     from statsforecast.models import AutoARIMA
 
-    season_length = _season_length_for_freq(freq)
+    season_length = default_season_length(freq)
     m = AutoARIMA(season_length=season_length)
     m.fit(history.values.astype(float))
     return m.predict(h=horizon)["mean"]
-
-
-# Duplicated from models/factories.py intentionally: exog_extender must not
-# import from the models layer to avoid a circular dependency (training → models
-# → training).
-_FREQ_TO_SEASON: dict[str, int] = {
-    "H": 24,
-    "D": 7,
-    "W": 52,
-    "MS": 12,
-    "M": 12,
-    "QS": 4,
-    "YS": 1,
-}
-
-
-def _season_length_for_freq(freq: str | None) -> int:
-    if freq is None:
-        return 1
-    return _FREQ_TO_SEASON.get(freq, 1)
 
 
 def align_val_exog_index(

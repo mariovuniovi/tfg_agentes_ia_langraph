@@ -4,18 +4,19 @@ Validation checks have their own dedicated test suites — these tests only veri
 planner_node orchestrates correctly (build context → run agent → assemble Command).
 All four validation functions are patched so we test ONLY the node's plumbing.
 """
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from mlops_agents.planning.node import planner_node
+import pytest
+
 from mlops_agents.contracts.planner import (
     CandidateSpec,
-    RejectedModelSpec,
-    EvidenceReference,
     DecisionBasis,
+    EvidenceReference,
     PlannerOutput,
+    RejectedModelSpec,
 )
 from mlops_agents.contracts.training import TrainingPlan
+from mlops_agents.planning.node import planner_node
 
 # All forecasting model keys from registry (minus "ets" which is the candidate)
 _FORECASTING_REJECTED_KEYS = [
@@ -465,6 +466,60 @@ def test_planner_node_injects_policy_forecasting_settings(
     assert fs["validation_strategy"]["n_folds"] == 2
 
 
+@patch("mlops_agents.planning.node._check_conflict_resolution_present_if_flagged")
+@patch("mlops_agents.planning.node._check_evidence_references_hybrid")
+@patch("mlops_agents.planning.node._check_plan_exhaustiveness")
+@patch("mlops_agents.planning.node._check_plan_integrity")
+@patch("mlops_agents.planning.node.build_planner_validation_context")
+@patch("mlops_agents.planning.node.build_planner_agent")
+@patch("mlops_agents.planning.node.build_planner_tools")
+@patch("mlops_agents.planning.node.build_dataset_profile")
+def test_planner_node_emits_executor_reconstructable_training_plan(
+    mock_profile, mock_build_tools, mock_build_agent, mock_build_ctx,
+    mock_integrity, mock_exhaust, mock_evidence, mock_conflict, tmp_path,
+):
+    """The state's training_plan must be a full, executor-ready TrainingPlan:
+    rebuildable via TrainingPlan.model_validate with the code-resolved settings."""
+    from mlops_agents.contracts.training import TrainingPlan
+
+    mock_profile_instance = MagicMock()
+    mock_profile_instance.model_dump.return_value = {}
+    mock_profile.return_value = mock_profile_instance
+    mock_ctx = MagicMock()
+    mock_ctx.problem_type = "forecasting"
+    mock_ctx.task_metadata = {}
+    mock_ctx.available_model_keys = ["ets"]
+    mock_ctx.similar_experiences = []
+    mock_ctx.matched_rules = []
+    mock_ctx.rules_by_id = {}
+    mock_build_ctx.return_value = mock_ctx
+    mock_build_tools.return_value = []
+    fake_agent = MagicMock()
+    fake_agent.invoke.return_value = {
+        "structured_response": _make_output_for("forecasting"),
+        "messages": [],
+    }
+    mock_build_agent.return_value = fake_agent
+
+    rows = "\n".join(f"2023-{(i % 12) + 1:02d}-01,{i}" for i in range(60))
+    csv = tmp_path / "p.csv"
+    csv.write_text("ds,y\n" + rows + "\n")
+    state = {
+        "processed_dataset_path": str(csv),
+        "problem_type": "forecasting",
+        "task_metadata": {
+            "target_column": "y", "datetime_column": "ds",
+            "forecast_horizon": 8, "exogenous_columns": [],
+        },
+    }
+    result = planner_node(state)
+
+    rebuilt = TrainingPlan.model_validate(result.update["training_plan"])
+    assert rebuilt.forecasting_settings is not None
+    assert rebuilt.forecasting_settings.validation_strategy.type == "expanding_window"
+    assert [c.model_key for c in rebuilt.candidates] == ["ets"]
+
+
 @patch("mlops_agents.planning.node.build_planner_validation_context")
 @patch("mlops_agents.planning.node.build_planner_agent")
 @patch("mlops_agents.planning.node.build_planner_tools")
@@ -473,6 +528,7 @@ def test_planner_node_raises_plannererror_on_too_small_forecasting(
     mock_profile, mock_build_tools, mock_build_agent, mock_build_ctx, tmp_path,
 ):
     import pytest
+
     from mlops_agents.planning.node import PlannerError
     mock_profile_instance = MagicMock()
     mock_profile_instance.model_dump.return_value = {}

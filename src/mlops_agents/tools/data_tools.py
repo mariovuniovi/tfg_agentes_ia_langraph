@@ -502,8 +502,20 @@ def _forecasting_impute(
     datetime_column: str,
     series_id_columns: list[str],
     max_interpolation_gap: int,
+    temporal_cols: set[str] | None = None,
 ) -> dict:
-    """Time-aware imputation for forecasting datasets."""
+    """Role-aware imputation for forecasting datasets.
+
+    The target — and any exogenous column explicitly declared time-varying in the
+    schema (``"temporal": true``) — is a genuine series, so it is imputed per series
+    with time-aware interpolation. Every other covariate is treated as a STATIC
+    per-entity attribute (e.g. store region/size joined from a dimension table):
+    interpolating it within a series is meaningless (it is constant within a series, or
+    absent for an entire orphan series), so it is filled cross-sectionally with the
+    column median (numeric) or ``"unknown"`` (categorical). When ``temporal_cols`` is
+    None (no schema available) every covariate is treated as time-varying, preserving
+    the legacy behaviour.
+    """
     if df[datetime_column].isnull().any():
         raise ValueError(
             f"datetime_column '{datetime_column}' contains null values — cannot impute"
@@ -519,11 +531,38 @@ def _forecasting_impute(
     rows_affected = 0
     target_large_gaps: list[dict] = []
 
+    def _is_temporal(col: str) -> bool:
+        if col == target_column:
+            return True
+        if temporal_cols is None:  # no schema → legacy: every covariate is time-varying
+            return True
+        return col in temporal_cols
+
+    # Static covariates: a per-series fill has no anchor (constant within a series, or
+    # null for an entire orphan series), so fill cross-sectionally — never fabricating a
+    # temporal trend that does not exist.
+    for col in df.columns:
+        if col in protected or _is_temporal(col):
+            continue
+        null_count = int(df[col].isnull().sum())
+        if null_count == 0:
+            continue
+        if pd.api.types.is_numeric_dtype(df[col]):
+            median = df[col].median()
+            if pd.notna(median):
+                df[col] = df[col].fillna(median)
+        else:
+            df[col] = df[col].fillna("unknown")
+        filled = null_count - int(df[col].isnull().sum())
+        if filled > 0:
+            imputed_cols.add(col)
+            rows_affected += filled
+
     def _process(grp: pd.DataFrame, series_id: dict) -> pd.DataFrame:
         nonlocal rows_affected
         g = grp.copy()
         for col in g.columns:
-            if col in protected:
+            if col in protected or not _is_temporal(col):
                 continue
             null_count = int(g[col].isnull().sum())
             if null_count == 0:
@@ -571,6 +610,25 @@ def _forecasting_impute(
     }
 
 
+def _read_temporal_columns(schema_path: str) -> set[str] | None:
+    """Names of covariates declared time-varying (``"temporal": true``) in the schema.
+
+    Returns an empty set when the schema is present but declares no time-varying
+    covariate (so every covariate is treated as static), and None when the schema
+    cannot be read — letting the caller fall back to legacy per-series imputation.
+    """
+    try:
+        schema = json.loads(Path(schema_path).read_text())
+    except Exception:
+        return None
+    temporal: set[str] = set()
+    for group in ("exogenous_columns", "columns"):
+        for entry in schema.get(group, []):
+            if isinstance(entry, dict) and entry.get("temporal") is True and entry.get("name"):
+                temporal.add(entry["name"])
+    return temporal
+
+
 @tool
 def impute_missing_values(
     dataset_path: str,
@@ -580,14 +638,15 @@ def impute_missing_values(
     series_id_columns: list[str] = [],  # noqa: B006
     max_interpolation_gap: int = 3,
     output_path: str = "",
+    schema_path: str = "",
 ) -> str:
     """Impute missing values using a strategy appropriate for the problem type.
 
     For classification/regression: rows with missing target are dropped; mean for
     numeric non-target columns, mode for categoricals.
-    For forecasting: protected datetime/series_id columns (raise if null); only short
-    internal gaps in the target are interpolated (<= max_interpolation_gap, bounded on
-    both sides); exogenous features get dtype-aware forward-fill/interpolation.
+    For forecasting: protected datetime/series_id columns (raise if null); the target
+    (and any exogenous column declared "temporal": true in the schema) is interpolated
+    per series; static covariates are filled cross-sectionally (median / "unknown").
 
     Args:
         dataset_path: Path to the CSV file to impute.
@@ -597,6 +656,8 @@ def impute_missing_values(
         series_id_columns: Required for forecasting — columns that identify each series.
         max_interpolation_gap: Max consecutive missing periods to interpolate in target.
         output_path: Destination path for imputed CSV. Defaults to overwrite input.
+        schema_path: Schema JSON path. For forecasting, columns declared "temporal": true
+            are interpolated per series and the rest are imputed as static covariates.
 
     Returns:
         JSON with {output_path, columns_imputed, rows_affected, warnings} plus
@@ -622,7 +683,10 @@ def impute_missing_values(
     else:
         if datetime_column is None:
             raise ValueError("datetime_column is required for forecasting imputation")
-        info = _forecasting_impute(df, target_column, datetime_column, cols, max_interpolation_gap)
+        temporal_cols = _read_temporal_columns(schema_path) if schema_path else None
+        info = _forecasting_impute(
+            df, target_column, datetime_column, cols, max_interpolation_gap, temporal_cols
+        )
 
     result_df: pd.DataFrame = info.pop("df")
     result_df.to_csv(dest, index=False)

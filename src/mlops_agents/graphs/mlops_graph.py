@@ -265,6 +265,25 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
             )]),
             goto="workflow_controller",
         )
+    except Exception as exc:
+        # The agent runtime failed to produce a usable result — e.g. the LLM emitted a tool
+        # call with malformed/empty JSON arguments (common after a long reasoning trace),
+        # which langchain cannot parse and surfaces as a JSONDecodeError. Don't crash the
+        # whole run: return a soft failure WITHOUT error_message so the workflow_controller
+        # re-dispatches the validator within its attempt budget (mirrors the timeout path).
+        logger.warning(
+            f"[data_validator] agent invocation failed — routing back for retry: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        return Command(
+            update=DataValidationStateUpdate(
+                validation_passed=False, schema_json=schema_json
+            ).to_update(messages=[HumanMessage(
+                content="Data validation failed to produce a usable result; retrying.",
+                name="data_validator",
+            )]),
+            goto="workflow_controller",
+        )
     final_message = result["messages"][-1].content
 
     quality_report: dict = _extract_tool_json(result["messages"], "check_data_quality")

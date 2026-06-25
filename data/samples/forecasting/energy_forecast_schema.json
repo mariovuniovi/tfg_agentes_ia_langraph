@@ -10,12 +10,14 @@
     {
       "name": "avg_temp_c",
       "future_availability": "unknown_future",
-      "note": "Next week's temperature is not known in advance — will be extended using the configured strategy (naive_carry by default)"
+      "note": "Next week's temperature is not known in advance — will be extended using the configured strategy (naive_carry by default)",
+      "temporal": true
     },
     {
       "name": "is_holiday_week",
       "future_availability": "known_future",
-      "note": "Holiday calendar is known in advance for any future date"
+      "note": "Holiday calendar is known in advance for any future date",
+      "temporal": true
     }
   ],
   "columns": [
@@ -48,7 +50,10 @@
       "description": "1 if the week contains a public holiday, 0 otherwise — known future (calendar)",
       "required": true,
       "nullable": false,
-      "allowed_values": [0, 1]
+      "allowed_values": [
+        0,
+        1
+      ]
     }
   ]
 }

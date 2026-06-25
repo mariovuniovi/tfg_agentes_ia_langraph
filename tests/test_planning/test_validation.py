@@ -6,12 +6,15 @@ from mlops_agents.planning.validation import (
     _check_plan_exhaustiveness,
     _check_evidence_references_hybrid,
     _collect_all_refs,
+    validate_forecasting_settings,
 )
 from mlops_agents.contracts.planner import (
     CandidateSpec, RejectedModelSpec, EvidenceReference,
     DecisionBasis, PlannerOutput, PlannerValidationContext,
 )
-from mlops_agents.contracts.training import TrainingPlan
+from mlops_agents.contracts.training import (
+    ExogStrategySettings, ForecastingSettings, TrainingPlan, ValidationStrategy,
+)
 from mlops_agents.planning.trace import ToolTrace
 
 # ---------------------------------------------------------------------------
@@ -261,3 +264,48 @@ def test_collect_all_refs_includes_rejected_refs():
     registry_ids = {r.source_id for r in refs if r.source == "registry"}
     assert KEY_A in registry_ids
     assert KEY_B in registry_ids
+
+
+# ---------------------------------------------------------------------------
+# validate_forecasting_settings — validates the CODE-resolved forecasting
+# settings (moved here from _check_plan_integrity after the planner/executor
+# schema split; the LLM no longer emits forecasting_settings).
+# ---------------------------------------------------------------------------
+
+
+def _fs(per_column=None):
+    return ForecastingSettings(
+        validation_strategy=ValidationStrategy(type="expanding_window", n_folds=5, horizon=8),
+        exog_strategies=ExogStrategySettings(per_column=per_column or {}),
+    )
+
+
+def test_validate_forecasting_settings_passes_on_valid():
+    validate_forecasting_settings(_fs(per_column={"temp": "ets"}), {})
+
+
+def test_validate_forecasting_settings_rejects_unallowed_exog_strategy():
+    # "known_future" is a valid ExogStrategy literal but not allowed as an
+    # *extension* strategy in per_column.
+    with pytest.raises(PlannerValidationError, match="invalid exog strategy"):
+        validate_forecasting_settings(_fs(per_column={"temp": "known_future"}), {})
+
+
+def test_validate_forecasting_settings_rejects_known_future_col_in_per_column():
+    # Real metadata shape: exogenous_columns with future_availability (not a flat
+    # known_future_columns list, which nothing in the codebase populates).
+    with pytest.raises(PlannerValidationError, match="known_future column"):
+        validate_forecasting_settings(
+            _fs(per_column={"temp": "ets"}),
+            {"exogenous_columns": [{"name": "temp", "future_availability": "known_future"}]},
+        )
+
+
+def test_validate_forecasting_settings_rejects_bad_validation_strategy():
+    # Bypass the Literal type guard to exercise the defense-in-depth branch.
+    fs = _fs()
+    fs.validation_strategy = ValidationStrategy.model_construct(
+        type="bogus", n_folds=5, horizon=8
+    )
+    with pytest.raises(PlannerValidationError, match="invalid validation_strategy"):
+        validate_forecasting_settings(fs, {})

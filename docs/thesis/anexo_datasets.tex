@@ -70,10 +70,15 @@ y los \textit{datasets} de validación de \textit{join discovery} se generaron p
         generado por \texttt{scripts/gen\_forecasting2.py}. No representa datos reales
         de una red eléctrica.
   \item \textbf{Samples de \textit{join} y cobertura parcial}
-        (\texttt{retail\_star\_schema}, \texttt{join\_partial\_coverage*}) y los
-        \textit{datasets} de fallos controlados (\texttt{broken/*}): generados por
+        (\texttt{retail\_star\_schema}, \texttt{join\_partial\_coverage*}): generados por
         \texttt{scripts/gen\_partial\_join\_*.py} y
         \texttt{scripts/\_make\_retail\_star\_schema.py}.
+  \item \textbf{\textit{Datasets} de fallos controlados} (\texttt{broken/*}:
+        \texttt{all\_nan\_target}, \texttt{missing\_target\_col},
+        \texttt{too\_small\_for\_horizon}): pequeñas series sintéticas que inyectan un
+        fallo concreto para validar la detección determinista. Generadas por
+        \texttt{scripts/\_make\_case\_study\_datasets.py} (datos) y
+        \texttt{scripts/\_make\_case\_study\_schemas.py} (esquemas).
 \end{itemize}
 
 \noindent

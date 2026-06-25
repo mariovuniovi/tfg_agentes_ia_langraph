@@ -33,11 +33,13 @@ template: |
   - impute_missing_values: Fill missing values. Always pass problem_type and
     target_column. For classification/regression: rows with missing target are
     dropped; other columns get mean/mode imputation. For forecasting also pass
-    datetime_column, series_id_columns, and max_interpolation_gap=3. The tool
-    protects datetime and series_id columns (raises if null), applies short-gap
-    linear interpolation to the target only (only gaps <= max_interpolation_gap that
-    are bounded by known values on both sides), and applies dtype-aware
-    forward-fill/interpolation to exogenous features.
+    datetime_column, series_id_columns, max_interpolation_gap=3, and schema_path (the
+    "Schema path" from your context). The tool protects datetime and series_id columns
+    (raises if null) and applies short-gap linear interpolation to the target and to any
+    exogenous column declared "temporal": true in the schema. STATIC covariates (the
+    default — e.g. store attributes joined from a dimension table) are filled
+    cross-sectionally with the median (numeric) or "unknown" (categorical), so orphan
+    keys from a partial-coverage join are handled without fabricating a temporal trend.
   - check_data_quality: Run a deterministic data quality report (missing values, duplicates).
   - check_data_drift: Compare two CSVs for statistical drift (optional).
 
@@ -82,7 +84,7 @@ template: |
      series_id_columns, frequency, and target_column from the schema. Abort if it
      raises — broken keys or duplicate timestamps are blocking errors.
   6. Call impute_missing_values with problem_type="forecasting", target_column,
-     datetime_column, series_id_columns, and max_interpolation_gap=3.
+     datetime_column, series_id_columns, max_interpolation_gap=3, and schema_path.
   7. Call validate_against_schema.
   8. Call check_data_quality.
 
@@ -109,10 +111,17 @@ template: |
      For raw_paths_json: build {"dataset_name": "path"} from the profiles in your context (each profile has dataset_name and path fields).
 
   5. Select a JoinPlan using the evaluation metrics.
-     Reject or request human clarification if:
-     - No candidate has acceptable coverage/containment
-     - Selected join has many_to_many relationship
-     - Row explosion risk is high
+     Reject a candidate only if:
+     - No candidate has acceptable left_coverage / containment, or
+     - join_explosion_risk is "high".
+     A many_to_many relationship is NOT, by itself, a reason to reject. When it is caused
+     only by duplicate keys on the right side and join_explosion_risk is "low", the join is
+     safe: execute_join_plan deduplicates the right key (first occurrence kept) before the
+     left join, so the base row count is always preserved. In that case, select the join and
+     record the duplicate-key warning in your `reason`. Treat many_to_many as a blocker only
+     when it appears together with a high explosion risk.
+     You cannot pause to ask the user here — make the decision and let the human approval
+     gate review the resulting join plan downstream.
 
   6. Call execute_join_plan() with:
      - selections_json: your decisions (base_dataset, selected candidate IDs with columns_to_add/reason, rejected candidate IDs with reason)

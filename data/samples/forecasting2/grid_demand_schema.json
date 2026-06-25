@@ -9,23 +9,28 @@
   "exogenous_columns": [
     {
       "name": "mean_temp_c",
-      "future_availability": "unknown_future"
+      "future_availability": "unknown_future",
+      "temporal": true
     },
     {
       "name": "wind_avg_ms",
-      "future_availability": "unknown_future"
+      "future_availability": "unknown_future",
+      "temporal": true
     },
     {
       "name": "public_holidays",
-      "future_availability": "known_future"
+      "future_availability": "known_future",
+      "temporal": true
     },
     {
       "name": "season",
-      "future_availability": "known_future"
+      "future_availability": "known_future",
+      "temporal": true
     },
     {
       "name": "renewable_share_pct",
-      "future_availability": "unknown_future"
+      "future_availability": "unknown_future",
+      "temporal": true
     }
   ],
   "columns": [
@@ -82,7 +87,12 @@
       "description": "Meteorological season of the week",
       "required": true,
       "nullable": false,
-      "allowed_values": ["winter", "spring", "summer", "autumn"]
+      "allowed_values": [
+        "winter",
+        "spring",
+        "summer",
+        "autumn"
+      ]
     },
     {
       "name": "renewable_share_pct",

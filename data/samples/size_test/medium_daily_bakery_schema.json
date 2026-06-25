@@ -9,11 +9,13 @@
   "exogenous_columns": [
     {
       "name": "is_weekend",
-      "future_availability": "known_future"
+      "future_availability": "known_future",
+      "temporal": true
     },
     {
       "name": "day_of_week",
-      "future_availability": "known_future"
+      "future_availability": "known_future",
+      "temporal": true
     }
   ],
   "columns": [

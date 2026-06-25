@@ -25,8 +25,9 @@ from mlops_agents.contracts.training import (
     TrainingResult,
     TrialBudget,
 )
+from mlops_agents.forecasting.seasonality import canonical_season_length
 from mlops_agents.models.factories import FACTORY_REGISTRY
-from mlops_agents.models.loader import get_model
+from mlops_agents.models.loader import SearchSpaceSpec, get_model
 from mlops_agents.models.search_spaces import build_suggest_fn
 from mlops_agents.training.exog_extender import align_val_exog_index, extend_exog
 from mlops_agents.training.exog_policy import resolve_exog_strategies
@@ -46,6 +47,31 @@ from mlops_agents.utils.logging import get_logger
 logger = get_logger(__name__)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+# Above this many combinations, a fully-categorical space falls back to TPE sampling
+# instead of an exhaustive GridSampler — defensive guard against a future model whose
+# Cartesian product blows up (e.g. 8*8*8=512). No effect today (max grid is 5).
+GRID_SAMPLER_MAX_COMBOS = 50
+
+
+def _narrow_seasonality_to_freq(spec: SearchSpaceSpec, freq: str | None) -> SearchSpaceSpec:
+    """Restrict a categorical season_length grid to the period matching the data
+    frequency (e.g. daily -> 7, weekly -> 52).
+
+    Known frequencies are authoritative even after a planner/user search-space
+    override: if the data is daily, season_length becomes 7 even if an override
+    had narrowed the grid to [52]. Unknown frequencies, non-categorical spaces,
+    and models without season_length keep their original search space.
+    """
+    param = spec.params.get("season_length")
+    season_length = canonical_season_length(freq)
+    if season_length is None or param is None or param.type != "categorical":
+        return spec
+    if param.choices == [season_length]:
+        return spec
+    new_params = dict(spec.params)
+    new_params["season_length"] = param.model_copy(update={"choices": [season_length]})
+    return spec.model_copy(update={"params": new_params})
 
 # ---------------------------------------------------------------------------
 # Metrics
@@ -99,6 +125,32 @@ def _fc_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 # Champion selection
 # ---------------------------------------------------------------------------
+
+
+def _make_sampler(narrowed: Any, requested_trials: int) -> tuple[optuna.samplers.BaseSampler, int]:
+    """Pick an Optuna sampler + trial count for a candidate's (narrowed) search space.
+
+    When the space is small and fully enumerable (every param categorical, and the
+    Cartesian product is at most GRID_SAMPLER_MAX_COMBOS), use an exhaustive
+    GridSampler so *every* configuration is always evaluated, regardless of how many
+    trials the planner allocated. This keeps champion selection deterministic and
+    decoupled from the (LLM-decided) trial budget. For statistical forecasters this
+    sweeps the frequency-narrowed season_length grid, usually a single canonical
+    value such as 7 for daily data or 52 for weekly data. Larger int/float spaces or
+    a categorical grid that would explode past the cap keep the seeded TPE sampler
+    with the requested budget.
+
+    Returns (sampler, effective_n_trials).
+    """
+    params = getattr(narrowed, "params", {})
+    if params and all(p.type == "categorical" and p.choices for p in params.values()):
+        grid = {name: list(p.choices) for name, p in params.items()}
+        n_grid = 1
+        for choices in grid.values():
+            n_grid *= len(choices)
+        if n_grid <= GRID_SAMPLER_MAX_COMBOS:
+            return optuna.samplers.GridSampler(grid, seed=42), n_grid
+    return optuna.samplers.TPESampler(seed=42), requested_trials
 
 
 def _pick_champion(results: list[dict], direction: str, tol: float) -> dict:
@@ -229,10 +281,9 @@ def _run_candidate_classification(
         val_strategy_label = f"stratified_kfold_{n_folds}"
 
     try:
-        study = optuna.create_study(
-            direction=direction, sampler=optuna.samplers.TPESampler(seed=42)
-        )
-        study.optimize(objective, n_trials=n_trials)
+        sampler, eff_trials = _make_sampler(narrowed, n_trials)
+        study = optuna.create_study(direction=direction, sampler=sampler)
+        study.optimize(objective, n_trials=eff_trials)
         if not study.best_trial:
             raise RuntimeError("No successful trial")
         best_params = study.best_params
@@ -327,10 +378,9 @@ def _run_candidate_regression(
         val_strategy_label = f"kfold_{n_folds}"
 
     try:
-        study = optuna.create_study(
-            direction=direction, sampler=optuna.samplers.TPESampler(seed=42)
-        )
-        study.optimize(objective, n_trials=n_trials)
+        sampler, eff_trials = _make_sampler(narrowed, n_trials)
+        study = optuna.create_study(direction=direction, sampler=sampler)
+        study.optimize(objective, n_trials=eff_trials)
         if not study.best_trial:
             raise RuntimeError("No successful trial")
         best_params = study.best_params
@@ -637,6 +687,7 @@ def _run_candidate_forecasting(
         narrow_search_space(candidate.model_key, candidate.search_space_override)
         if candidate.search_space_override else spec.search_space
     )
+    narrowed = _narrow_seasonality_to_freq(narrowed, freq)
     suggest_fn = build_suggest_fn(narrowed)
 
     def objective(trial: optuna.Trial) -> float:
@@ -651,10 +702,9 @@ def _run_candidate_forecasting(
             best_score, last_per_fold, last_failures = fit_score(spec.default_params)
             best_params, n_used = spec.default_params, 1
         else:
-            study = optuna.create_study(
-                direction=direction, sampler=optuna.samplers.TPESampler(seed=42)
-            )
-            study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+            sampler, eff_trials = _make_sampler(narrowed, n_trials)
+            study = optuna.create_study(direction=direction, sampler=sampler)
+            study.optimize(objective, n_trials=eff_trials, show_progress_bar=False)
             best_trial = study.best_trial
             last_per_fold = best_trial.user_attrs.get("per_fold_scores", [])
             last_failures = best_trial.user_attrs.get("exog_fit_failures", [])

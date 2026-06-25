@@ -11,7 +11,7 @@ from mlops_agents.config.settings import settings
 from mlops_agents.contracts.planner import (
     EvidenceReference, PlannerOutput, PlannerValidationContext,
 )
-from mlops_agents.contracts.training import TrainingPlan
+from mlops_agents.contracts.training import ForecastingSettings, TrainingPlan
 from mlops_agents.planning.trace import ToolTrace
 
 
@@ -88,30 +88,10 @@ def _check_plan_integrity(
             f"models overlap candidates and rejected: {sorted(overlap)}"
         )
 
-    # 5. Forecasting-specific settings
-    if ctx.problem_type == "forecasting":
-        fc = getattr(output.plan, "forecasting_settings", None)
-        if fc is None:
-            raise PlannerValidationError("forecasting plan missing forecasting_settings")
-        val_strat = getattr(fc.validation_strategy, "type", None)
-        if val_strat not in ALLOWED_VAL_STRATEGIES:
-            raise PlannerValidationError(
-                f"invalid validation_strategy: {val_strat!r}. "
-                f"Allowed: {sorted(ALLOWED_VAL_STRATEGIES)}"
-            )
-        exog_strats = getattr(fc.exog_strategies, "per_column", {}) or {}
-        known_future = set(ctx.task_metadata.get("known_future_columns", []))
-        for col, strat in exog_strats.items():
-            if strat not in ALLOWED_EXOG_STRATEGIES:
-                raise PlannerValidationError(
-                    f"invalid exog strategy {strat!r} for column {col!r}. "
-                    f"Allowed: {sorted(ALLOWED_EXOG_STRATEGIES)}"
-                )
-            if col in known_future:
-                raise PlannerValidationError(
-                    f"known_future column {col!r} cannot appear in per-column "
-                    f"unknown-future strategies"
-                )
+    # 5. forecasting_settings is no longer part of the LLM's decision
+    #    (PlannerTrainingPlan has no such field). The code-resolved settings are
+    #    validated separately by validate_forecasting_settings(), called from
+    #    planner_node against the deterministically-built forecasting_fs.
 
     # 6. Per-candidate registry self-citation
     for c in output.plan.candidates:
@@ -124,6 +104,42 @@ def _check_plan_integrity(
         if not _has_registry_self_ref(r.evidence_refs, r.model_key):
             raise PlannerValidationError(
                 f"rejected model {r.model_key!r} missing registry self-citation"
+            )
+
+
+def validate_forecasting_settings(fs: ForecastingSettings, task_metadata: dict) -> None:
+    """Defense-in-depth check on the *code-resolved* forecasting settings.
+
+    These come from resolve_validation_strategy / resolve_exog_strategies (not from
+    the LLM), so this guards against resolver bugs, not bad agent output. Called by
+    planner_node against the deterministically-built forecasting_fs. Raises
+    PlannerValidationError on an invalid setting.
+    """
+    val_strat = getattr(fs.validation_strategy, "type", None)
+    if val_strat not in ALLOWED_VAL_STRATEGIES:
+        raise PlannerValidationError(
+            f"invalid validation_strategy: {val_strat!r}. "
+            f"Allowed: {sorted(ALLOWED_VAL_STRATEGIES)}"
+        )
+    exog_strats = getattr(fs.exog_strategies, "per_column", {}) or {}
+    # Derive known-future columns from the canonical metadata shape used everywhere
+    # else (exog_policy.resolve_exog_strategies, executor._resolve_exog_availability):
+    # exogenous_columns: [{"name": ..., "future_availability": "known_future" | ...}].
+    known_future = {
+        e["name"]
+        for e in task_metadata.get("exogenous_columns", [])
+        if e.get("future_availability") == "known_future"
+    }
+    for col, strat in exog_strats.items():
+        if strat not in ALLOWED_EXOG_STRATEGIES:
+            raise PlannerValidationError(
+                f"invalid exog strategy {strat!r} for column {col!r}. "
+                f"Allowed: {sorted(ALLOWED_EXOG_STRATEGIES)}"
+            )
+        if col in known_future:
+            raise PlannerValidationError(
+                f"known_future column {col!r} cannot appear in per-column "
+                f"unknown-future strategies"
             )
 
 

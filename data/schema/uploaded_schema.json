@@ -1,97 +1,59 @@
 {
   "problem_type": "forecasting",
-  "name": "grid_demand_forecast",
-  "description": "Weekly electricity grid demand forecasting using weather, calendar and market data",
-  "target_column": "demand_mwh",
-  "datetime_column": "timestamp_week",
-  "forecast_horizon": 8,
-  "frequency": "W",
+  "name": "medium_daily_bakery",
+  "description": "Daily units sold by a bakery chain over ~1,000 days (2021–2023). Trend + weekly seasonality. Used as the MEDIUM dataset in the validator size stress-test.",
+  "target_column": "units_sold",
+  "datetime_column": "date",
+  "forecast_horizon": 14,
+  "frequency": "D",
   "exogenous_columns": [
     {
-      "name": "mean_temp_c",
-      "future_availability": "unknown_future"
+      "name": "is_weekend",
+      "future_availability": "known_future",
+      "temporal": true
     },
     {
-      "name": "wind_avg_ms",
-      "future_availability": "unknown_future"
-    },
-    {
-      "name": "public_holidays",
-      "future_availability": "known_future"
-    },
-    {
-      "name": "season",
-      "future_availability": "known_future"
-    },
-    {
-      "name": "renewable_share_pct",
-      "future_availability": "unknown_future"
+      "name": "day_of_week",
+      "future_availability": "known_future",
+      "temporal": true
     }
   ],
   "columns": [
     {
-      "name": "timestamp_week",
+      "name": "date",
       "dtype": "datetime",
-      "description": "Monday marking the start of the measurement week",
+      "description": "Calendar date (YYYY-MM-DD).",
       "required": true,
       "nullable": false,
       "unique": true
     },
     {
-      "name": "demand_mwh",
-      "dtype": "float",
-      "description": "Total electricity consumed across the grid during the week in megawatt-hours",
-      "required": true,
-      "nullable": false,
-      "min": 0.0
-    },
-    {
-      "name": "peak_demand_mw",
-      "dtype": "float",
-      "description": "Maximum instantaneous load recorded on the grid during the week in megawatts",
-      "required": true,
-      "nullable": false,
-      "min": 0.0
-    },
-    {
-      "name": "mean_temp_c",
-      "dtype": "float",
-      "description": "Weekly mean outdoor temperature in degrees Celsius",
-      "required": true,
-      "nullable": false
-    },
-    {
-      "name": "wind_avg_ms",
-      "dtype": "float",
-      "description": "Weekly average wind speed in metres per second",
-      "required": true,
-      "nullable": false,
-      "min": 0.0
-    },
-    {
-      "name": "public_holidays",
+      "name": "units_sold",
       "dtype": "int",
-      "description": "Number of public holidays falling within the week",
+      "description": "Total bread/pastry units sold that day.",
       "required": true,
       "nullable": false,
       "min": 0
     },
     {
-      "name": "season",
-      "dtype": "str",
-      "description": "Meteorological season of the week",
+      "name": "is_weekend",
+      "dtype": "int",
+      "description": "1 if Saturday or Sunday, 0 otherwise.",
       "required": true,
       "nullable": false,
-      "allowed_values": ["winter", "spring", "summer", "autumn"]
+      "allowed_values": [
+        0,
+        1
+      ]
     },
     {
-      "name": "renewable_share_pct",
-      "dtype": "float",
-      "description": "Share of renewable energy in total generation during the week, as a percentage",
+      "name": "day_of_week",
+      "dtype": "int",
+      "description": "ISO weekday index: 0 = Monday … 6 = Sunday.",
       "required": true,
       "nullable": false,
-      "min": 0.0,
-      "max": 100.0
+      "min": 0,
+      "max": 6
     }
   ]
 }

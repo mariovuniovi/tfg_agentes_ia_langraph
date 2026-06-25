@@ -9,15 +9,18 @@
   "exogenous_columns": [
     {
       "name": "temperature_c",
-      "future_availability": "unknown_future"
+      "future_availability": "unknown_future",
+      "temporal": true
     },
     {
       "name": "is_weekend",
-      "future_availability": "known_future"
+      "future_availability": "known_future",
+      "temporal": true
     },
     {
       "name": "hour_of_day",
-      "future_availability": "known_future"
+      "future_availability": "known_future",
+      "temporal": true
     }
   ],
   "columns": [

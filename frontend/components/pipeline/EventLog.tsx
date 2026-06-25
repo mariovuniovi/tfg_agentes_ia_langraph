@@ -39,6 +39,23 @@ const HITL_STATUS_STYLES: Record<string, string> = {
   none: 'text-zinc-400',
 }
 
+const MADRID_TIME_ZONE = 'Europe/Madrid'
+const madridTime = new Intl.DateTimeFormat('en-GB', {
+  timeZone: MADRID_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+})
+
+function formatMadridTime(ms: number) {
+  return madridTime.format(new Date(ms))
+}
+
+function formatMadridTimeWithMs(ms: number) {
+  return `${formatMadridTime(ms)}.${String(new Date(ms).getMilliseconds()).padStart(3, '0')}`
+}
+
 export function EventLog() {
   const events = useRunStore((s) => s.events)
   const runId = useRunStore((s) => s.runId)
@@ -94,7 +111,7 @@ export function EventLog() {
             {timeline.map((r, i) => (
               <li key={i} className="flex gap-2">
                 <span className="shrink-0 font-mono text-zinc-300">
-                  {new Date(r.ts).toISOString().slice(11, 19)}
+                  {formatMadridTime(r.ts)}
                 </span>
                 <span className="text-zinc-700">{r.text}</span>
               </li>
@@ -175,7 +192,7 @@ export function EventLog() {
             {events.length === 0 && <p className="text-zinc-400">Waiting for events…</p>}
             {events.map((e: PipelineEvent, i) => (
               <div key={i} className="mb-0.5 flex gap-2">
-                <span className="shrink-0 text-zinc-300">{new Date(e.timestamp_ms).toISOString().slice(11, 23)}</span>
+                <span className="shrink-0 text-zinc-300">{formatMadridTimeWithMs(e.timestamp_ms)}</span>
                 <span className={`shrink-0 ${TYPE_COLORS[e.type] ?? 'text-zinc-500'}`}>{e.type}</span>
                 <span className="shrink-0 text-zinc-500">{displayAgentName(e.agent)}</span>
                 <span className="min-w-0 break-words text-zinc-600">

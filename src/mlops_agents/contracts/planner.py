@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from mlops_agents.contracts.evidence import EvidenceReference
 from mlops_agents.contracts.training import (
     CandidateSpec,
+    PlannerTrainingPlan,
     RejectedModelSpec,
-    TrainingPlan,
 )
 from mlops_agents.models.loader import ModelSpec
 
@@ -100,7 +100,7 @@ class PlannerOutput(BaseModel):
     evidence_used: list[EvidenceReference] = Field(default_factory=list)
     evidence_conflicts: list[EvidenceConflict] = Field(default_factory=list)
     risks_or_warnings: list[str] = Field(default_factory=list)
-    plan: TrainingPlan
+    plan: PlannerTrainingPlan
 
 
 class PlannerValidationContext(BaseModel):

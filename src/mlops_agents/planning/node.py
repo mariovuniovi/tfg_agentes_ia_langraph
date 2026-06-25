@@ -13,7 +13,7 @@ from langgraph.types import Command
 
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.outputs import PlannerStateUpdate
-from mlops_agents.contracts.training import ForecastingSettings
+from mlops_agents.contracts.training import ForecastingSettings, TrainingPlan
 from mlops_agents.planning.agent import build_planner_agent
 from mlops_agents.planning.context import build_planner_validation_context
 from mlops_agents.planning.prompts import build_retry_message, format_planner_inputs
@@ -27,6 +27,7 @@ from mlops_agents.planning.validation import (
     _check_plan_integrity,
     _collect_all_refs,
     detect_soft_conflicts,
+    validate_forecasting_settings,
 )
 from mlops_agents.prompts import get_prompt
 from mlops_agents.state.agent_state import AgentState
@@ -84,6 +85,12 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
             )
         except ValueError as exc:
             raise PlannerError(f"Forecasting capacity check failed: {exc}") from exc
+        # Defense-in-depth on the resolver output. A failure here is a code bug, not
+        # bad LLM output, so hard-fail rather than retry (a retry can't fix it).
+        try:
+            validate_forecasting_settings(forecasting_fs, task_meta)
+        except PlannerValidationError as exc:
+            raise PlannerError(f"Resolved forecasting settings are invalid: {exc}") from exc
         policy_summary = (
             f"validation_strategy: type={forecasting_fs.validation_strategy.type}, "
             f"n_folds={forecasting_fs.validation_strategy.n_folds}; "
@@ -92,6 +99,7 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
         )
 
     output = None
+    executor_plan: TrainingPlan | None = None
     trace = ToolTrace()
     last_error = ""
     retry_used = False
@@ -125,14 +133,17 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
                     "agent returned no structured_response — model failed to produce PlannerOutput"
                 )
 
-            if forecasting_fs is not None:
-                output = output.model_copy(
-                    update={"plan": output.plan.model_copy(
-                        update={"forecasting_settings": forecasting_fs})}
-                )
-
             _check_plan_integrity(output, trace, validation_ctx)
-            _check_plan_exhaustiveness(output.plan, validation_ctx.available_model_keys)
+
+            # Build the executable experiment contract: the LLM's model-selection
+            # decision (output.plan) plus the code-resolved forecasting policy the LLM
+            # is not allowed to choose. forecasting_fs is None for non-forecasting.
+            # Any stray forecasting_settings on the decision is dropped — the
+            # code-resolved policy is always authoritative.
+            decision = output.plan.model_dump()
+            decision.pop("forecasting_settings", None)
+            executor_plan = TrainingPlan(**decision, forecasting_settings=forecasting_fs)
+            _check_plan_exhaustiveness(executor_plan, validation_ctx.available_model_keys)
             _check_evidence_references_hybrid(output, validation_ctx, trace)
             _check_conflict_resolution_present_if_flagged(output, validation_ctx, trace)
             break  # success
@@ -149,11 +160,10 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
                 raise PlannerError(f"Planner failed after retry: {last_error}") from exc
 
     # Sort candidates by priority (deterministic order for executor)
-    assert output is not None
-    sorted_candidates = sorted(output.plan.candidates, key=lambda c: c.priority)
-    output.plan.candidates = sorted_candidates
+    assert output is not None and executor_plan is not None
+    executor_plan.candidates = sorted(executor_plan.candidates, key=lambda c: c.priority)
 
-    soft = detect_soft_conflicts(validation_ctx, trace, output.plan, output)
+    soft = detect_soft_conflicts(validation_ctx, trace, executor_plan, output)
     cited_experience_ids = sorted({
         r.source_id for r in _collect_refs_for_record(output)
         if r.source == "experience" and r.source_id
@@ -167,11 +177,12 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     record = _build_planner_output_record(
         output, trace, validation_ctx, soft,
         cited_experience_ids, cited_rule_ids, planner_status, last_error,
+        plan=executor_plan,
     )
 
     logger.info(
-        f"[planner] status={planner_status} candidates={len(output.plan.candidates)} "
-        f"rejected={len(output.plan.models_not_recommended)} tool_calls={trace.tool_call_count}"
+        f"[planner] status={planner_status} candidates={len(executor_plan.candidates)} "
+        f"rejected={len(executor_plan.models_not_recommended)} tool_calls={trace.tool_call_count}"
     )
 
     output_state = PlannerStateUpdate(
@@ -180,7 +191,7 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
         planner_warnings=output.risks_or_warnings,
         planner_status=planner_status,
         planner_retry_used=retry_used,
-        training_plan=output.plan.model_dump(),
+        training_plan=executor_plan.model_dump(),
         planner_tool_trace=trace.model_dump(),
         planner_validation_context=_audit_subset(validation_ctx),
         planner_output_record=record,
@@ -213,8 +224,13 @@ def _build_planner_output_record(
     cited_rule_ids: list,
     status: str,
     last_error: str,
+    plan: Any,
 ) -> dict:
-    """Compose the rich record consumed by the SSE pipeline & frontend PlannerPanel."""
+    """Compose the rich record consumed by the SSE pipeline & frontend PlannerPanel.
+
+    ``plan`` is the executable :class:`TrainingPlan` (decision + resolved settings) so
+    the record reflects exactly what reaches training.
+    """
     return {
         "planner_status": status,
         "retry_used": status == "retry_ok",
@@ -226,10 +242,10 @@ def _build_planner_output_record(
         "risks_or_warnings": output.risks_or_warnings,
         "validation_errors": [last_error] if status == "retry_ok" else [],
         "plan_summary": {
-            "candidate_rationales": [c.model_dump() for c in output.plan.candidates],
-            "rejected_model_rationales": [r.model_dump() for r in output.plan.models_not_recommended],
-            "candidate_models": [c.model_key for c in output.plan.candidates],
-            "models_not_recommended": [r.model_key for r in output.plan.models_not_recommended],
+            "candidate_rationales": [c.model_dump() for c in plan.candidates],
+            "rejected_model_rationales": [r.model_dump() for r in plan.models_not_recommended],
+            "candidate_models": [c.model_key for c in plan.candidates],
+            "models_not_recommended": [r.model_key for r in plan.models_not_recommended],
         },
         "cited_experience_ids": cited_experience_ids,
         "cited_rule_ids": cited_rule_ids,

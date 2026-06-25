@@ -107,13 +107,21 @@ class TrialBudget(BaseModel):
     min_trials_per_candidate: int = 5
 
 
-class TrainingPlan(BaseModel):
+class PlannerTrainingPlan(BaseModel):
+    """The planner agent's *decision surface* — only the fields the LLM controls.
+
+    Deliberately omits ``forecasting_settings``: the validation + exogenous-extension
+    policy is resolved deterministically by code (``planner_node``) and the LLM must
+    not emit it. ``planner_node`` builds the executable :class:`TrainingPlan` from this
+    decision plus the resolved settings. This keeps the planner's contract honest —
+    it can no longer return a field that is always overwritten and ignored.
+    """
+
     problem_type: Literal["classification", "regression", "forecasting"]
     metric_to_optimize: str | None = None
     candidates: list[CandidateSpec]
     models_not_recommended: list[RejectedModelSpec] = Field(default_factory=list)
     trial_budget: TrialBudget = Field(default_factory=TrialBudget)
-    forecasting_settings: ForecastingSettings | None = None
 
     @model_validator(mode="after")
     def priorities_unique(self):
@@ -149,6 +157,17 @@ class TrainingPlan(BaseModel):
             )
 
         return self
+
+
+class TrainingPlan(PlannerTrainingPlan):
+    """The executable experiment contract handed to the deterministic executor.
+
+    Extends the planner's decision (:class:`PlannerTrainingPlan`) with
+    ``forecasting_settings`` — the code-resolved validation + exogenous policy.
+    Only forecasting plans populate it; classification/regression leave it ``None``.
+    """
+
+    forecasting_settings: ForecastingSettings | None = None
 
 
 class TrainingResult(BaseModel):

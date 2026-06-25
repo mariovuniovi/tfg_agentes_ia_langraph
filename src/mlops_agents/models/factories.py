@@ -16,6 +16,8 @@ from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 
+from mlops_agents.forecasting.seasonality import default_season_length
+
 
 def _tabular_pipeline(estimator: Any) -> Pipeline:
     """Wrap a tabular estimator so string/categorical features are encoded before fit.
@@ -83,13 +85,6 @@ def build_catboost_regressor(params: dict[str, Any]):
     return _tabular_pipeline(CatBoostRegressor(**{**params, "verbose": 0}))
 
 
-_FREQ_TO_SEASON = {"H": 24, "D": 7, "W": 52, "MS": 12, "M": 12, "QS": 4, "YS": 1}
-
-
-def _default_season_length(freq: str) -> int:
-    return _FREQ_TO_SEASON.get(freq, 1)
-
-
 def build_naive(spec: dict[str, Any]):
     """Naive forecaster: predicts the last observed value."""
     from statsforecast import StatsForecast
@@ -103,7 +98,7 @@ def build_seasonal_naive(spec: dict[str, Any]):
     from statsforecast import StatsForecast
     from statsforecast.models import SeasonalNaive
     freq = spec["task_metadata"]["frequency"]
-    season_length = spec["params"].get("season_length", _default_season_length(freq))
+    season_length = spec["params"].get("season_length", default_season_length(freq))
     return StatsForecast(models=[SeasonalNaive(season_length=season_length)], freq=freq, n_jobs=1)
 
 
@@ -111,7 +106,7 @@ def build_ets(spec: dict[str, Any]):
     from statsforecast import StatsForecast
     from statsforecast.models import AutoETS
     freq = spec["task_metadata"]["frequency"]
-    season_length = spec["params"].get("season_length", _default_season_length(freq))
+    season_length = spec["params"].get("season_length", default_season_length(freq))
     return StatsForecast(models=[AutoETS(season_length=season_length)], freq=freq, n_jobs=1)
 
 
@@ -119,7 +114,7 @@ def build_auto_arima(spec: dict[str, Any]):
     from statsforecast import StatsForecast
     from statsforecast.models import AutoARIMA
     freq = spec["task_metadata"]["frequency"]
-    season_length = spec["params"].get("season_length", _default_season_length(freq))
+    season_length = spec["params"].get("season_length", default_season_length(freq))
     return StatsForecast(models=[AutoARIMA(season_length=season_length)], freq=freq, n_jobs=1)
 
 

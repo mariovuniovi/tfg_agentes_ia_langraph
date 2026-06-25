@@ -9,11 +9,13 @@
   "exogenous_columns": [
     {
       "name": "fuel_price_idx",
-      "future_availability": "unknown_future"
+      "future_availability": "unknown_future",
+      "temporal": true
     },
     {
       "name": "avg_load_factor_pct",
-      "future_availability": "unknown_future"
+      "future_availability": "unknown_future",
+      "temporal": true
     }
   ],
   "columns": [
@@ -24,7 +26,7 @@
       "required": true,
       "nullable": false,
       "unique": true
-    }, 
+    },
     {
       "name": "passengers",
       "dtype": "int",

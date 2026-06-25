@@ -551,6 +551,43 @@ def test_impute_forecasting_exogenous_categorical_filled(tmp_path):
     assert df_after["category"].isnull().sum() == 0
 
 
+def test_impute_forecasting_static_covariate_filled_cross_sectionally(tmp_path):
+    # A static store attribute (temporal:false) is constant per series and entirely null
+    # for an orphan series (s3). Per-series interpolation cannot fill it, so it must be
+    # filled cross-sectionally: median (numeric) / "unknown" (categorical) — never a
+    # fabricated temporal trend.
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02"] * 3,
+        "target": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "store": ["s1", "s1", "s2", "s2", "s3", "s3"],
+        "size": [100.0, 100.0, 300.0, 300.0, None, None],   # s3 orphan → whole series null
+        "region": ["north", "north", "south", "south", None, None],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text(json.dumps({"columns": [
+        {"name": "size", "temporal": False},
+        {"name": "region", "temporal": False},
+    ]}))
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "forecasting",
+        "target_column": "target",
+        "datetime_column": "date",
+        "series_id_columns": ["store"],
+        "schema_path": str(schema_path),
+    }))
+    after = pd.read_csv(path)
+    assert after["size"].isnull().sum() == 0
+    assert after["region"].isnull().sum() == 0
+    # orphan series s3 gets the cross-sectional median of {100,100,300,300} = 200
+    assert after[after["store"] == "s3"]["size"].unique().tolist() == [200.0]
+    # categorical orphan gets the explicit "unknown" category, not a fabricated region
+    assert after[after["store"] == "s3"]["region"].unique().tolist() == ["unknown"]
+    assert "size" in result["columns_imputed"] and "region" in result["columns_imputed"]
+
+
 def test_impute_forecasting_multi_series_no_index_collision(tmp_path):
     """Multi-series concat must reset index so get_loc in gap helper never sees duplicates."""
     csv = tmp_path / "multi.csv"
