@@ -1,0 +1,6 @@
+2026/06/26 01:06:48 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 01:06:48 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 01:06:51 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m01:06:52[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 13.092055236748141, 'mae': 11.924334462483724, 'mape': 0.11252444093564404, 'smape': 0.10533892404300618}
+coal_feedstock_daily: champion=naive rmse=13.092055236748141 (47s)
+forecasting count now: 15

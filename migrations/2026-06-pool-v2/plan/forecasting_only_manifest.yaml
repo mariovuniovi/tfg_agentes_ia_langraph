@@ -1,0 +1,330 @@
+- dataset_id: air_passengers
+  source: statsmodels
+  source_id: air_passengers
+  problem_type: forecasting
+  target_column: passengers
+  datetime_column: month
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 12
+  expected_family: statistical
+- dataset_id: co2_mauna_loa
+  source: statsmodels
+  source_id: co2
+  problem_type: forecasting
+  target_column: co2
+  datetime_column: date
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 6
+  expected_family: statistical
+- dataset_id: sunspots
+  source: statsmodels
+  source_id: sunspots
+  problem_type: forecasting
+  target_column: sunspots
+  datetime_column: year
+  series_id_columns: []
+  frequency: YS
+  forecast_horizon: 3
+  expected_family: statistical
+- dataset_id: nile
+  source: statsmodels
+  source_id: nile
+  problem_type: forecasting
+  target_column: volume
+  datetime_column: year
+  series_id_columns: []
+  frequency: YS
+  forecast_horizon: 3
+  expected_family: statistical
+- dataset_id: bike_sharing_daily
+  source: uci_url
+  source_id: https://archive.ics.uci.edu/ml/machine-learning-databases/00275/Bike-Sharing-Dataset.zip
+  problem_type: forecasting
+  target_column: cnt
+  datetime_column: dteday
+  series_id_columns: []
+  frequency: D
+  forecast_horizon: 14
+  skip_models:
+  - auto_arima
+  exogenous_columns:
+  - name: temp
+    future_availability: unknown_future
+  - name: hum
+    future_availability: unknown_future
+  - name: windspeed
+    future_availability: unknown_future
+  - name: season
+    future_availability: known_future
+  - name: holiday
+    future_availability: known_future
+  - name: workingday
+    future_availability: known_future
+  - name: weekday
+    future_availability: known_future
+- dataset_id: appliances_energy
+  source: uci_url
+  source_id: https://archive.ics.uci.edu/ml/machine-learning-databases/00374/energydata_complete.csv
+  problem_type: forecasting
+  target_column: Appliances
+  datetime_column: date
+  series_id_columns: []
+  frequency: H
+  forecast_horizon: 24
+  skip_models:
+  - auto_arima
+  exogenous_columns:
+  - name: T6
+    future_availability: unknown_future
+  - name: RH_6
+    future_availability: unknown_future
+  - name: T_out
+    future_availability: unknown_future
+  - name: RH_out
+    future_availability: unknown_future
+  - name: Windspeed
+    future_availability: unknown_future
+  - name: Visibility
+    future_availability: unknown_future
+  - name: Press_mm_hg
+    future_availability: unknown_future
+- dataset_id: sp500_weekly
+  source: yfinance_multi
+  source_id: ^GSPC
+  exog_tickers:
+  - ^VIX
+  - ^TNX
+  - CL=F
+  - GC=F
+  - DX-Y.NYB
+  - EURUSD=X
+  - ^IXIC
+  col_names:
+    ^GSPC: sp500
+    ^VIX: vix
+    ^TNX: treasury_10y
+    CL=F: oil_wti
+    GC=F: gold
+    DX-Y.NYB: usd_index
+    EURUSD=X: eurusd
+    ^IXIC: nasdaq
+  problem_type: forecasting
+  target_column: sp500
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  interval: 1wk
+  start: '2005-01-01'
+  end: '2024-06-01'
+  exogenous_columns:
+  - name: vix
+    future_availability: unknown_future
+  - name: treasury_10y
+    future_availability: unknown_future
+  - name: oil_wti
+    future_availability: unknown_future
+  - name: gold
+    future_availability: unknown_future
+  - name: usd_index
+    future_availability: unknown_future
+  - name: eurusd
+    future_availability: unknown_future
+  - name: nasdaq
+    future_availability: unknown_future
+- dataset_id: oil_weekly
+  source: yfinance_multi
+  source_id: CL=F
+  exog_tickers:
+  - NG=F
+  - RB=F
+  - HG=F
+  - ^GSPC
+  - DX-Y.NYB
+  - GC=F
+  - ^VIX
+  col_names:
+    CL=F: oil_wti
+    NG=F: nat_gas
+    RB=F: gasoline
+    HG=F: copper
+    ^GSPC: sp500
+    DX-Y.NYB: usd_index
+    GC=F: gold
+    ^VIX: vix
+  problem_type: forecasting
+  target_column: oil_wti
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  interval: 1wk
+  start: '2005-01-01'
+  end: '2024-06-01'
+  exogenous_columns:
+  - name: nat_gas
+    future_availability: unknown_future
+  - name: gasoline
+    future_availability: unknown_future
+  - name: copper
+    future_availability: unknown_future
+  - name: sp500
+    future_availability: unknown_future
+  - name: usd_index
+    future_availability: unknown_future
+  - name: gold
+    future_availability: unknown_future
+  - name: vix
+    future_availability: unknown_future
+- dataset_id: gold_macro_weekly
+  source: yfinance_multi
+  source_id: GC=F
+  exog_tickers:
+  - SI=F
+  - HG=F
+  - CL=F
+  - DX-Y.NYB
+  - ^TNX
+  - ^GSPC
+  - ^VIX
+  col_names:
+    GC=F: gold
+    SI=F: silver
+    HG=F: copper
+    CL=F: oil_wti
+    DX-Y.NYB: usd_index
+    ^TNX: treasury_10y
+    ^GSPC: sp500
+    ^VIX: vix
+  problem_type: forecasting
+  target_column: gold
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  interval: 1wk
+  start: '2005-01-01'
+  end: '2024-06-01'
+  exogenous_columns:
+  - name: silver
+    future_availability: unknown_future
+  - name: copper
+    future_availability: unknown_future
+  - name: oil_wti
+    future_availability: unknown_future
+  - name: usd_index
+    future_availability: unknown_future
+  - name: treasury_10y
+    future_availability: unknown_future
+  - name: sp500
+    future_availability: unknown_future
+  - name: vix
+    future_availability: unknown_future
+- dataset_id: crypto_weekly
+  source: local
+  source_id: data/benchmarks/crypto_weekly.csv
+  problem_type: forecasting
+  target_column: btc_close
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+- dataset_id: fx_weekly
+  source: local
+  source_id: data/benchmarks/fx_exog_weekly.csv
+  problem_type: forecasting
+  target_column: eurusd_close
+  datetime_column: week
+  series_id_columns: []
+  frequency: W
+  forecast_horizon: 13
+  exogenous_columns:
+  - name: gbpusd_close
+    future_availability: unknown_future
+  - name: jpyusd_close
+    future_availability: unknown_future
+  - name: gold_close
+    future_availability: unknown_future
+- dataset_id: brent_oil
+  source: fred
+  source_id: DCOILBRENTEU
+  fred_columns:
+    DCOILBRENTEU: price_usd_bbl
+  problem_type: forecasting
+  target_column: price_usd_bbl
+  datetime_column: date
+  series_id_columns: []
+  frequency: B
+  forecast_horizon: 30
+  start: '2009-06-01'
+  end: '2024-06-01'
+  exogenous_columns: []
+- dataset_id: henry_hub_gas
+  source: fred
+  source_id: MHHNGSP
+  fred_columns:
+    MHHNGSP: price_usd_mmbtu
+  problem_type: forecasting
+  target_column: price_usd_mmbtu
+  datetime_column: date
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 12
+  start: '1997-01-01'
+  end: '2024-06-01'
+  exogenous_columns: []
+- dataset_id: ppi_chemicals
+  source: fred
+  source_id: PCU325325,IPG325S
+  fred_columns:
+    PCU325325: ppi_index
+    IPG325S: ip_index
+  problem_type: forecasting
+  target_column: ppi_index
+  datetime_column: date
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 12
+  start: '1985-01-01'
+  end: '2024-06-01'
+  exogenous_columns:
+  - name: ip_index
+    future_availability: unknown_future
+- dataset_id: coal_feedstock_daily
+  source: yfinance_multi
+  source_id: MTF=F
+  exog_tickers:
+  - NG=F
+  - CL=F
+  - BZ=F
+  - HG=F
+  - DX-Y.NYB
+  col_names:
+    MTF=F: coal_api2
+    NG=F: nat_gas
+    CL=F: wti
+    BZ=F: brent
+    HG=F: copper
+    DX-Y.NYB: usd_index
+  problem_type: forecasting
+  target_column: coal_api2
+  datetime_column: date
+  series_id_columns: []
+  frequency: B
+  forecast_horizon: 30
+  interval: 1d
+  start: '2014-01-01'
+  end: '2024-06-01'
+  exogenous_columns:
+  - name: nat_gas
+    future_availability: unknown_future
+  - name: wti
+    future_availability: unknown_future
+  - name: brent
+    future_availability: unknown_future
+  - name: copper
+    future_availability: unknown_future
+  - name: usd_index
+    future_availability: unknown_future

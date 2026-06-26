@@ -96,3 +96,7 @@ plan_model_agent.md
 # Log files (rotation-managed, not committed)
 logs/*.log
 logs/*.log.*
+
+# Migration rollback backups — insurance during a migration, redundant with
+# git history afterwards; the plan/ and run/ docs commit, baseline/ does not
+migrations/*/baseline/
