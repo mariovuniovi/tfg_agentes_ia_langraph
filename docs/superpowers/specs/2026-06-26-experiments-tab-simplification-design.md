@@ -104,8 +104,10 @@ is now dead work, but removing it is deferred (see Out of scope).
 
 ## Micro-decisions
 
-1. **Card title** — change the panel header from "Metrics" to **"Run details"**
-   (it now shows metrics + config + metadata).
+1. **Panel heading** — the old `<Card title="Metrics">` is removed (see Chrome &
+   scrolling). With the Card gone there is no misleading "Metrics" title to
+   correct; the **run name** (`run_name`) serves as the panel's heading at the
+   top of the header row.
 2. **Status badge** — `status` is MLflow's raw uppercase value
    (`run.info.status`), not the app's `RunStatus` union. Map via a small table,
    reusing the validation-pill classes from `DatasetPanel`:
