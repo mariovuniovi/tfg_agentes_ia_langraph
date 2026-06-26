@@ -16,7 +16,7 @@
 - **Date display:** local timezone, format `YYYY-MM-DD HH:mm` (minute precision); unparseable input falls back to the raw string.
 - **Metric & param ordering:** alphabetical by key, everywhere (display and CSV).
 - **Empty-state copy (verbatim):** no-selection → `Select a run to view its metrics`; no metrics → `No metrics logged`; no params → `No parameters logged`.
-- **CSV:** RFC 4180 — header `type,key,value`; rows tagged `metric` or `param`; every field double-quoted with embedded `"` escaped as `""`. Filename `run-<run_id first 8 chars>-metrics.csv`. Export button hidden when there are no metrics AND no params.
+- **CSV:** RFC 4180 — header row `"type","key","value"`; data rows tagged `metric` or `param`; **every field double-quoted** (header and data) with embedded `"` escaped as `""`. Filename `run-<run_id first 8 chars>-metrics.csv`. Export button hidden when there are no metrics AND no params.
 - **Commit policy:** committing is allowed; never `git merge` or `git push`. Never add a Claude/Anthropic co-author trailer.
 - **Run commands from the `frontend/` directory.**
 
@@ -74,12 +74,14 @@ describe('formatRunTime', () => {
 describe('buildRunCsv', () => {
   it('quotes every field and tags rows by type', () => {
     const csv = buildRunCsv({ rmse: 18.5 }, { model_type: 'ets' })
-    expect(csv).toBe('type,key,value\n"metric","rmse","18.5"\n"param","model_type","ets"')
+    expect(csv).toBe('"type","key","value"\n"metric","rmse","18.5"\n"param","model_type","ets"')
   })
 
   it('escapes commas and quotes in param values', () => {
     const csv = buildRunCsv({}, { lags: '[1, 2, 3, 12]' })
     expect(csv).toContain('"param","lags","[1, 2, 3, 12]"')
+    const csv2 = buildRunCsv({}, { note: 'say "hello"' })
+    expect(csv2).toContain('"param","note","say ""hello"""')
   })
 
   it('sorts metrics and params alphabetically by key', () => {
@@ -123,7 +125,7 @@ export function buildRunCsv(
   params: Record<string, string>,
 ): string {
   const cell = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const rows = ['type,key,value']
+  const rows = ['"type","key","value"']
   for (const [k, v] of Object.entries(metrics).sort(([a], [b]) => a.localeCompare(b))) {
     rows.push([cell('metric'), cell(k), cell(String(v))].join(','))
   }

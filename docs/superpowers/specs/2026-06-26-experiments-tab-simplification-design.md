@@ -126,8 +126,9 @@ is now dead work, but removing it is deferred (see Out of scope).
    Non-finite values render as `—`.
 5. **Export CSV** — kept, moved to the header. Exports all metrics **and**
    params (was metrics-only on the old deployment chart). Format is RFC 4180:
-   header row `type,key,value`; rows tagged `metric` or `param`; every field
-   quoted with embedded `"` escaped as `""` (param values such as
+   header row `"type","key","value"`; data rows tagged `metric` or `param`;
+   every field quoted (header and data) with embedded `"` escaped as `""`
+   (param values such as
    `lags = [1, 2, 3, 12]` contain commas). Filename
    `run-<run_id-prefix>-metrics.csv`. Button is **hidden when there are no
    metrics and no params** (nothing to export).
