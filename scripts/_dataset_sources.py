@@ -87,6 +87,9 @@ def fetch_dataset(entry: dict[str, Any]) -> pd.DataFrame:
         df[dt_col] = pd.to_datetime(df[dt_col]).dt.strftime("%Y-%m-%d")
         return df
 
+    if src == "fred":
+        return _fetch_fred(entry)
+
     if src == "statsmodels":
         return _fetch_statsmodels(entry)
 
@@ -96,7 +99,45 @@ def fetch_dataset(entry: dict[str, Any]) -> pd.DataFrame:
     if src == "dominicks":
         return _fetch_dominicks(entry)
 
-    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi, statsmodels, uci_url, dominicks")
+    raise ValueError(f"Unknown source: {src!r}. Valid: sklearn, openml, local, yfinance, yfinance_multi, fred, statsmodels, uci_url, dominicks")
+
+
+# ---------------------------------------------------------------------------
+# fred source — FRED economic series via the keyless public CSV endpoint
+# (https://fred.stlouisfed.org/graph/fredgraph.csv?id=...). No API key, no extra
+# dependency. Supports one target series plus optional companion series joined on
+# the shared date index (for unknown-future exogenous columns).
+# ---------------------------------------------------------------------------
+
+
+def _fetch_fred(entry: dict[str, Any]) -> pd.DataFrame:
+    series_ids = str(entry["source_id"])  # e.g. "PCU325325" or "PCU325325,IPG325S"
+    colmap = entry.get("fred_columns", {})  # FRED code -> friendly column name
+    date_col = entry.get("datetime_column", "date")
+    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_ids}"
+    raw = pd.read_csv(url)
+    if raw.empty or raw.shape[1] < 2:
+        raise RuntimeError(f"FRED returned no usable data for id={series_ids!r}")
+    # First column is the date ("DATE" or "observation_date" depending on FRED version).
+    raw = raw.rename(columns={raw.columns[0]: date_col})
+    value_cols = [c for c in raw.columns if c != date_col]
+    # FRED encodes missing observations as ".".
+    for c in value_cols:
+        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+    raw = raw.rename(columns=colmap)
+    value_cols = [colmap.get(c, c) for c in value_cols]
+    raw[date_col] = pd.to_datetime(raw[date_col])
+    if entry.get("start"):
+        raw = raw[raw[date_col] >= pd.Timestamp(entry["start"])]
+    if entry.get("end"):
+        raw = raw[raw[date_col] <= pd.Timestamp(entry["end"])]
+    raw = raw.sort_values(date_col)
+    # Forward-fill isolated gaps (e.g. business-day series), then drop any leading
+    # rows that have no observation yet for one of the joined series.
+    raw[value_cols] = raw[value_cols].ffill()
+    raw = raw.dropna(subset=value_cols)
+    raw[date_col] = raw[date_col].dt.strftime("%Y-%m-%d")
+    return raw[[date_col, *value_cols]].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------

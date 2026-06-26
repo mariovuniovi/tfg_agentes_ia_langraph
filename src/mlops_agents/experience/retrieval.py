@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from mlops_agents.experience.pool import ExperiencePool
 
 RETRIEVAL_WEIGHTS: dict[str, int] = {
-    "n_rows": 3, "n_series": 3, "history_length": 3, "horizon_difficulty": 3, "seasonality_detected": 3,
+    "n_rows": 3, "history_length": 3, "horizon_difficulty": 3, "seasonality_detected": 3,
     "class_balance": 2, "n_classes": 2, "target_distribution": 2, "exogenous_features_available": 2,
     "frequency": 2, "trend_detected": 2, "stationarity": 2,
     "n_features": 1, "missing_rate": 1, "n_categorical_features": 1, "n_numerical_features": 1,
@@ -18,11 +18,11 @@ RETRIEVAL_WEIGHTS: dict[str, int] = {
 MAX_SCORE_BY_PROBLEM_TYPE: dict[str, int] = {
     # Achievable maximum per problem type: sum of RETRIEVAL_WEIGHTS for fields
     # that the profiler actually sets (non-null). Fields only set for other
-    # problem types (e.g. n_classes for classification, n_series for forecasting)
-    # are never populated and must not inflate the denominator.
+    # problem types (e.g. n_classes for classification, target_distribution for
+    # regression) are never populated and must not inflate the denominator.
     "classification": 11,  # n_rows+n_features+missing+n_cat+n_num+n_classes+class_balance
     "regression": 9,       # n_rows+n_features+missing+n_cat+n_num+target_distribution
-    "forecasting": 27,     # all forecasting fields (excludes n_classes/class_balance/target_distribution)
+    "forecasting": 24,     # all forecasting fields (excludes n_classes/class_balance/target_distribution)
 }
 
 

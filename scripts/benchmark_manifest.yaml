@@ -164,44 +164,11 @@
     - { name: workingday, future_availability: known_future }
     - { name: weekday,    future_availability: known_future }
 
-# UCI 492 — Metro Interstate Traffic Volume hourly → daily
-- dataset_id: metro_traffic_volume
-  source: uci_url
-  source_id: "https://archive.ics.uci.edu/ml/machine-learning-databases/00492/Metro_Interstate_Traffic_Volume.csv.gz"
-  problem_type: forecasting
-  target_column: traffic_volume
-  datetime_column: date
-  series_id_columns: []
-  frequency: D
-  forecast_horizon: 14
-  expected_family: supervised
-  skip_models: [auto_arima]
-  exogenous_columns:
-    - { name: temp,       future_availability: unknown_future }
-    - { name: rain_1h,    future_availability: unknown_future }
-    - { name: snow_1h,    future_availability: unknown_future }
-    - { name: clouds_all, future_availability: unknown_future }
-    - { name: is_holiday, future_availability: known_future }
+# metro_traffic_volume removed in pool migration v2 (daily seasonal series;
+# structurally overlaps with beijing_pm25 / appliances_energy. Loader retained.)
 
-# UCI 381 — Beijing PM2.5 hourly 2010-2014 → daily
-- dataset_id: beijing_pm25
-  source: uci_url
-  source_id: "https://archive.ics.uci.edu/ml/machine-learning-databases/00381/PRSA_data_2010.1.1-2014.12.31.csv"
-  problem_type: forecasting
-  target_column: pm25
-  datetime_column: date
-  series_id_columns: []
-  frequency: D
-  forecast_horizon: 14
-  expected_family: supervised
-  skip_models: [auto_arima]
-  exogenous_columns:
-    - { name: DEWP, future_availability: unknown_future }
-    - { name: TEMP, future_availability: unknown_future }
-    - { name: PRES, future_availability: unknown_future }
-    - { name: Iws,  future_availability: unknown_future }
-    - { name: Is,   future_availability: unknown_future }
-    - { name: Ir,   future_availability: unknown_future }
+# beijing_pm25 removed in pool migration v2 (daily seasonal air-quality series with
+# unknown-future exog; structurally overlaps bike_sharing_daily/appliances_energy.)
 
 # UCI 374 — Appliances Energy 10-min → hourly (~3,300 rows; lightgbm/xgboost eligible)
 - dataset_id: appliances_energy
@@ -223,38 +190,11 @@
     - { name: Visibility,  future_availability: unknown_future }
     - { name: Press_mm_hg, future_availability: unknown_future }
 
-# Victorian electricity demand 30-min → daily
-- dataset_id: vic_elec
-  source: uci_url
-  source_id: "https://raw.githubusercontent.com/tidyverts/tsibbledata/master/data-raw/vic_elec/VIC2015"
-  problem_type: forecasting
-  target_column: demand
-  datetime_column: date
-  series_id_columns: []
-  frequency: D
-  forecast_horizon: 14
-  skip_models: [auto_arima]
-  exogenous_columns:
-    - { name: temperature, future_availability: unknown_future }
-    - { name: holiday,     future_availability: known_future }
+# vic_elec removed in pool migration v2 (half-hourly demand → daily; high-frequency
+# industrial series deferred, no structural replacement in this migration. Loader retained.)
 
-# Dominick's Finer Foods — store 62, top-selling cookie UPC (4400000720)
-# 387 weekly obs; promo flag is known_future (planned promotions)
-- dataset_id: dominicks_cookies
-  source: dominicks
-  source_id: data/benchmarks/dominicks_cookies_raw.csv
-  store_id: 62
-  upc: 4400000720
-  problem_type: forecasting
-  target_column: sales
-  datetime_column: week
-  series_id_columns: []
-  frequency: W
-  forecast_horizon: 13
-  expected_family: supervised
-  exogenous_columns:
-    - { name: price, future_availability: unknown_future }
-    - { name: promo, future_availability: known_future }
+# dominicks_cookies removed in pool migration v2 (retail weekly sales; off-domain,
+# the only known_future-promo pattern — dropped per human review. Loader retained.)
 
 # ── Random walk (5): near-efficient financial series → naive wins ────────────
 # Fixed end: "2024-06-01" ensures reproducible snapshots.
@@ -375,3 +315,80 @@
     - { name: gbpusd_close, future_availability: unknown_future }
     - { name: jpyusd_close, future_availability: unknown_future }
     - { name: gold_close,   future_availability: unknown_future }
+
+# ── Pool migration v2 — energy/chemical commodity series (FRED keyless CSV) ──
+# Real public series, honest provenance. Cover commodity-energy (daily Brent,
+# complementing weekly WTI), a petrochemical input (Henry Hub gas), and the
+# chemical-sector producer price index (closest public analogue to the target
+# domain). Fetched via the keyless fred.stlouisfed.org CSV endpoint.
+
+# EIA Europe Brent Spot (FRED DCOILBRENTEU) — daily, ~3900 business days.
+- dataset_id: brent_oil
+  source: fred
+  source_id: DCOILBRENTEU
+  fred_columns: { DCOILBRENTEU: price_usd_bbl }
+  problem_type: forecasting
+  target_column: price_usd_bbl
+  datetime_column: date
+  series_id_columns: []
+  frequency: B
+  forecast_horizon: 30
+  start: "2009-06-01"
+  end: "2024-06-01"
+  exogenous_columns: []
+
+# Henry Hub natural gas spot (FRED MHHNGSP) — monthly, petrochemical input.
+- dataset_id: henry_hub_gas
+  source: fred
+  source_id: MHHNGSP
+  fred_columns: { MHHNGSP: price_usd_mmbtu }
+  problem_type: forecasting
+  target_column: price_usd_mmbtu
+  datetime_column: date
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 12
+  start: "1997-01-01"
+  end: "2024-06-01"
+  exogenous_columns: []
+
+# PPI Chemical Manufacturing (FRED PCU325325) with IP Chemicals (IPG325S) as an
+# unknown-future exogenous companion — closest public analogue to the target domain.
+- dataset_id: ppi_chemicals
+  source: fred
+  source_id: "PCU325325,IPG325S"
+  fred_columns: { PCU325325: ppi_index, IPG325S: ip_index }
+  problem_type: forecasting
+  target_column: ppi_index
+  datetime_column: date
+  series_id_columns: []
+  frequency: MS
+  forecast_horizon: 12
+  start: "1985-01-01"
+  end: "2024-06-01"
+  exogenous_columns:
+    - { name: ip_index, future_availability: unknown_future }
+
+# Coal API2 CIF ARA futures (Yahoo MTF=F) — thermal coal, a chemical feedstock via
+# gasification (coal-to-chemicals: syngas -> methanol/ammonia/olefins). Daily
+# multi-exog commodity panel; target is coal (not WTI -> no overlap with oil_weekly).
+- dataset_id: coal_feedstock_daily
+  source: yfinance_multi
+  source_id: MTF=F
+  exog_tickers: ["NG=F", "CL=F", "BZ=F", "HG=F", "DX-Y.NYB"]
+  col_names: { MTF=F: coal_api2, NG=F: nat_gas, CL=F: wti, BZ=F: brent, HG=F: copper, DX-Y.NYB: usd_index }
+  problem_type: forecasting
+  target_column: coal_api2
+  datetime_column: date
+  series_id_columns: []
+  frequency: B
+  forecast_horizon: 30
+  interval: "1d"
+  start: "2014-01-01"
+  end: "2024-06-01"
+  exogenous_columns:
+    - { name: nat_gas,   future_availability: unknown_future }
+    - { name: wti,       future_availability: unknown_future }
+    - { name: brent,     future_availability: unknown_future }
+    - { name: copper,    future_availability: unknown_future }
+    - { name: usd_index, future_availability: unknown_future }
