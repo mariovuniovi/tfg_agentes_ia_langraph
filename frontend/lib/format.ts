@@ -33,7 +33,7 @@ export function buildRunCsv(
   params: Record<string, string>,
 ): string {
   const cell = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const rows = ['type,key,value']
+  const rows = ['"type","key","value"']
   for (const [k, v] of Object.entries(metrics).sort(([a], [b]) => a.localeCompare(b))) {
     rows.push([cell('metric'), cell(k), cell(String(v))].join(','))
   }

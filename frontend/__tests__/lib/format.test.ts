@@ -71,12 +71,14 @@ describe('formatRunTime', () => {
 describe('buildRunCsv', () => {
   it('quotes every field and tags rows by type', () => {
     const csv = buildRunCsv({ rmse: 18.5 }, { model_type: 'ets' })
-    expect(csv).toBe('type,key,value\n"metric","rmse","18.5"\n"param","model_type","ets"')
+    expect(csv).toBe('"type","key","value"\n"metric","rmse","18.5"\n"param","model_type","ets"')
   })
 
   it('escapes commas and quotes in param values', () => {
     const csv = buildRunCsv({}, { lags: '[1, 2, 3, 12]' })
     expect(csv).toContain('"param","lags","[1, 2, 3, 12]"')
+    const csv2 = buildRunCsv({}, { note: 'say "hello"' })
+    expect(csv2).toContain('"param","note","say ""hello"""')
   })
 
   it('sorts metrics and params alphabetically by key', () => {
