@@ -90,7 +90,7 @@ Touch only what you must. Clean up only your own mess.
 - Use `uv run` prefix — never activate venv manually
 - **Agent creation**: use `from langchain.agents import create_agent` with `system_prompt=` parameter — `create_react_agent` from `langgraph.prebuilt` is deprecated and removed
 - **Evidently 0.7.21 API**: use `DataSummaryPreset` (not `DataQualityPreset`), `DataDriftPreset()` (no `method=` arg), and `result.dump_dict()` (not `as_dict()` or `load_dict()`)
-- Never commit changes
+- Committing is allowed; never merge or push (no `git merge`, `git push`) unless explicitly asked
 - **Never add Claude as co-author** in any commit or merge message — do not include `Co-Authored-By: Claude` or any Anthropic co-author trailer
 
 ## Agent Design Principles
