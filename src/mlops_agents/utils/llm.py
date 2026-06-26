@@ -16,7 +16,10 @@ def get_llm(agent: str = "") -> ChatOpenAI:
     """
     config = get_agent_config(agent) if agent else {}
     model = config.get("model", settings.openai_model)
-    kwargs: dict = {"model": model, "api_key": settings.openai_api_key, "max_retries": 3}
+    # timeout bounds a stuck connection (else the SDK default lets a hung call
+    # stall for minutes); max_retries then re-issues it. 240s sits well above
+    # legitimate reasoning-call latency (~30-150s) so it never cuts a real call.
+    kwargs: dict = {"model": model, "api_key": settings.openai_api_key, "max_retries": 3, "timeout": 240}
     if reasoning_effort := config.get("reasoning_effort"):
         kwargs["use_responses_api"] = True
         kwargs["output_version"] = "responses/v1"
