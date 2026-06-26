@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { RunSidebar } from '@/components/experiments/RunSidebar'
-import { ChartPanel } from '@/components/experiments/ChartPanel'
+import { RunDetailPanel } from '@/components/experiments/RunDetailPanel'
 import type { RunOut } from '@/types/api'
 
 export default function ExperimentsPage() {
@@ -12,7 +12,7 @@ export default function ExperimentsPage() {
         <RunSidebar selectedRunId={selectedRun?.run_id ?? null} onSelectRun={setSelectedRun} />
       </div>
       <div className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white p-4">
-        <ChartPanel run={selectedRun} />
+        <RunDetailPanel run={selectedRun} />
       </div>
     </div>
   )
