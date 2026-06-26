@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatK, formatCost } from '@/lib/format'
+import { formatK, formatCost, formatMetricValue, formatRunTime, buildRunCsv } from '@/lib/format'
 
 describe('formatK', () => {
   it('returns plain string for values below 1000', () => {
@@ -38,5 +38,53 @@ describe('formatCost', () => {
     expect(formatCost(0.01512)).toBe('$0.0151')
     expect(formatCost(0.01115)).toBe('$0.0112')
     expect(formatCost(1.23456)).toBe('$1.2346')
+  })
+})
+
+describe('formatMetricValue', () => {
+  it('uses 3 decimals for magnitude >= 1', () => {
+    expect(formatMetricValue(18.5)).toBe('18.500')
+    expect(formatMetricValue(-2)).toBe('-2.000')
+  })
+
+  it('uses 4 decimals for magnitude < 1', () => {
+    expect(formatMetricValue(0.0412)).toBe('0.0412')
+    expect(formatMetricValue(0)).toBe('0.0000')
+  })
+
+  it('renders an em dash for non-finite values', () => {
+    expect(formatMetricValue(NaN)).toBe('—')
+    expect(formatMetricValue(Infinity)).toBe('—')
+  })
+})
+
+describe('formatRunTime', () => {
+  it('formats a valid ISO string as YYYY-MM-DD HH:mm', () => {
+    expect(formatRunTime('2026-06-26T06:27:05+00:00')).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  })
+
+  it('falls back to the raw string when unparseable', () => {
+    expect(formatRunTime('not-a-date')).toBe('not-a-date')
+  })
+})
+
+describe('buildRunCsv', () => {
+  it('quotes every field and tags rows by type', () => {
+    const csv = buildRunCsv({ rmse: 18.5 }, { model_type: 'ets' })
+    expect(csv).toBe('type,key,value\n"metric","rmse","18.5"\n"param","model_type","ets"')
+  })
+
+  it('escapes commas and quotes in param values', () => {
+    const csv = buildRunCsv({}, { lags: '[1, 2, 3, 12]' })
+    expect(csv).toContain('"param","lags","[1, 2, 3, 12]"')
+  })
+
+  it('sorts metrics and params alphabetically by key', () => {
+    const csv = buildRunCsv({ rmse: 1, mae: 2 }, { z: '1', a: '2' })
+    const lines = csv.split('\n')
+    expect(lines[1]).toContain('"mae"')
+    expect(lines[2]).toContain('"rmse"')
+    expect(lines[3]).toContain('"a"')
+    expect(lines[4]).toContain('"z"')
   })
 })
