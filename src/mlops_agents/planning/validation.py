@@ -127,7 +127,7 @@ def validate_forecasting_settings(fs: ForecastingSettings, task_metadata: dict) 
     # exogenous_columns: [{"name": ..., "future_availability": "known_future" | ...}].
     known_future = {
         e["name"]
-        for e in task_metadata.get("exogenous_columns", [])
+        for e in (task_metadata.get("exogenous_columns") or [])
         if e.get("future_availability") == "known_future"
     }
     for col, strat in exog_strats.items():

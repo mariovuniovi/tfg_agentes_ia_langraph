@@ -309,3 +309,10 @@ def test_validate_forecasting_settings_rejects_bad_validation_strategy():
     )
     with pytest.raises(PlannerValidationError, match="invalid validation_strategy"):
         validate_forecasting_settings(fs, {})
+
+
+def test_validate_forecasting_settings_handles_none_exogenous_columns():
+    # Datasets with no exog carry exogenous_columns=None (present, not absent).
+    # Must not raise "'NoneType' object is not iterable" (regression: small_monthly_revenue).
+    validate_forecasting_settings(_fs(), {"exogenous_columns": None})
+    validate_forecasting_settings(_fs(), {})  # absent key path too
