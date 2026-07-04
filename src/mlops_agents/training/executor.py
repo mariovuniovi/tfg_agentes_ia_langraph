@@ -455,38 +455,6 @@ def _to_sf_format(
     return out[["unique_id", "ds", "y"]]
 
 
-def _build_exog_df(
-    df: pd.DataFrame,
-    dt_col: str,
-    target: str,
-    sid_cols: list[str],
-    series_dict: dict[str, pd.Series] | None = None,
-) -> pd.DataFrame | None:
-    """Extract exogenous columns as a DataFrame whose index matches series_dict.
-
-    skforecast requires exog and series to share the same index type
-    (DatetimeIndex or RangeIndex). Returns None when no exogenous columns exist.
-    """
-    exclude = {dt_col, target} | set(sid_cols)
-    exog_cols = [
-        c for c in df.columns
-        if c not in exclude and pd.api.types.is_numeric_dtype(df[c])
-    ]
-    if not exog_cols:
-        return None
-    # sid_cols is always empty in V1 (panel is out of scope)
-    if sid_cols:
-        return None
-    exog = df.sort_values(dt_col).set_index(dt_col)[exog_cols].copy()
-    exog.index = pd.to_datetime(exog.index)
-    # If series_dict fell back to RangeIndex we must match it
-    if series_dict is not None:
-        sample = next(iter(series_dict.values()))
-        if isinstance(sample.index, pd.RangeIndex):
-            exog = exog.reset_index(drop=True)
-    return exog
-
-
 def _build_series_dict(
     df: pd.DataFrame, dt_col: str, target: str, sid_cols: list[str], freq_hint: str | None = None
 ) -> dict[str, pd.Series]:
