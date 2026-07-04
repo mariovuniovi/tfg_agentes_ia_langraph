@@ -3,10 +3,12 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Overview
-Multi-agent MLOps system using a custom LangGraph supervisor pattern.
-Four specialist agents (data validation, training, evaluation, deployment)
-orchestrated by a supervisor with structured output routing.
-Built with UV, Streamlit dashboard, MLflow, Evidently AI, and OpenAI API (gpt-4.1-mini).
+Multi-agent MLOps system on a custom LangGraph StateGraph with a deterministic
+workflow_controller router. Each pipeline stage is a domain package consumed by
+the graph through a thin node wrapper. Two LLM agent stages (data validation,
+planning) plus an LLM audit node (report writer); training, evaluation and
+deployment are deterministic. Built with UV, FastAPI backend, MLflow, Evidently
+AI, and the OpenAI API.
 
 ## Commands
 ```
@@ -16,39 +18,52 @@ uv run pytest -m "not integration"               # Unit tests only (no LLM calls
 uv run pytest tests/test_tools/test_data_tools.py  # Run a single test file
 uv run ruff check . && uv run ruff format .      # Lint & format
 uv run mypy src/                                 # Type check
-uv run streamlit run dashboard/app.py            # Start dashboard (port 8501)
-uv run python scripts/run_pipeline.py            # Run full MLOps pipeline
+uv run python scripts/run_pipeline.py            # Run full MLOps pipeline (CLI + HITL)
 uv run python scripts/seed_mlflow.py             # Seed MLflow with sample runs
-docker compose up                                # Full stack: MLflow (5000) + app (8501)
+docker compose up                                # Full stack: MLflow (5000) + app
 ```
 
 ## Architecture
 ```
 src/mlops_agents/
-├── agents/      supervisor.py + data_agent.py, training_agent.py,
-│                evaluation_agent.py, deployment_agent.py, registry.py
-├── graphs/      mlops_graph.py (main StateGraph) + subgraphs/
-├── state/       agent_state.py (TypedDict) + schemas.py (Pydantic)
-├── tools/       data_tools.py, training_tools.py, mlflow_tools.py, evidently_tools.py
-├── prompts/     YAML templates per agent + loader.py
-├── config/      settings.py (Pydantic Settings reads .env) + constants.py
-└── utils/       llm.py (LLM factory), logging.py, runners.py
-dashboard/       Streamlit multi-page app (imports from mlops_agents)
+├── graphs/           mlops_graph.py (topology + thin node wrappers), cli.py (CLI + HITL),
+│                     workflow_controller.py (deterministic router), approval_nodes.py
+│                     (HITL gates), taxonomy.py (node categories)
+├── data_validation/  node.py + agent.py + context.py + schema_contract.py (LLM stage)
+├── planning/         node.py + agent.py + tools.py + validation.py + context.py (LLM stage)
+├── training/         executor.py + profiler, splitter, validation_policy, … (deterministic)
+├── evaluation/       promotion.py (deterministic decision) + report_writer.py (LLM audit)
+├── deployment/       deployer.py (deterministic MLflow registration)
+├── experience/       pool.py + retrieval.py (experience store for the planner)
+├── knowledge/        reader.py (static ML rule base)
+├── models/           loader.py (model registry) + factories.py + search_spaces.py
+├── forecasting/      seasonality.py (season-length policy, import-cycle-free)
+├── contracts/        Pydantic contracts (node→state updates, plans, profiles)
+├── state/            agent_state.py (AgentState TypedDict)
+├── tools/            data_tools.py, join_discovery_tools.py, mlflow_tools.py
+├── prompts/          YAML templates per agent + loader.py
+├── config/           settings.py (Pydantic Settings reads .env) + constants.py
+├── observability/    pricing.py (token→cost)
+└── utils/            llm.py (LLM factory), logging.py
+api/                  FastAPI backend (imports graph from mlops_agents)
+frontend/             Next.js UI (sub-project 2, not started)
 ```
 
 ### Execution flow
 ```
-.env (GITHUB_TOKEN, GITHUB_MODEL)
+.env (OPENAI_API_KEY)
     ↓
 config/settings.py      ← reads env vars
     ↓
-utils/llm.py            ← creates ChatOpenAI pointing to GitHub Models
+utils/llm.py            ← creates ChatOpenAI per agent (model from prompt YAML)
     ↓
-agents/registry.py      ← lazy-builds the 4 agents with @lru_cache
+each LLM stage builds and caches its own agent
+(data_validation/agent.py, planning/agent.py, evaluation/report_writer.py)
     ↓
-graphs/mlops_graph.py   ← StateGraph: START → supervisor → agents → supervisor → END
+graphs/mlops_graph.py   ← StateGraph: START → workflow_controller → stage nodes
+                          → workflow_controller → … → END
     ↓
-dashboard/app.py        ← Streamlit UI  OR  scripts/run_pipeline.py  ← CLI
+api/ (FastAPI)  OR  scripts/run_pipeline.py → graphs/cli.py  ← CLI
 ```
 
 ## Core Principles
@@ -99,10 +114,9 @@ Touch only what you must. Clean up only your own mess.
 - **HITL at**: deployment gate — `interrupt()` in `deployer_node` before MLflow Model Registry promotion
 - **HITL rule**: all code before `interrupt()` must be idempotent (the node restarts on resume)
 - **`interrupt()` placement**: only in graph nodes, never inside react agent tools
-- **Supervisor routing**: structured `RouterOutput` (next + reasoning) — every decision is logged
-- **Rate limits**: 150 RPD per model on GitHub Models free tier — use different models per agent
-- **Agent node names** in the graph: `data_validator`, `trainer`, `evaluator`, `deployer` (not the builder names)
-- **Graceful recursion exit**: check `remaining_steps <= 2` in supervisor and force `Command(goto=END)`
+- **Routing**: deterministic `workflow_controller` (no LLM) reads state and returns `Command(goto=...)` — every decision is logged
+- **Node names** in the graph: `data_validator`, `planner`, `executor`, `evaluation`, `report_writer`, `deployer` + gates `dataset_approval`, `deployment_approval`
+- **Agent ownership**: each LLM stage builds and caches its own agent (`data_validation/agent.py: get_data_agent`, `planning/agent.py: build_planner_agent` per-run, `evaluation/report_writer.py: get_report_writer_agent`) — there is no central registry
 
 ## Testing Conventions
 - Unit tests must NOT make real LLM calls — mock the LLM with `unittest.mock`
@@ -114,5 +128,5 @@ Touch only what you must. Clean up only your own mess.
 - `src/mlops_agents/state/agent_state.py` — shared state schema (read before editing agents)
 - `src/mlops_agents/graphs/mlops_graph.py` — graph topology (the source of truth for flow)
 - `src/mlops_agents/config/settings.py` — all configuration via env vars
-- `src/mlops_agents/agents/registry.py` — lazy agent factory (`get_agent(name)`)
+- `src/mlops_agents/graphs/workflow_controller.py` — deterministic router (routing rules live here)
 - `tests/conftest.py` — shared fixtures (check before creating new ones)

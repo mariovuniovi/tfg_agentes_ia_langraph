@@ -43,7 +43,7 @@ def test_build_report_writer_returns_structured_llm():
         from mlops_agents.evaluation.report_writer import build_report_writer
         result = build_report_writer()
 
-    mock_get_llm.assert_called_once_with("report_writer", max_tokens=8000)
+    mock_get_llm.assert_called_once_with("report_writer")
     fake_llm.with_structured_output.assert_called_once()
     assert result == "STRUCTURED"
 
@@ -74,7 +74,7 @@ def test_run_report_writer_ok_on_first_try():
         "training_plan": {"candidates": [{"model_key": "lightgbm"}]},
         "champion_candidate": {"model_key": "lightgbm"},
     }
-    with patch("mlops_agents.evaluation.report_writer.get_agent", return_value=fake_agent):
+    with patch("mlops_agents.evaluation.report_writer.get_report_writer_agent", return_value=fake_agent):
         result = run_report_writer(state)
 
     assert result["evaluation_report_audit_status"] == "ok"
@@ -95,7 +95,7 @@ def test_run_report_writer_retry_then_stub_on_repeated_failure():
         "training_plan": {},
         "champion_candidate": {},
     }
-    with patch("mlops_agents.evaluation.report_writer.get_agent", return_value=fake_agent):
+    with patch("mlops_agents.evaluation.report_writer.get_report_writer_agent", return_value=fake_agent):
         result = run_report_writer(state)
 
     assert result["evaluation_report_audit_status"] == "stub"

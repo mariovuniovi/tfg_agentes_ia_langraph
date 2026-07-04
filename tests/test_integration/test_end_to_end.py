@@ -53,19 +53,11 @@ def iris_training_plan() -> dict:
         "metric_to_optimize": None,
         "candidates": [
             {"priority": 1, "model_key": "logistic_regression",
-             "search_space_override": None,
-             "requested_trials": None, "reason": ""},
+             "search_space_override": None, "reason": ""},
             {"priority": 2, "model_key": "random_forest_classifier",
-             "search_space_override": None,
-             "requested_trials": None, "reason": ""},
+             "search_space_override": None, "reason": ""},
         ],
         "models_not_recommended": [],
-        "trial_budget": {
-            "total_trials": 12,
-            "allocation_strategy": "priority_weighted",
-            "max_trials_per_candidate": 8,
-            "min_trials_per_candidate": 4,
-        },
         "forecasting_settings": None,
     }
 
@@ -213,8 +205,8 @@ def test_graph_state_flows_through_data_validator_to_supervisor(tmp_path, iris_s
         "_planner_output_record": None,
     }
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", side_effect=lambda _: make_agent()):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
+    with patch("mlops_agents.data_validation.node.get_data_agent", side_effect=lambda: make_agent()):
+        from mlops_agents.data_validation.node import data_validator_node
         command = data_validator_node(state)
 
     assert command.goto == "workflow_controller"

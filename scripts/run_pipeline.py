@@ -11,7 +11,7 @@ from pathlib import Path
 # Ensure src is on the path when running as a script
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from mlops_agents.graphs.mlops_graph import main
+from mlops_agents.graphs.cli import main
 
 if __name__ == "__main__":
     main()

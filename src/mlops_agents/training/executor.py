@@ -31,7 +31,7 @@ from mlops_agents.models.loader import SearchSpaceSpec, get_model
 from mlops_agents.models.search_spaces import build_suggest_fn
 from mlops_agents.training.exog_extender import align_val_exog_index, extend_exog
 from mlops_agents.training.exog_policy import resolve_exog_strategies
-from mlops_agents.training.experience import build_task_id, write_experience_record
+from mlops_agents.training.experience_record import build_task_id, write_experience_record
 from mlops_agents.training.override_validation import narrow_search_space
 from mlops_agents.training.profiler import build_dataset_profile
 from mlops_agents.training.splitter import split_dataset

@@ -100,8 +100,8 @@ def test_data_validator_node_routes_to_workflow_controller(tmp_path):
         tool_content=f'{{"output_path": "{state["processed_dataset_path"]}", "mapped_columns": 2}}',
     )
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
+    with patch("mlops_agents.data_validation.node.get_data_agent", return_value=mock_agent):
+        from mlops_agents.data_validation.node import data_validator_node
         command = data_validator_node(state)
 
     assert command.goto == "workflow_controller"
@@ -126,8 +126,8 @@ def test_data_validator_node_injects_rejection_comment_into_agent(tmp_path):
 
     mock_agent.invoke = capturing_invoke
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent", return_value=mock_agent):
-        from mlops_agents.graphs.mlops_graph import data_validator_node
+    with patch("mlops_agents.data_validation.node.get_data_agent", return_value=mock_agent):
+        from mlops_agents.data_validation.node import data_validator_node
         data_validator_node(state)
 
     feedback_msgs = [m for m in captured_messages if "rejected" in m.content.lower()]
@@ -174,11 +174,9 @@ def _make_executor_state(tmp_path, problem_type="classification"):
         "metric_to_optimize": None,
         "candidates": [
             {"priority": 1, "model_key": "logistic_regression",
-             "search_space_override": None, "requested_trials": None, "reason": ""},
+             "search_space_override": None, "reason": ""},
         ],
         "models_not_recommended": [],
-        "trial_budget": {"total_trials": 10, "allocation_strategy": "priority_weighted",
-                         "max_trials_per_candidate": 10, "min_trials_per_candidate": 3},
         "forecasting_settings": None,
     }
     return {

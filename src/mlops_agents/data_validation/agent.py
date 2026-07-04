@@ -1,12 +1,11 @@
 """Data Validation Agent — validates datasets before they enter the pipeline."""
 
+from functools import cache
+from typing import Any
+
 from langchain.agents import create_agent
 
 from mlops_agents.prompts import get_prompt
-from mlops_agents.tools.join_discovery_tools import (
-    evaluate_join_candidates,
-    execute_join_plan,
-)
 from mlops_agents.tools.data_tools import (
     apply_column_mapping,
     check_data_quality,
@@ -18,10 +17,20 @@ from mlops_agents.tools.data_tools import (
     parse_datetime_column,
     validate_against_schema,
 )
+from mlops_agents.tools.join_discovery_tools import (
+    evaluate_join_candidates,
+    execute_join_plan,
+)
 from mlops_agents.utils.llm import get_llm
 
 
-def build_data_agent():
+@cache
+def get_data_agent() -> Any:
+    """Return the data validation agent, built lazily on first use and cached."""
+    return build_data_agent()
+
+
+def build_data_agent() -> Any:
     """Build and return the data validation react agent."""
     return create_agent(
         model=get_llm("data_agent"),

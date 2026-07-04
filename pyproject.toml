@@ -50,7 +50,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mlops-pipeline = "mlops_agents.utils.runners:run_pipeline"
+mlops-pipeline = "mlops_agents.graphs.cli:main"
 
 [dependency-groups]
 dev = [

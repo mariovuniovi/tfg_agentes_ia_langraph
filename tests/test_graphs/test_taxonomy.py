@@ -1,4 +1,4 @@
-from mlops_agents.agents.taxonomy import NODE_CATEGORIES, is_agent, is_llm_node, is_deterministic, is_hitl
+from mlops_agents.graphs.taxonomy import NODE_CATEGORIES, is_agent, is_llm_node, is_deterministic, is_hitl
 
 def test_categories_are_disjoint_and_cover_all_nodes():
     agents = set(NODE_CATEGORIES["agents"])

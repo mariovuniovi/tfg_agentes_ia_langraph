@@ -1,4 +1,4 @@
-"""Tests for _extract_tool_json and updated worker node state extraction."""
+"""Tests for extract_tool_json and updated worker node state extraction."""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 # ---------------------------------------------------------------------------
-# _extract_tool_json
+# extract_tool_json
 # ---------------------------------------------------------------------------
 
 
 def test_extract_tool_json_finds_matching_message():
-    from mlops_agents.graphs.mlops_graph import _extract_tool_json
+    from mlops_agents.data_validation.context import extract_tool_json
 
     msgs = [
         ToolMessage(
@@ -20,55 +20,55 @@ def test_extract_tool_json_finds_matching_message():
             name="check_data_quality",
         )
     ]
-    result = _extract_tool_json(msgs, "check_data_quality")
+    result = extract_tool_json(msgs, "check_data_quality")
     assert result == {"passed": True, "row_count": 150}
 
 
 def test_extract_tool_json_returns_empty_dict_when_no_match():
-    from mlops_agents.graphs.mlops_graph import _extract_tool_json
+    from mlops_agents.data_validation.context import extract_tool_json
 
-    result = _extract_tool_json([], "check_data_quality")
+    result = extract_tool_json([], "check_data_quality")
     assert result == {}
 
 
 def test_extract_tool_json_returns_last_matching_message():
-    from mlops_agents.graphs.mlops_graph import _extract_tool_json
+    from mlops_agents.data_validation.context import extract_tool_json
 
     msgs = [
         ToolMessage(content='{"row_count": 100}', tool_call_id="1", name="check_data_quality"),
         ToolMessage(content='{"row_count": 200}', tool_call_id="2", name="check_data_quality"),
     ]
-    result = _extract_tool_json(msgs, "check_data_quality")
+    result = extract_tool_json(msgs, "check_data_quality")
     assert result["row_count"] == 200
 
 
 def test_extract_tool_json_handles_invalid_json_gracefully():
-    from mlops_agents.graphs.mlops_graph import _extract_tool_json
+    from mlops_agents.data_validation.context import extract_tool_json
 
     msgs = [ToolMessage(content="not valid json", tool_call_id="1", name="my_tool")]
-    result = _extract_tool_json(msgs, "my_tool")
+    result = extract_tool_json(msgs, "my_tool")
     assert result == {}
 
 
 def test_extract_tool_json_handles_list_result():
-    from mlops_agents.graphs.mlops_graph import _extract_tool_json
+    from mlops_agents.data_validation.context import extract_tool_json
 
     payload = json.dumps([{"run_id": "abc", "metrics": {"accuracy": 0.95}}])
     msgs = [ToolMessage(content=payload, tool_call_id="1", name="get_best_run")]
-    result = _extract_tool_json(msgs, "get_best_run")
+    result = extract_tool_json(msgs, "get_best_run")
     assert isinstance(result, list)
     assert result[0]["run_id"] == "abc"
 
 
 def test_extract_tool_json_skips_non_tool_messages():
-    from mlops_agents.graphs.mlops_graph import _extract_tool_json
+    from mlops_agents.data_validation.context import extract_tool_json
 
     msgs = [
         HumanMessage(content="run pipeline"),
         AIMessage(content="calling tool"),
         ToolMessage(content='{"found": true}', tool_call_id="1", name="my_tool"),
     ]
-    result = _extract_tool_json(msgs, "my_tool")
+    result = extract_tool_json(msgs, "my_tool")
     assert result == {"found": True}
 
 
@@ -142,12 +142,12 @@ def test_agent_state_has_schema_json_field():
 
 
 # ---------------------------------------------------------------------------
-# _validate_schema_contract
+# validate_schema_contract
 # ---------------------------------------------------------------------------
 
 
 def test_validate_schema_contract_passes_for_valid_classification():
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "classification",
@@ -157,22 +157,22 @@ def test_validate_schema_contract_passes_for_valid_classification():
             {"name": "label"},
         ],
     }
-    _validate_schema_contract(schema)  # must not raise
+    validate_schema_contract(schema)  # must not raise
 
 
 def test_validate_schema_contract_passes_for_valid_regression():
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "regression",
         "target_column": "price",
         "columns": [{"name": "size"}, {"name": "price"}],
     }
-    _validate_schema_contract(schema)  # must not raise
+    validate_schema_contract(schema)  # must not raise
 
 
 def test_validate_schema_contract_passes_for_valid_forecasting():
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "forecasting",
@@ -187,23 +187,23 @@ def test_validate_schema_contract_passes_for_valid_forecasting():
             {"name": "sales"},
         ],
     }
-    _validate_schema_contract(schema)  # must not raise
+    validate_schema_contract(schema)  # must not raise
 
 
 def test_validate_schema_contract_raises_on_missing_problem_type():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {"target_column": "label", "columns": [{"name": "label"}]}
     with pytest.raises(ValueError, match="problem_type"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_on_unknown_problem_type():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "clustering",
@@ -211,13 +211,13 @@ def test_validate_schema_contract_raises_on_unknown_problem_type():
         "columns": [{"name": "label"}],
     }
     with pytest.raises(ValueError, match="problem_type"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_when_target_column_missing_from_schema():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "classification",
@@ -225,26 +225,26 @@ def test_validate_schema_contract_raises_when_target_column_missing_from_schema(
         "columns": [{"name": "feature_a"}],
     }
     with pytest.raises(ValueError, match="target_column"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_when_target_column_not_declared():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "regression",
         "columns": [{"name": "price"}],
     }
     with pytest.raises(ValueError, match="target_column"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_on_missing_forecasting_fields():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "forecasting",
@@ -253,13 +253,13 @@ def test_validate_schema_contract_raises_on_missing_forecasting_fields():
         # missing datetime_column, forecast_horizon, frequency
     }
     with pytest.raises(ValueError, match="datetime_column|forecast_horizon|frequency"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "forecasting",
@@ -270,13 +270,13 @@ def test_validate_schema_contract_raises_when_forecast_horizon_not_positive():
         "columns": [{"name": "date"}, {"name": "sales"}],
     }
     with pytest.raises(ValueError, match="forecast_horizon"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_when_forecast_horizon_is_negative():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "forecasting",
@@ -287,13 +287,13 @@ def test_validate_schema_contract_raises_when_forecast_horizon_is_negative():
         "columns": [{"name": "date"}, {"name": "sales"}],
     }
     with pytest.raises(ValueError, match="forecast_horizon"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "forecasting",
@@ -304,13 +304,13 @@ def test_validate_schema_contract_raises_when_datetime_column_not_in_columns():
         "columns": [{"name": "sales"}],
     }
     with pytest.raises(ValueError, match="datetime_column"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_validate_schema_contract_raises_when_series_id_column_not_in_columns():
     import pytest
 
-    from mlops_agents.graphs.mlops_graph import _validate_schema_contract
+    from mlops_agents.data_validation.schema_contract import validate_schema_contract
 
     schema = {
         "problem_type": "forecasting",
@@ -322,11 +322,11 @@ def test_validate_schema_contract_raises_when_series_id_column_not_in_columns():
         "columns": [{"name": "date"}, {"name": "sales"}],
     }
     with pytest.raises(ValueError, match="series_id_columns"):
-        _validate_schema_contract(schema)
+        validate_schema_contract(schema)
 
 
 def test_data_validator_node_populates_validation_report():
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     quality_json = json.dumps(
         {
@@ -346,7 +346,7 @@ def test_data_validator_node_populates_validation_report():
             AIMessage(content="Data validation passed."),
         ]
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -360,10 +360,10 @@ def test_data_validator_node_populates_validation_report():
 
 
 def test_data_validator_node_passed_false_when_no_tool_output():
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     mock_result = {"messages": [AIMessage(content="Could not validate.")]}
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -387,7 +387,7 @@ def test_executor_node_returns_to_supervisor(tmp_path):
     import pandas as pd
     from sklearn.datasets import load_iris
     from mlops_agents.graphs.mlops_graph import executor_node
-    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 
     data = load_iris(as_frame=True)
     df = pd.concat([data.data, data.target.rename("target")], axis=1)
@@ -397,7 +397,6 @@ def test_executor_node_returns_to_supervisor(tmp_path):
     plan = TrainingPlan(
         problem_type="classification",
         candidates=[TrainingPlanCandidate(priority=1, model_key="logistic_regression")],
-        trial_budget=TrialBudget(total_trials=3, min_trials_per_candidate=3, max_trials_per_candidate=3),
     )
     state = _make_state()
     state["processed_dataset_path"] = str(csv_path)
@@ -453,7 +452,7 @@ def test_evaluation_node_populates_evaluation_report():
 
 def test_data_validator_node_extracts_imputation_result():
     """data_validator_node sets validation_passed=True when impute_missing_values succeeds."""
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     imputation_json = json.dumps({
         "output_path": "./data/processed/iris.csv",
@@ -470,7 +469,7 @@ def test_data_validator_node_extracts_imputation_result():
         ]
     }
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -483,7 +482,7 @@ def test_data_validator_node_extracts_imputation_result():
 
 def test_data_validator_node_routes_to_workflow_controller_on_failure():
     """data_validator_node routes to workflow_controller (not supervisor) on validation failure."""
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     validation_json = json.dumps({"passed": False, "violations": [{"column": "target", "rule": "allowed_values", "detail": "Unexpected values: ['bad']"}]})
     mock_result = {
@@ -493,7 +492,7 @@ def test_data_validator_node_routes_to_workflow_controller_on_failure():
         ]
     }
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -511,19 +510,19 @@ def test_data_validator_node_routes_to_workflow_controller_on_failure():
 
 
 def test_build_data_validator_context_includes_raw_files():
-    from mlops_agents.graphs.mlops_graph import _build_data_validator_context
+    from mlops_agents.data_validation.context import build_data_validator_context
 
     state = _make_state()
-    msg = _build_data_validator_context(state)
+    msg = build_data_validator_context(state)
     assert "./data/samples/iris.csv" in msg.content
     assert "Raw files:" in msg.content
 
 
 def test_build_data_validator_context_includes_schema_path():
-    from mlops_agents.graphs.mlops_graph import _build_data_validator_context
+    from mlops_agents.data_validation.context import build_data_validator_context
 
     state = _make_state()
-    msg = _build_data_validator_context(
+    msg = build_data_validator_context(
         state,
         schema_json='{"columns": [{"name": "target"}]}',
         schema_path="/data/schemas/iris.json",
@@ -534,26 +533,12 @@ def test_build_data_validator_context_includes_schema_path():
     assert '"target"' in msg.content
 
 
-def test_build_evaluator_context_includes_run_id_and_metrics():
-    from mlops_agents.graphs.mlops_graph import _build_evaluator_context
-
-    state = _make_state()
-    state["training_run_id"] = "abc123"
-    state["trained_model_path"] = "models/rf.pkl"
-    state["training_metrics"] = {"val_accuracy": 0.95}
-    msg = _build_evaluator_context(state)
-    assert "abc123" in msg.content
-    assert "models/rf.pkl" in msg.content
-    assert "0.95" in msg.content
-
-
-
 def test_data_validator_node_builds_dataset_summary_on_success():
     """data_validator_node must set dataset_summary in state when validation passes."""
     import os
     import tempfile
 
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("a,b\n1,2\n3,4\n")
@@ -568,7 +553,7 @@ def test_data_validator_node_builds_dataset_summary_on_success():
     }
 
     try:
-        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+        with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
@@ -587,10 +572,10 @@ def test_data_validator_node_builds_dataset_summary_on_success():
 
 def test_data_validator_node_sets_empty_dataset_summary_on_failure():
     """dataset_summary must be {} when validation fails."""
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     mock_result = {"messages": [AIMessage(content="Could not validate.")]}
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -605,7 +590,7 @@ def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
     import os
     import tempfile
 
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("sepal_length,target\n5.1,setosa\n6.3,versicolor\n")
@@ -625,7 +610,7 @@ def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
     }
 
     try:
-        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+        with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
@@ -642,11 +627,11 @@ def test_data_validator_node_sets_problem_type_and_task_metadata_in_state():
 
 def test_data_validator_node_aborts_on_contract_violation():
     """data_validator_node must return error Command immediately when schema contract is invalid."""
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     bad_schema = json.dumps({"columns": [{"name": "feature_a"}]})  # no problem_type
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_get_agent.return_value = mock_agent
 
@@ -664,7 +649,7 @@ def test_data_validator_node_aborts_on_contract_violation():
 
 def test_data_validator_node_invokes_agent_with_isolated_context():
     """data_validator_node must NOT pass state['messages'] to agent.invoke."""
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     validation_json = json.dumps({"passed": True, "output_path": ""})
     mock_result = {
@@ -673,7 +658,7 @@ def test_data_validator_node_invokes_agent_with_isolated_context():
             AIMessage(content="Validation passed."),
         ]
     }
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_agent.invoke.return_value = mock_result
         mock_get_agent.return_value = mock_agent
@@ -697,7 +682,7 @@ def test_executor_node_uses_plan_from_state(tmp_path):
     import pandas as pd
     from sklearn.datasets import load_iris
     from mlops_agents.graphs.mlops_graph import executor_node
-    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 
     data = load_iris(as_frame=True)
     df = pd.concat([data.data, data.target.rename("target")], axis=1)
@@ -707,7 +692,6 @@ def test_executor_node_uses_plan_from_state(tmp_path):
     plan = TrainingPlan(
         problem_type="classification",
         candidates=[TrainingPlanCandidate(priority=1, model_key="logistic_regression")],
-        trial_budget=TrialBudget(total_trials=3, min_trials_per_candidate=3, max_trials_per_candidate=3),
     )
     state = _make_state()
     state["processed_dataset_path"] = str(csv_path)
@@ -751,24 +735,12 @@ def test_evaluation_node_is_deterministic_no_agent():
 
 
 
-def test_build_evaluator_context_includes_problem_type_and_task_metadata():
-    from mlops_agents.graphs.mlops_graph import _build_evaluator_context
-
-    state = _make_state()
-    state["problem_type"] = "regression"
-    state["task_metadata"] = {"target_column": "price"}
-    msg = _build_evaluator_context(state)
-    assert "Problem type: regression" in msg.content
-    assert "target_column" in msg.content
-
-
-
 def test_data_validator_node_reads_schema_json_from_state():
     """data_validator_node must use state['schema_json'] instead of loading from disk."""
     import os
     import tempfile
 
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("sepal_length,target\n5.1,setosa\n6.3,versicolor\n")
@@ -788,7 +760,7 @@ def test_data_validator_node_reads_schema_json_from_state():
     }
 
     try:
-        with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+        with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
             mock_agent = MagicMock()
             mock_agent.invoke.return_value = mock_result
             mock_get_agent.return_value = mock_agent
@@ -805,9 +777,9 @@ def test_data_validator_node_reads_schema_json_from_state():
 
 def test_data_validator_node_aborts_when_schema_json_empty():
     """data_validator_node must abort immediately when schema_json is empty."""
-    from mlops_agents.graphs.mlops_graph import data_validator_node
+    from mlops_agents.data_validation.node import data_validator_node
 
-    with patch("mlops_agents.graphs.mlops_graph.get_agent") as mock_get_agent:
+    with patch("mlops_agents.data_validation.node.get_data_agent") as mock_get_agent:
         mock_agent = MagicMock()
         mock_get_agent.return_value = mock_agent
 
