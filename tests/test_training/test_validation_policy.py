@@ -6,7 +6,6 @@ from mlops_agents.contracts.training import (
     ForecastingSettings,
     TrainingPlan,
     TrainingPlanCandidate,
-    TrialBudget,
     ValidationStrategy,
 )
 from mlops_agents.contracts.profile import DatasetProfile
@@ -74,8 +73,6 @@ def _plan_with(forecasting_settings):
     return TrainingPlan(
         problem_type="forecasting",
         candidates=[TrainingPlanCandidate(priority=1, model_key="naive")],
-        trial_budget=TrialBudget(total_trials=2, allocation_strategy="equal",
-                                 min_trials_per_candidate=1, max_trials_per_candidate=2),
         forecasting_settings=forecasting_settings,
     )
 

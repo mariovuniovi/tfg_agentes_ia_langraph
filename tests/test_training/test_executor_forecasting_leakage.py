@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate, TrialBudget,
+    TrainingPlan, TrainingPlanCandidate,
     ValidationStrategy, ExogStrategySettings, ForecastingSettings,
 )
 from mlops_agents.training.executor import run_training_plan
@@ -28,8 +28,6 @@ def _plan(horizon=10):
     return TrainingPlan(
         problem_type="forecasting",
         candidates=[TrainingPlanCandidate(priority=1, model_key="lightgbm_forecaster")],
-        trial_budget=TrialBudget(total_trials=2, allocation_strategy="equal",
-                                 min_trials_per_candidate=1, max_trials_per_candidate=2),
         forecasting_settings=ForecastingSettings(
             validation_strategy=ValidationStrategy(horizon=horizon),
             exog_strategies=ExogStrategySettings(

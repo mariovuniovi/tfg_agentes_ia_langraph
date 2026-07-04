@@ -18,6 +18,6 @@ def test_build_planner_agent_returns_agent():
 
         result = build_planner_agent(tools)
 
-    mock_get_llm.assert_called_once_with("planner", max_tokens=16000)
+    mock_get_llm.assert_called_once_with("planner")
     mock_create_agent.assert_called_once()
     assert result == "AGENT"

@@ -79,9 +79,9 @@ def _ctx(similar_experiences=None, matched_rules=None, rules_by_id=None) -> Plan
     )
 
 
-# --- hard conflict: cited experience winner not selected ---
+# --- cited experience winner not selected is SOFT (expected under a capped set) ---
 
-def test_detect_hard_conflict_cited_experience_winner_not_selected():
+def test_cited_experience_winner_not_selected_is_soft():
     cand = CandidateSpec(
         model_key="ets", priority=1, reason="ok",
         evidence_refs=[_registry_ref("ets")],
@@ -89,8 +89,13 @@ def test_detect_hard_conflict_cited_experience_winner_not_selected():
     out = _output(candidates=[cand], evidence_used=[_exp_ref("e1")])
     ctx = _ctx(similar_experiences=[_es("e1", best_model="extra_trees_forecaster")])
     trace = ToolTrace(retrieved_experience_ids=["e1"])
-    conflicts = _detect_conflicts(ctx, trace, out.plan, out)
-    assert any(c["type"] == "cited_experience_winner_not_selected" for c in conflicts)
+    # Not a hard/blocking conflict any more (the planner is capped to a bounded set,
+    # so some cited winners naturally do not make the selection).
+    hard = _detect_conflicts(ctx, trace, out.plan, out)
+    assert not any(c["type"] == "cited_experience_winner_not_selected" for c in hard)
+    # ...but still surfaced as a soft, informational signal.
+    soft = detect_soft_conflicts(ctx, trace, out.plan, out)
+    assert any(c["type"] == "cited_experience_winner_not_selected" for c in soft)
 
 
 # --- soft conflict: retrieved but not cited ---
@@ -114,13 +119,23 @@ def test_soft_conflict_only_when_retrieved_but_not_cited():
 # --- resolution required for flagged hard conflicts ---
 
 def test_hard_conflict_resolution_required():
+    # A cited rule whose avoided model is selected is still a HARD conflict; without a
+    # resolution in evidence_conflicts it must raise.
     cand = CandidateSpec(
-        model_key="ets", priority=1, reason="ok",
-        evidence_refs=[_registry_ref("ets")],
+        model_key="extra_trees_forecaster", priority=1, reason="ok",
+        evidence_refs=[_registry_ref("extra_trees_forecaster")],
     )
-    out = _output(candidates=[cand], evidence_used=[_exp_ref("e1")])
-    ctx = _ctx(similar_experiences=[_es("e1", best_model="extra_trees_forecaster")])
-    trace = ToolTrace(retrieved_experience_ids=["e1"])
+    rule_ref = EvidenceReference(source="rule", source_id="rule_short_history")
+    out = _output(candidates=[cand], evidence_used=[rule_ref])
+    ctx = _ctx(rules_by_id={
+        "rule_short_history": {
+            "rule_id": "rule_short_history",
+            "prefer": ["ets"],
+            "avoid_or_deprioritize": ["extra_trees_forecaster"],
+            "recommend": [],
+        }
+    })
+    trace = ToolTrace(retrieved_rule_ids=["rule_short_history"])
 
     with pytest.raises(PlannerValidationError, match="evidence_conflicts is empty"):
         _check_conflict_resolution_present_if_flagged(out, ctx, trace)
@@ -128,22 +143,30 @@ def test_hard_conflict_resolution_required():
 
 def test_hard_conflict_with_resolution_passes():
     cand = CandidateSpec(
-        model_key="ets", priority=1, reason="ok",
-        evidence_refs=[_registry_ref("ets")],
+        model_key="extra_trees_forecaster", priority=1, reason="ok",
+        evidence_refs=[_registry_ref("extra_trees_forecaster")],
     )
+    rule_ref = EvidenceReference(source="rule", source_id="rule_short_history")
     resolved = EvidenceConflict(
-        summary="extra_trees_forecaster won in cited experience but rule prefers statistical models",
+        summary="rule avoids extra_trees but exogenous features justify it",
         affected_models=["extra_trees_forecaster"],
-        conflicting_evidence_refs=[_exp_ref("e1")],
-        resolution="short history; statistical baseline safer",
+        conflicting_evidence_refs=[rule_ref],
+        resolution="exogenous calendar features present; tree model justified",
     )
     out = _output(
         candidates=[cand],
-        evidence_used=[_exp_ref("e1")],
+        evidence_used=[rule_ref],
         conflicts=[resolved],
     )
-    ctx = _ctx(similar_experiences=[_es("e1", best_model="extra_trees_forecaster")])
-    trace = ToolTrace(retrieved_experience_ids=["e1"])
+    ctx = _ctx(rules_by_id={
+        "rule_short_history": {
+            "rule_id": "rule_short_history",
+            "prefer": ["ets"],
+            "avoid_or_deprioritize": ["extra_trees_forecaster"],
+            "recommend": [],
+        }
+    })
+    trace = ToolTrace(retrieved_rule_ids=["rule_short_history"])
 
     _check_conflict_resolution_present_if_flagged(out, ctx, trace)  # no raise
 
@@ -171,7 +194,9 @@ def test_cited_rule_avoid_violated_flagged():
     assert any(c["type"] == "cited_rule_avoid_violated" for c in conflicts)
 
 
-def test_cited_rule_prefer_rejected_flagged():
+def test_cited_rule_prefer_rejected_is_soft():
+    # A cited rule preferring a model that the (capped) plan rejected is expected,
+    # so it is a SOFT signal, not a hard/blocking conflict.
     cand = CandidateSpec(
         model_key="extra_trees_forecaster", priority=1, reason="ok",
         evidence_refs=[_registry_ref("extra_trees_forecaster")],
@@ -192,8 +217,10 @@ def test_cited_rule_prefer_rejected_flagged():
     })
     trace = ToolTrace(retrieved_rule_ids=["rule_short_history"])
 
-    conflicts = _detect_conflicts(ctx, trace, out.plan, out)
-    assert any(c["type"] == "cited_rule_prefer_rejected" for c in conflicts)
+    hard = _detect_conflicts(ctx, trace, out.plan, out)
+    assert not any(c["type"] == "cited_rule_prefer_rejected" for c in hard)
+    soft = detect_soft_conflicts(ctx, trace, out.plan, out)
+    assert any(c["type"] == "cited_rule_prefer_rejected" for c in soft)
 
 
 # --- no false positives ---

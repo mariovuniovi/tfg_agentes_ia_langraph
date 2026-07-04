@@ -10,6 +10,7 @@
 | 5 | Desarrollo e Implementación | Agente de validación de datos, Agente de entrenamiento, Agente de evaluación, Agente de despliegue, Pool de experiencia, API REST y frontend, Contenerización | cap05_join_discovery.tex (parcial) | pending |
 | 6 | Resultados | Introducción, Evaluación del pool de experiencias (benchmarks), Comportamiento agéntico: casos de estudio, Coste agéntico y supervisión humana | cap06_resultados.tex | done |
 | 7 | Conclusiones y Trabajo Futuro | Conclusiones, Limitaciones, Escalabilidad del proyecto, Trabajo futuro | — | pending |
+| A | Anexo: Interfaz de usuario | Visión general (3 ventanas), Pipeline, Experiments, Observability | anexo_interfaz.tex | done |
 
 ## Terminology (ES)
 | English term | Spanish term used |
@@ -50,6 +51,13 @@
 | referential integrity | integridad referencial |
 | ordinal encoding | codificación ordinal |
 | id column drop | descarte de columnas identificadoras |
+| control panel | panel de control |
+| run header | cabecera de ejecución |
+| pipeline stepper | stepper / secuenciador de etapas |
+| Server-Sent Events | flujo de eventos (Server-Sent Events) |
+| run detail panel | detalle de ejecución |
+| estimated cost | coste estimado |
+| empty state | estado vacío |
 
 ## Cross-references
 | Label | Introduced in | Description |
@@ -135,3 +143,10 @@
 | tab:coste-desglose | cap06 | Tiempo de cómputo por nodo y coste USD por ejecución |
 | tab:variabilidad | cap06 | 4 repeticiones de la panadería: coste variable |
 | fig:cap06-join-plan | cap06 | Plan de join inferido para Grid Demand (captura UI) |
+| anexo:interfaz | anexo_interfaz | Anexo raíz: interfaz de usuario del panel de control |
+| anexo:ui-pipeline | anexo_interfaz | Ventana Pipeline: lanzamiento, eventos SSE y puertas HITL |
+| anexo:ui-experiments | anexo_interfaz | Ventana Experiments: detalle de ejecución sin gráficas (MLflow) |
+| anexo:ui-observability | anexo_interfaz | Ventana Observability: salud, coste LLM estimado y uso de herramientas |
+| fig:ui-pipeline | anexo_interfaz | Captura de la ventana Pipeline en estado idle |
+| fig:ui-experiments | anexo_interfaz | Captura de la ventana Experiments (extra_trees_forecaster) |
+| fig:ui-observability | anexo_interfaz | Captura de la ventana Observability sin ejecución activa |

@@ -8,7 +8,6 @@ from mlops_agents.contracts.training import (
     SearchParamOverride,
     TrainingPlan,
     TrainingPlanCandidate,
-    TrialBudget,
 )
 
 
@@ -52,22 +51,6 @@ def test_training_plan_unique_priorities_required():
     ]
     with pytest.raises(ValidationError, match="unique"):
         TrainingPlan(problem_type="classification", candidates=candidates)
-
-
-def test_training_plan_default_trial_budget():
-    plan = TrainingPlan(
-        problem_type="classification",
-        candidates=[TrainingPlanCandidate(priority=1, model_key="logistic_regression")],
-    )
-    assert plan.trial_budget.total_trials == 60
-    assert plan.trial_budget.allocation_strategy == "priority_weighted"
-
-
-def test_trial_budget_field_default_factory():
-    """Two TrialBudget instances must be independent (no shared mutable default)."""
-    a = TrialBudget()
-    b = TrialBudget()
-    assert a is not b
 
 
 def test_rejected_model_basic():

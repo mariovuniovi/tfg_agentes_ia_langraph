@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate, TrialBudget,
+    TrainingPlan, TrainingPlanCandidate,
     ValidationStrategy, ExogStrategySettings, ForecastingSettings,
 )
 from mlops_agents.training.executor import run_training_plan
@@ -27,8 +27,6 @@ def test_panel_forecasting_raises_not_implemented(tmp_path: Path, monkeypatch: p
     plan = TrainingPlan(
         problem_type="forecasting",
         candidates=[TrainingPlanCandidate(priority=1, model_key="naive")],
-        trial_budget=TrialBudget(total_trials=2, allocation_strategy="equal",
-                                 min_trials_per_candidate=1, max_trials_per_candidate=2),
         forecasting_settings=ForecastingSettings(
             validation_strategy=ValidationStrategy(horizon=4),
             exog_strategies=ExogStrategySettings(),

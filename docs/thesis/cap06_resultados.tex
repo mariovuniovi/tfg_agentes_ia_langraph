@@ -203,10 +203,33 @@ agregada y determinista, esta sección examina el sistema \emph{en funcionamient
 seis casos de estudio a través del pipeline interactivo completo, cada uno diseñado para
 validar un aspecto distinto del comportamiento agéntico. Todas las ejecuciones se
 realizaron con los modelos \texttt{gpt-5.4-mini} (validador y planificador) y
-\texttt{gpt-5.4-nano} (informe de auditoría) sobre la capa gratuita de GitHub~Models.
+\texttt{gpt-5.4-nano} (informe de auditoría) a través de la API de OpenAI.
 La Tabla~\ref{tab:casos-resumen} resume las cuatro ejecuciones de pronóstico; las
 métricas de error son SMAPE (\textit{Symmetric Mean Absolute Percentage Error}),
-adimensional y comparable entre escalas.
+adimensional y comparable entre escalas. La Tabla~\ref{tab:casos-roadmap} sintetiza, a modo
+de hoja de ruta, qué capacidad valida cada caso y su resultado principal.
+
+\begin{table}[H]
+\centering
+\caption{Hoja de ruta de los casos de estudio del pipeline interactivo (todos de
+ pronóstico). Las métricas de error se detallan en la Tabla~\ref{tab:casos-resumen}.}
+\label{tab:casos-roadmap}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrp{3.9cm}p{4.6cm}}
+\toprule
+\textbf{\S} & \textbf{Dataset} & \textbf{Filas} & \textbf{Aspecto evaluado} & \textbf{Resultado principal} \\
+\midrule
+6.2.1 & Revenue        & 120    & Recuperación del \textit{pool} por similitud & Perfil idéntico a Air~Passengers (sim.\ 1,00); campeón AutoARIMA \\
+6.2.1 & Air Passengers & 144    & Recuperación exacta del \textit{pool}        & Recupera su experiencia homónima (sim.\ 0,83) \\
+6.2.2 & Grid Demand    & 156    & \textit{Joins} multi-tabla, cobertura total  & 3 \textit{joins} 1-a-1 (cobertura 100\,\%); el humano confirma \\
+6.2.3 & Bakery         & 1.000  & Adaptación de familia con exógenas           & Amplía a candidatos de árboles; campeón ETS \\
+6.2.4 & Casos \textit{break} & --- & Robustez ante entradas malformadas          & Estado terminal limpio sin entrenar \\
+6.2.6 & Store Sales         & 156    & \textit{Joins} con cobertura parcial         & Une contexto al 72\,\%, imputa 43 huérfanas, entrena y despliega \\
+6.3   & Large (Factory)& 10.000 & Tratabilidad y coste por tamaño              & Coste agéntico independiente del tamaño \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{table}[H]
 \centering
@@ -397,121 +420,84 @@ proponer nunca un modelo de pronóstico. El cambio de tipo de problema se propag
 el esquema cargado por el usuario a través del estado compartido, y ni el controlador ni
 el ejecutor requieren modificación. Las mejoras introducidas en el dominio de pronóstico
 no degradan el comportamiento en clasificación o regresión.
-El caso siguiente hace concreta esta generalidad con una ejecución de regresión que, a
-diferencia de los \textit{datasets} tabulares limpios del \textit{benchmark}, ejercita
-el camino completo de ingeniería de datos sobre fuentes multi-tabla con integridad
-referencial imperfecta.
+El último caso de estudio vuelve al pronóstico para ejercitar el camino completo de
+ingeniería de datos —descubrimiento de \textit{joins} e integridad referencial imperfecta—
+sobre fuentes multi-tabla, esta vez con cobertura parcial del contexto exógeno.
 
-% ── 6.2.6  Joins imperfectos y características categóricas ───────────────────
+% ── 6.2.6  Joins con cobertura parcial en pronóstico ────────────────────────
 
-\subsubsection{Joins imperfectos y características categóricas en regresión}
+\subsubsection{Joins con cobertura parcial en pronóstico}
 \label{sec:caso-joins-imperfectos}
 
-Este último caso es el más exigente para el agente de validación porque concentra en una
-sola subida los tres frentes que un escenario multi-tabla real plantea: integridad
-referencial imperfecta, características categóricas que requieren imputación y
-codificación, y columnas identificadoras que no deben convertirse en variables
-predictoras. Es además un problema de regresión, por lo que materializa de forma concreta
-la generalidad argumentada en la Sección~\ref{sec:caso-generalidad}.
+El último caso lleva el descubrimiento de \textit{joins} al terreno más exigente para una
+serie temporal: enriquecer una serie con contexto exógeno cuando ese contexto solo cubre
+\emph{parte} del histórico. Es la contraparte en pronóstico del \textit{join} de cobertura
+total de Grid~Demand (Sección~\ref{sec:caso-joins}), pero aquí una de las fuentes deja
+periodos huérfanos que hay que imputar, y las exógenas se separan entre las de
+disponibilidad futura conocida y desconocida —una distinción que solo existe en pronóstico—.
 
-Se cargaron cuatro ficheros: una tabla de hechos de ventas minoristas
-(\texttt{retail\_sales}, 320~filas, objetivo \texttt{revenue\_eur}) y tres tablas de
-dimensión —catálogo de productos, directorio de tiendas y segmentos de cliente— cuyas
-claves tienen nombres distintos de los de la tabla de hechos
-(\texttt{product\_id}$\,\leftrightarrow\,$\texttt{sku},
-\texttt{store\_id}$\,\leftrightarrow\,$\texttt{store\_code},
-\texttt{segment\_code}$\,\leftrightarrow\,$\texttt{segment\_code}). El descubrimiento de
-\textit{joins} alineó las tres claves de forma semántica y reportó, para cada una, las
-métricas que distinguen tres regímenes de integridad referencial muy distintos
+Se cargaron tres ficheros: la serie base de ventas semanales (\texttt{weekly\_demand},
+156~semanas, objetivo \texttt{units\_sold}) y dos tablas de contexto cuyas claves temporales
+tienen nombres distintos de la serie base. El descubrimiento de \textit{joins} las alineó
+semánticamente sobre la fecha y reportó dos regímenes de cobertura muy distintos
 (Tabla~\ref{tab:joins-imperfectos}).
 
 \begin{table}[H]
 \centering
-\caption{\textit{Joins} descubiertos en \texttt{retail\_sales}.
- \textit{Cobertura izq.}\ = fracción de filas de la tabla de hechos con correspondencia;
- \textit{Contención} = relación entre el conjunto de claves foráneas (FK) y el de claves
- primarias (PK) de la dimensión.}
+\caption{\textit{Joins} descubiertos en \texttt{weekly\_demand}. \textit{Cobertura} =
+ fracción de las 156~semanas de la serie con correspondencia en la tabla de contexto;
+ \textit{Disp.\ futura} = disponibilidad de la exógena en el horizonte de pronóstico.}
 \label{tab:joins-imperfectos}
 \small
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lllll}
 \toprule
-\textbf{Dimensión} & \textbf{Clave (hecho\,$\leftrightarrow$\,dim.)}
-  & \textbf{Cobertura izq.} & \textbf{Contención} & \textbf{Acción} \\
+\textbf{Contexto} & \textbf{Clave (base\,$\leftrightarrow$\,ctx.)}
+  & \textbf{Cobertura} & \textbf{Disp.\ futura} & \textbf{Acción} \\
 \midrule
-Producto  & \texttt{product\_id}$\,\leftrightarrow\,$\texttt{sku}
-          & 100\,\%   & FK\,$\subsetneq$\,PK (40/60) & \textit{Join} limpio \\
-Tienda    & \texttt{store\_id}$\,\leftrightarrow\,$\texttt{store\_code}
-          & 71,6\,\%  & parcial + huérfanas          & \textit{Join} + imputación + dedup. \\
-Segmento  & \texttt{segment\_code}$\,\leftrightarrow\,$\texttt{segment\_code}
-          & 100\,\%   & FK\,$\subsetneq$\,PK (4/6)    & \textit{Join} limpio \\
+Meteorología & \texttt{week}$\,\leftrightarrow\,$\texttt{week\_ref}
+             & 72,4\,\% (113/156) & desconocida & \textit{Join} + imputación (43 huérfanas) \\
+Calendario   & \texttt{week}$\,\leftrightarrow\,$\texttt{week\_key}
+             & 100\,\% ($+$12 fut.) & conocida & \textit{Join} limpio \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-La distinción que el sistema establece es clave. Las dimensiones de producto y segmento
-presentan \emph{contención}: la dimensión contiene más claves de las que la tabla de
-hechos utiliza (40 de 60~SKU; 4 de 6~segmentos), pero \emph{todas} las filas de hechos
-encuentran correspondencia (cobertura izquierda del 100\,\%). Es el caso benigno
-FK\,$\subsetneq$\,PK: un \textit{join} \textsc{left} limpio sin valores nulos. El
-directorio de tiendas, en cambio, es el caso problemático: solo cubre el 71,6\,\% de las
-filas (229 de 320), dejando 91~filas \emph{huérfanas} cuyos atributos de tienda
-(\texttt{region}, \texttt{store\_size\_sqm}, \texttt{store\_type}) quedan nulos tras el
-\textit{join}; además contiene una clave duplicada (\texttt{ST05} aparece dos veces), que
-el descubrimiento señala como riesgo de cardinalidad y resuelve deduplicando la dimensión
-para que el multiplicador de filas se mantenga en $1{,}00\times$ y la tabla de hechos no
-se infle. Que el sistema separe estos dos regímenes —cobertura parcial benigna frente a
-claves foráneas huérfanas— descansa en reportar por separado la cobertura izquierda y la
-contención, y en aplicar un umbral de aviso (cobertura $<$ 80\,\%) que solo dispara la
-alerta sobre el \textit{join} de tiendas.
+El calendario presenta \emph{contención} benigna: cubre las 156~semanas de la serie y aporta
+12~semanas futuras adicionales (FK\,$\subsetneq$\,PK), útiles porque sus variables
+(\texttt{is\_holiday\_week}, \texttt{week\_of\_year}) son de \emph{futuro conocido} y podrán
+alimentar el horizonte de pronóstico. La meteorología, en cambio, solo cubre el 72,4\,\% de
+las semanas (113 de 156), dejando 43~semanas \emph{huérfanas} cuyas variables
+(\texttt{mean\_temp\_c}, \texttt{rainfall\_mm}) quedan nulas tras el \textit{join}; al ser de
+futuro \emph{desconocido} requerirán además una estrategia de extensión determinista en el
+horizonte. El descubrimiento aplica un umbral de aviso (cobertura $<$ 80\,\%) que dispara la
+alerta solo sobre el \textit{join} meteorológico —el que el revisor inspecciona en la puerta
+de aprobación del \textit{dataset}, de nuevo bajo el principio de que el humano
+\emph{confirma} la integridad imperfecta detectada, no la diagnostica—.
 
-El plan de \textit{join}, con su cobertura y su nivel de riesgo por candidato, se presenta
-al revisor en la puerta de aprobación del \textit{dataset} (Figura~\ref{fig:cap06-join-imperfecto}),
-de nuevo bajo el principio de que el humano \emph{confirma} la integridad imperfecta
-detectada, no la diagnostica.
+Tras la aprobación, la cadena determinista resolvió la cobertura parcial sin intervención
+adicional: el agente de validación \emph{imputó} las dos columnas meteorológicas de las
+43~semanas huérfanas y revalidó el \textit{dataset} con éxito (0~violaciones), materializando
+un \textit{dataset} de 156~filas $\times$ 6~columnas con cuatro exógenas. La estrategia de
+extensión de exógenas —fijada por política determinista, no por el LLM— asignó a las
+variables de futuro desconocido su forma de propagación al horizonte, mientras las de futuro
+conocido se usaron directamente.
 
-\begin{figure}[H]
-\centering
-% Fuente: captura de la tarjeta de aprobación del dataset (run retail_sales_partial_join)
-\includegraphics[width=\textwidth]{figuras/cap06/retail_join_imperfecto.png}
-\caption{Plan de \textit{join} para \texttt{retail\_sales} en la puerta de aprobación. El
- agente reporta la cobertura parcial del directorio de tiendas (71,6\,\%) y las filas
- huérfanas resultantes, junto a los dos \textit{joins} limpios de producto y segmento.}
-\label{fig:cap06-join-imperfecto}
-\end{figure}
+El campeón seleccionado en validación fue AutoARIMA (RMSE de validación $\approx$~28,5),
+estable entre repeticiones. A diferencia de un objetivo sin señal aprendible suficiente,
+\emph{superó} la puerta de evaluación determinista: el sistema ofreció la puerta de
+despliegue y, tras la confirmación humana, promovió el modelo al registro. Las cuatro
+pestañas de la interfaz —\textit{dataset}, planificador, modelo y auditoría— se completaron
+en verde con un modelo desplegado.
 
-Tras la aprobación, la cadena determinista resolvió los tres frentes sin intervención
-adicional. Primero, el agente de validación \emph{imputó} las 91~filas huérfanas —los
-atributos categóricos \texttt{region} y \texttt{store\_type} con la moda, y el numérico
-\texttt{store\_size\_sqm} con la media— y revalidó el \textit{dataset} con éxito.
-Segundo, el ejecutor \emph{descartó} la columna \texttt{txn\_id}: marcada como
-\texttt{unique:\,true} en el esquema y no estructural (ni objetivo, ni índice temporal),
-es un identificador puro que no debe filtrarse como ruido de alta cardinalidad al modelo.
-Tercero, el \textit{pipeline} del modelo \emph{codificó} de forma ordinal las columnas
-categóricas restantes (\texttt{category}, \texttt{brand}, \texttt{region},
-\texttt{store\_type}, \texttt{segment\_name}) antes del ajuste, dejando intactas las
-numéricas. El orden importa: la imputación de cadenas precede a la codificación, de modo
-que el codificador nunca recibe nulos.
-
-El campeón seleccionado en validación fue Ridge (RMSE~285,26; MAE~210,32; R$^2 \approx
-0{,}50$ sobre el conjunto de prueba retenido). Es relevante que la puerta de evaluación
-determinista \emph{retuviera} la promoción: con R$^2 = 0{,}50 < 0{,}70$ (umbral aplicado),
-el sistema no ofreció la puerta de despliegue y alcanzó un estado terminal limpio sin
-promover el modelo. Esto no es un fallo sino la conducta honesta esperada: el objetivo
-sintético tiene una señal aprendible limitada por construcción, y el sistema declina
-promover un modelo por debajo del umbral en lugar de enmascararlo. Las cuatro pestañas de
-la interfaz —\textit{dataset}, planificador, modelo y auditoría— se completaron en verde,
-documentando un recorrido íntegro pese a la decisión de no promover.
-
-En conjunto, este caso ejercita toda la superficie de ingeniería de datos que una subida
-multi-tabla real presenta —emparejamiento semántico de claves con nombres distintos, tres
-regímenes de integridad referencial en una sola subida, cardinalidad con clave duplicada,
-mezcla de características categóricas y numéricas, e higiene de identificadores— y la
-columna vertebral determinista la resolvió en su totalidad sin más intervención humana que
-la única puerta de confirmación. Es la evidencia más completa de la afirmación~(i): la
-robustez del controlador y del agente de validación no se limita a entradas malformadas
-(Sección~\ref{sec:caso-robustez}), sino que abarca la integridad referencial parcial,
-el escenario más común y silencioso en datos tabulares del mundo real.
+En conjunto, este caso demuestra que el descubrimiento de \textit{joins} y el manejo de
+integridad referencial parcial —emparejamiento semántico de claves temporales con nombres
+distintos, cobertura parcial con imputación de periodos huérfanos, y separación de exógenas
+por disponibilidad futura— operan igual en pronóstico que en un escenario tabular, cerrando
+el recorrido completo hasta el despliegue. Es la contraparte en series temporales del
+\textit{join} de cobertura total de Grid~Demand (Sección~\ref{sec:caso-joins}): el mismo
+mecanismo determinista frente a un régimen de integridad referencial más difícil, el
+escenario más común y silencioso en las fuentes de datos del mundo real.
 
 % ============================================================
 \subsection{Coste agéntico y supervisión humana}
@@ -527,79 +513,133 @@ cuantifica a partir de la instrumentación del propio sistema (tarjeta de coste 
 \subsubsection{Desglose de coste por nodo}
 \label{sec:coste-desglose}
 
-La Tabla~\ref{tab:coste-desglose} desglosa, para tres casos de pronóstico
-representativos —Revenue, Grid y Bakery—, el
+La Tabla~\ref{tab:coste-desglose} desglosa, para cinco casos de pronóstico
+representativos —Revenue, Bakery, Large, Grid y Store~Sales—, el
 tiempo de cómputo por nodo (excluyendo las pausas de revisión humana en las puertas
 HITL) y el coste monetario estimado. El tiempo se mide a partir de las marcas temporales
 del \textit{EventLog}; el coste, a partir del recuento de \textit{tokens} y la tabla de
 precios local (\texttt{gpt-5.4-mini}: \$0,75/\$4,50 por millón de \textit{tokens} de
-entrada/salida; \texttt{gpt-5.4-nano}: \$0,20/\$1,25). Se omite Air~Passengers del
-desglose porque no aporta un régimen de coste distinto: en su variante con \textit{join}
-coincide con Grid y en su variante de fichero único con Revenue. Su aportación específica
-—la validación de la recuperación del \textit{pool}— se documenta en
-la Sección~\ref{sec:caso-retrieval}.
+entrada/salida; \texttt{gpt-5.4-nano}: \$0,20/\$1,25). Los tres primeros casos son de
+fichero único y cubren el eje de tamaño (120, 1.000 y 10.000 filas); los dos últimos
+ejercitan el descubrimiento de \textit{joins} (4 y 3 ficheros de origen), y el último
+(Store~Sales) además con \emph{cobertura parcial} —semanas sin contexto que el validador imputa—.
+Las cifras promedian
+entre 5 y 10 ejecuciones por caso —\textit{headless} (con las puertas HITL auto-aprobadas)
+e interactivas—, excluyendo las pausas humanas en las puertas HITL y las ejecuciones con
+reintento del planificador (tratadas aparte en la Sección~\ref{sec:coste-variabilidad}).
 
 \begin{table}[H]
 \centering
 \caption{Desglose de tiempo de cómputo (segundos) y coste por ejecución. Los nodos
  \texttt{executor}, \texttt{evaluation} y \texttt{deployer} son deterministas; el resto
  son agénticos (LLM). El tiempo excluye las pausas humanas en las puertas HITL.
- Las tres columnas promedian 3 ejecuciones; los tiempos por nodo
- se reconstruyen a partir de las marcas de tiempo de los eventos del \textit{run}.}
+ Cada columna promedia entre 5 y 10 ejecuciones (fila \textit{N}); los tiempos por nodo se
+ reconstruyen a partir de las marcas de tiempo de los eventos del \textit{run}. Se excluyen
+ las ejecuciones con reintento del planificador —caracterizadas aparte en la
+ Sección~\ref{sec:coste-variabilidad}—, de modo que el tiempo del \texttt{planner}
+ corresponde a una única llamada al LLM. Se indica
+ media\,$\pm$\,desviación típica en las dos filas de mayor varianza. Los tiempos son
+ intrínsecamente variables por dos causas distintas: la latencia de la API en los nodos LLM
+ (sobre todo el \texttt{planner}) y, en el \texttt{executor}, el conjunto de candidatos que
+ el \texttt{planner} selecciona en cada ejecución —un plan con modelos pesados (p.\,ej.\
+ \textit{xgboost} o árboles) multiplica el tiempo de entrenamiento—. Store~Sales es un
+ \textit{join} de cobertura parcial (3 ficheros); Grid es un \textit{join} de cobertura
+ total (4 ficheros).}
 \label{tab:coste-desglose}
 \small
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{lrrrr}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrrr}
 \toprule
 \textbf{Nodo} & \textbf{Tipo}
-  & \textbf{Revenue} & \textbf{Grid} & \textbf{Bakery} \\
+  & \textbf{Revenue} & \textbf{Bakery} & \textbf{Large} & \textbf{Grid} & \textbf{Store Sales} \\
 \midrule
-\texttt{data\_validator} & LLM    & 23,6 & 44,2 & 16,9 \\
-\texttt{planner}         & LLM    & 60,9 & 55,4 & 120,9 \\
-\texttt{executor}        & Determ.& 17,3 & 20,7 & 95,9 \\
-\texttt{evaluation}      & Determ.& 0,1 & 0,1 & 0,1 \\
-\texttt{report\_writer}  & LLM    & 5,6 & 7,7 & 6,5 \\
+\texttt{data\_validator} & LLM    & 21,5 & 21,1 & 22,7 & 50,6 & 44,9 \\
+\texttt{planner}         & LLM    & $55{,}3{\pm}19$ & $71{,}2{\pm}8$ & $72{,}8{\pm}17$ & $59{,}3{\pm}15$ & $61{,}3{\pm}26$ \\
+\texttt{executor}        & Determ.& $8{,}4{\pm}1$ & $56{,}5{\pm}34$ & $116{,}0{\pm}42$ & $10{,}0{\pm}1$ & $7{,}7{\pm}1$ \\
+\texttt{evaluation}      & Determ.& 0,1 & 0,1 & 0,1 & 0,1 & 0,0 \\
+\texttt{report\_writer}  & LLM    & 5,9 & 5,5 & 6,7 & 6,2 & 6,4 \\
+\texttt{deployer}        & Determ.& 0,3 & 0,3 & — & 0,4 & 0,3 \\
 \midrule
-\textbf{Total cómputo}   &        & 107,5 & 128,1 & 240,1 \\
-\textbf{Cuota LLM}       &        & 84\,\% & 84\,\% & 60\,\% \\
+\textbf{Total cómputo}   &        & 91,5 & 154,7 & 218,3 & 126,6 & 120,6 \\
+\textbf{Cuota LLM}       &        & 90\,\% & 63\,\% & 47\,\% & 92\,\% & 93\,\% \\
 \midrule
-\textbf{Coste (USD)}     &        & 0,091 & 0,175 & 0,137 \\
+\textbf{Coste (USD)}     &        & 0,087 & 0,091 & 0,094 & 0,173 & 0,157 \\
+\midrule
+\multicolumn{2}{l}{\textit{N (ejecuciones)}} & 9 & 9 & 9 & 10 & 5 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Tres observaciones se desprenden de la tabla. Primero, el coste monetario por ejecución
-completa es muy bajo —entre \$0,09 y \$0,18—, dominado por el agente de validación
+De la tabla se desprenden cuatro observaciones. Primero, el coste monetario por ejecución
+completa es bajo —entre \$0,09 y \$0,17—, dominado por el agente de validación
 (cuyo histórico de mensajes crece con cada ronda de herramientas) y por el planificador.
-Segundo, la cuota del tiempo de cómputo atribuible a los nodos LLM oscila entre el 60\,\%
-y el 84\,\%: un pipeline determinista tradicional solo pagaría la fracción restante
+Segundo, el descubrimiento de \textit{joins} \emph{reubica} el coste en el
+\texttt{data\_validator}: su coste pasa de \$0,03 en fichero único (Revenue, Bakery, Large)
+a \$0,10--0,12 cuando hay \textit{joins} (Grid, Store~Sales), mientras el coste del
+planificador se mantiene estable; el sobrecoste de varias tablas es, por tanto, un coste de
+validación de datos. El caso Store~Sales muestra además que la \emph{cobertura parcial} —semanas
+huérfanas sin contexto que el validador imputa— no añade coste apreciable frente a un
+\textit{join} limpio: su perfil de coste coincide con el de Grid. Tercero, la cuota del tiempo de cómputo atribuible a los nodos LLM
+oscila entre el 47\,\% y el 93\,\%: cae cuando el entrenamiento es pesado (Large, 47\,\%;
+Bakery, 63\,\%) y sube cuando es ligero (series cortas y \textit{joins}, 90--93\,\%). Un
+pipeline determinista tradicional solo pagaría la fracción restante
 (\texttt{executor}\,+\,\texttt{evaluation}). Ese sobrecoste agéntico compra exactamente
 las cuatro capacidades que justifican la arquitectura: selección adaptativa de modelos,
 acumulación de experiencia, informes de auditoría en lenguaje natural y las puertas de
-supervisión humana. Tercero, el tiempo del \texttt{executor} \emph{sí} escala con la
-complejidad: 95,9~s en la panadería (1.000~filas y candidatos supervisados de árboles)
-frente a 17--21~s en Revenue y Grid, de histórico corto y candidatos estadísticos.
+supervisión humana. Cuarto, el tiempo del \texttt{executor} escala con el volumen de datos
+—116~s en Large (10.000~filas horarias) frente a 8--10~s en Revenue, Grid y Store~Sales, de
+histórico corto— pero su gran varianza (desviación típica de $\pm$34--42~s en Bakery y
+Large) revela una segunda dependencia más sutil: como el \texttt{executor} entrena
+\emph{todos} los candidatos que el \texttt{planner} propuso, su coste hereda la
+no-determinación del plan. Un plan que incluye un modelo pesado (p.\,ej.\ \textit{xgboost} o
+un ensemble de árboles) multiplica por tres el tiempo de entrenamiento frente a otro de
+solo candidatos estadísticos, sobre los mismos datos. Así, el nodo determinista por
+excelencia exhibe, paradójicamente, un coste no determinista —un matiz que la
+Sección~\ref{sec:coste-variabilidad} desarrolla para el \texttt{planner}—.
 
-\paragraph{Reintentos del agente como factor de inflación.}
-Las cifras de un nodo agéntico pueden además inflarse por \emph{reintentos}: cuando la
-salida estructurada de un agente no supera la validación determinista de su esquema, el
-nodo se reejecuta dentro de su presupuesto de intentos. Es ilustrativo el caso de la
-panadería, cuya columna promedia 3 ejecuciones: en 2 de ellas el planificador reintentó
-—su salida citaba una evidencia de tipo \texttt{dataset\_profile} con \texttt{source\_id}
-no nulo, rechazada por el validador— y ese reintento prácticamente \textbf{duplica tanto
-el tiempo como el coste} de ese nodo, de $\sim$77~s y \$0,07 sin reintento a $\sim$140~s
-y \$0,12 con él. El reintento es, por tanto, el principal factor de variabilidad de coste
-entre ejecuciones de un mismo \textit{dataset}, por encima del tamaño o el tipo de
-problema. Conviene subrayar que el reintento no es un fallo del sistema sino su garantía
-de integridad funcionando: la validación determinista nunca acepta una salida malformada,
-y prefiere pagar un segundo intento a propagar un plan inválido aguas abajo.
+\paragraph{Variabilidad entre ejecuciones.}
+Los dos nodos de mayor varianza son el \texttt{executor} —por la elección de candidatos ya
+descrita— y el \texttt{planner}, cuya desviación típica ($\pm$8 a $\pm$26~s según el caso,
+una vez excluidos de la Tabla~\ref{tab:coste-desglose} los reintentos) tiene a su vez dos
+factores. El primero es el tamaño del bloque de razonamiento que el
+modelo genera antes de emitir el plan: al ser texto generado \textit{token} a \textit{token},
+su latencia y su coste escalan con cuántos \textit{tokens} de razonamiento produzca, que
+varía entre ejecuciones.
+El segundo son los \emph{reintentos}: cuando la salida estructurada de un agente no supera
+la validación determinista de su esquema, el nodo se reejecuta dentro de su presupuesto de
+intentos, lo que puede prácticamente \textbf{duplicar su tiempo y su coste} (por ejemplo,
+un reintento del planificador cuya salida citaba una evidencia de tipo
+\texttt{dataset\_profile} con \texttt{source\_id} no nulo, rechazada por el validador).
+Conviene subrayar que el reintento no es un fallo del sistema sino su garantía de
+integridad funcionando: la validación determinista nunca acepta una salida malformada, y
+prefiere pagar un segundo intento a propagar un plan inválido aguas abajo.
 
 \paragraph{Nota honesta sobre la latencia.}
-Los tiempos de los nodos LLM están acotados por la latencia de la API y los límites de
-la capa gratuita de GitHub~Models (150 peticiones diarias por modelo), no por el cómputo
-propio del sistema. En un nivel de pago, las fases agénticas serían considerablemente más
-rápidas; las cifras de la Tabla~\ref{tab:coste-desglose} deben leerse como una cota
-superior conservadora.
+Los tiempos de los nodos LLM están dominados por la latencia de la API de OpenAI
+—en particular la generación del bloque de razonamiento del planificador—, no por el
+cómputo propio del sistema. Esa latencia es, además, la principal fuente de varianza entre
+ejecuciones, de ahí la desviación típica del \texttt{planner}. Las cifras de la
+Tabla~\ref{tab:coste-desglose} deben leerse, por tanto, como tiempos de pared dependientes
+de la red, no como una cota de cómputo determinista; el coste en \textit{tokens}, en
+cambio, es la métrica reproducible (varía menos de un 20\,\% entre ejecuciones del mismo
+\textit{dataset}).
+
+\paragraph{Límite del enfoque en esquemas estrella profundos.}
+La cobertura parcial en pronóstico queda cubierta por el caso Store~Sales de la tabla; un
+\textit{dataset} adicional —Retail, una venta minorista en esquema estrella de 5 tablas (un
+hecho y 4 dimensiones) y problema de regresión— se midió pero quedó fuera de la tabla porque
+no produce una ejecución de coste comparable, esta vez por la \emph{profundidad} del esquema,
+no por la cobertura. El descubrimiento de \textit{joins} sobre 5
+ficheros agota el bucle acotado de herramientas del \texttt{data\_validator}: en 2 de 5
+ejecuciones se alcanzó el límite de recursión del grafo (\texttt{GraphRecursionError})
+antes de cerrar la validación, y en las 3 restantes el agente consumió $\sim$110~s solo en
+validar, sin llegar a entrenar. Es un límite honesto del enfoque agéntico: la profundidad
+de razonamiento que exige un esquema estrella con \textit{joins} indirectos
+(p.\,ej.\ \texttt{productos}$\rightarrow$\texttt{marcas}, cuya clave no aparece en la tabla
+de hechos) excede el presupuesto de pasos con el que el validador está configurado para
+terminar de forma controlada. Reservar este caso como límite —en lugar de subir el límite
+de pasos para forzar una cifra— refleja el comportamiento real del sistema tal como está
+configurado.
 
 % ── 6.3.2  Independencia del tamaño ─────────────────────────────────────────
 
@@ -647,7 +687,7 @@ de nombres y tipos—, nunca en el número de filas.
 Combinada con la Sección~\ref{sec:coste-desglose}, esta propiedad permite caracterizar el
 coste total del pipeline como la suma de dos términos de naturaleza opuesta: un
 \textbf{sobrecoste agéntico aproximadamente constante} (validación, planificación y
-auditoría, $\sim$150~s e independiente del tamaño) y un \textbf{coste de entrenamiento
+auditoría, $\sim$100~s e independiente del tamaño) y un \textbf{coste de entrenamiento
 determinista que escala con los datos} ($O(\text{filas}\times\text{particiones}\times
 \text{ensayos}\times\text{modelos})$, como en cualquier sistema de AutoML). La inteligencia
 agéntica, por tanto, añade un coste fijo que no se degrada con la escala; el cuello de
@@ -662,26 +702,27 @@ lo alivia al podar el conjunto de candidatos—.
 
 Una propiedad inesperada y relevante de los componentes agénticos es que su coste
 \emph{no es determinista}, aun cuando la decisión sí lo es. La Tabla~\ref{tab:variabilidad}
-recoge cuatro ejecuciones del mismo \textit{dataset} (la panadería) con el mismo modelo
+recoge cinco ejecuciones del mismo \textit{dataset} (la panadería) con el mismo modelo
 y la misma configuración: la familia de candidatos y el campeón seleccionado se mantienen
-estables entre repeticiones, pero la duración del planificador varía entre 84 y 131~s y
-sus \textit{tokens} de salida entre 12,8k y 26,3k.
+estables entre repeticiones, pero la duración del planificador varía entre 61 y 83~s y
+sus \textit{tokens} de salida entre 10,2k y 13,3k.
 
 \begin{table}[H]
 \centering
-\caption{Cuatro repeticiones de la panadería: decisión estable, coste variable.
+\caption{Cinco repeticiones de la panadería: decisión estable, coste variable.
  \textit{Tokens} de salida del planificador (incluyen los de razonamiento).}
 \label{tab:variabilidad}
 \small
-\begin{tabular}{lrrrl}
+\begin{tabular}{lrrr}
 \toprule
 \textbf{Ejecución} & \textbf{Validador (s)} & \textbf{Planner (s)}
-  & \textbf{Tokens salida planner} & \textbf{Reintento} \\
+  & \textbf{Tokens salida planner} \\
 \midrule
-1 & 13,6 & 130,6 & 15,4k & no \\
-2 & 4,1  & 84,3  & 14,5k & no \\
-3 & 20,0 & 91,0  & 26,3k & sí \\
-4 & 12,2 & 120,3 & 12,8k & no \\
+1 & 21,5 & 82,1 & 11,7k \\
+2 & 24,9 & 61,4 & 10,2k \\
+3 & 16,0 & 64,4 & 10,4k \\
+4 & 13,5 & 82,9 & 13,3k \\
+5 & 21,4 & 63,3 & 11,4k \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -693,12 +734,34 @@ entre ejecuciones aunque la respuesta final sea equivalente; la inferencia en
 \textit{hardware} compartido no es además bit-reproducible ni siquiera a temperatura
 cero. La segunda fuente es discreta: si la salida del planificador no supera la
 validación determinista de estructura (las comprobaciones \texttt{\_check\_*}), el nodo
-reintenta con realimentación correctiva, duplicando aproximadamente el trabajo. La
-ejecución~3 de la Tabla~\ref{tab:variabilidad} es precisamente un caso de reintento
-(\texttt{retry\_ok}), lo que explica su mayor recuento de \textit{tokens}. La conclusión
+reintenta con realimentación correctiva, duplicando aproximadamente el trabajo de ese nodo.
+Ninguna de las cinco repeticiones de la Tabla~\ref{tab:variabilidad} necesitó reintento
+—de ahí que la variación observada ($\pm$10~s) proceda íntegramente de la primera fuente—,
+pero cuando el reintento ocurre superpone un segundo modo de variabilidad de mayor
+amplitud. La conclusión
 para el diseño es importante: la \emph{decisión} del sistema es estable y reproducible
 —gracias a la recuperación determinista del \textit{pool} y a las reglas—, mientras que
-su \emph{coste} es estocástico y dominado por el razonamiento del planificador.
+su \emph{coste} es estocástico; en el planificador, por el razonamiento y los reintentos.
+
+\paragraph{El coste determinista hereda la no-determinación del plan.}
+La misma disociación entre decisión y coste reaparece, de forma aún más marcada, en un
+nodo que por definición es \emph{determinista}: el \texttt{executor}. Su tiempo no depende
+solo del volumen de datos, sino del \emph{conjunto de candidatos} que el planificador
+decide entrenar —y ese conjunto varía entre ejecuciones por la no-determinación del LLM—.
+Sobre la panadería, los planes que incluyeron un modelo pesado (\textit{xgboost}) tardaron
+$\sim$150~s en entrenar frente a los $\sim$40~s de los que solo propusieron candidatos
+estadísticos, sobre \emph{los mismos datos} y sin mediar reintento alguno (se verificó que
+un plan con \textit{xgboost} pero sin reintento ya alcanzaba los 150~s, aislando este
+efecto del de los reintentos del planificador). El matiz decisivo es que ese modelo pesado
+\emph{nunca resultó campeón} —el ganador fue siempre \texttt{ets} o \texttt{auto\_arima}—:
+el sobrecoste es, por tanto, cómputo desperdiciado entrenando candidatos que la validación
+acaba descartando. Se confirma así el principio de diseño en su forma más fuerte: la
+\emph{decisión} está protegida del azar, pero la \emph{no-determinación residual del LLM se
+filtra al coste} a través de la propuesta de candidatos, convirtiendo el coste de un nodo
+determinista en una variable estocástica. Es una ineficiencia acotada y \emph{atacable}
+—endurecer las reglas de selección o \emph{cachear} el plan para un perfil de
+\textit{dataset} dado eliminaría esta varianza sin alterar unas decisiones que ya son
+estables—, y se recoge como línea de trabajo futuro.
 
 % ── 6.3.4  HITL ─────────────────────────────────────────────────────────────
 

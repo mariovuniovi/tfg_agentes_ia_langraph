@@ -18,7 +18,7 @@ from mlops_agents.contracts.planner import (
     PlannerOutput,
     RejectedModelSpec,
 )
-from mlops_agents.contracts.training import TrainingPlan
+from mlops_agents.contracts.training import SearchParamOverride, TrainingPlan
 
 
 def _ref(source="registry", source_id="lr"):
@@ -94,13 +94,14 @@ def test_candidate_risks_populated():
     assert spec.risks == ["may underfit", "high bias"]
 
 
-def test_candidate_preserves_existing_fields():
-    """search_space_override and requested_trials still work."""
+def test_candidate_search_space_override():
+    """search_space_override still works."""
     spec = CandidateSpec(
         model_key="ridge", priority=2,
-        requested_trials=10,
+        search_space_override={"alpha": SearchParamOverride(low=0.01, high=0.1)},
     )
-    assert spec.requested_trials == 10
+    assert spec.search_space_override["alpha"].low == 0.01
+    assert spec.search_space_override["alpha"].high == 0.1
 
 
 # --- RejectedModelSpec ---

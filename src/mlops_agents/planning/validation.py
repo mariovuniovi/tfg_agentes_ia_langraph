@@ -201,24 +201,12 @@ def _detect_conflicts(
     """Deterministic HARD conflict detection. Returns list of flagged conflicts."""
     hard: list[dict] = []
     candidate_keys = {c.model_key for c in plan.candidates}
-    rejected_keys = {r.model_key for r in plan.models_not_recommended}
 
-    cited_experience_ids = {
-        ref.source_id for ref in _collect_all_refs(output)
-        if ref.source == "experience" and ref.source_id
-    }
-    cited_winners = {
-        e.best_model for e in ctx.similar_experiences
-        if e.experience_id in cited_experience_ids and e.best_model
-    }
-    omitted_cited = cited_winners - candidate_keys
-    if omitted_cited:
-        hard.append({
-            "type": "cited_experience_winner_not_selected",
-            "models": sorted(omitted_cited),
-            "severity": "hard",
-        })
-
+    # NOTE: "cited experience winner not selected" is intentionally NOT a hard conflict.
+    # The planner is capped to a bounded candidate set (top-5), so it is expected that
+    # some winners of cited experiences do not make the selection. Treating that as a
+    # hard conflict forced needless retries (and occasional planner failures); it is now
+    # surfaced as a SOFT, non-blocking signal in detect_soft_conflicts() instead.
     cited_rule_ids = {
         ref.source_id for ref in _collect_all_refs(output)
         if ref.source == "rule" and ref.source_id
@@ -228,17 +216,14 @@ def _detect_conflicts(
         if not rule:
             continue
         avoid_in_cands = set(rule.get("avoid_or_deprioritize", []) or []) & candidate_keys
-        prefer_in_rej = set(rule.get("prefer", []) or []) & rejected_keys
         if avoid_in_cands:
             hard.append({
                 "type": "cited_rule_avoid_violated", "rule_id": rid,
                 "models": sorted(avoid_in_cands), "severity": "hard",
             })
-        if prefer_in_rej:
-            hard.append({
-                "type": "cited_rule_prefer_rejected", "rule_id": rid,
-                "models": sorted(prefer_in_rej), "severity": "hard",
-            })
+        # NOTE: cited_rule_prefer_rejected (a cited rule prefers a model that ended up
+        # rejected) is NOT hard: under a capped candidate set the planner must reject
+        # some rule-preferred models. It is surfaced as soft in detect_soft_conflicts().
     return hard
 
 
@@ -274,6 +259,38 @@ def detect_soft_conflicts(
                 f"cited or selected: {sorted(soft_omitted)}."
             ),
         })
+
+    cited_omitted = cited_winners - candidate_keys
+    if cited_omitted:
+        soft.append({
+            "type": "cited_experience_winner_not_selected",
+            "models": sorted(cited_omitted),
+            "summary": (
+                f"{len(cited_omitted)} model(s) won in a cited experience but were not "
+                f"selected (expected under a capped candidate set): {sorted(cited_omitted)}."
+            ),
+        })
+
+    rejected_keys = {r.model_key for r in plan.models_not_recommended}
+    cited_rule_ids = {
+        ref.source_id for ref in _collect_all_refs(output)
+        if ref.source == "rule" and ref.source_id
+    }
+    for rid in cited_rule_ids:
+        rule = ctx.rules_by_id.get(rid)
+        if not rule:
+            continue
+        prefer_in_rej = set(rule.get("prefer", []) or []) & rejected_keys
+        if prefer_in_rej:
+            soft.append({
+                "type": "cited_rule_prefer_rejected",
+                "rule_id": rid,
+                "models": sorted(prefer_in_rej),
+                "summary": (
+                    f"cited rule {rid!r} prefers {sorted(prefer_in_rej)} but they were "
+                    f"rejected (expected under a capped candidate set)."
+                ),
+            })
     return soft
 
 

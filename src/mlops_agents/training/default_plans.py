@@ -1,7 +1,7 @@
 """Generate a default TrainingPlan from the registry when no agent is involved."""
 from __future__ import annotations
 from mlops_agents.contracts.profile import DatasetProfile
-from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 from mlops_agents.models.loader import ModelSpec, get_models_for
 
 
@@ -34,5 +34,4 @@ def default_training_plan(problem_type: str, dataset_profile: DatasetProfile) ->
     return TrainingPlan(
         problem_type=problem_type,
         candidates=candidates,
-        trial_budget=TrialBudget(allocation_strategy="equal", total_trials=60),
     )

@@ -9,6 +9,34 @@ import pytest
 from mlops_agents.experience.schema import ExperienceRecord, SelectedSolution
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-integration",
+        action="store_true",
+        default=False,
+        help="Run tests marked integration.",
+    )
+    parser.addoption(
+        "--run-llm",
+        action="store_true",
+        default=False,
+        help="Run tests marked llm. Implies --run-integration for llm tests.",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    run_integration = config.getoption("--run-integration")
+    run_llm = config.getoption("--run-llm")
+    skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
+    skip_llm = pytest.mark.skip(reason="need --run-llm option to run")
+
+    for item in items:
+        if "llm" in item.keywords and not run_llm:
+            item.add_marker(skip_llm)
+        elif "integration" in item.keywords and not (run_integration or run_llm):
+            item.add_marker(skip_integration)
+
+
 @pytest.fixture()
 def sample_csv(tmp_path: Path) -> Path:
     """Minimal 5-row CSV with a 'target' column. Use for data_tools tests."""

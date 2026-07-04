@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from sklearn.datasets import load_iris
-from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 from mlops_agents.training.executor import run_training_plan
 from mlops_agents.models import factories as factories_module
 
@@ -32,7 +32,6 @@ def test_one_failed_one_succeeds_run_completes(iris_csv, tmp_path, monkeypatch):
                 TrainingPlanCandidate(priority=1, model_key="logistic_regression"),
                 TrainingPlanCandidate(priority=2, model_key="random_forest_classifier"),
             ],
-            trial_budget=TrialBudget(total_trials=6, min_trials_per_candidate=3, max_trials_per_candidate=3),
         )
         result = run_training_plan(
             plan=plan,

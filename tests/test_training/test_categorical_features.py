@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate, TrialBudget,
+    TrainingPlan, TrainingPlanCandidate,
 )
 
 
@@ -23,10 +23,6 @@ def _reg_plan() -> TrainingPlan:
             TrainingPlanCandidate(priority=1, model_key="ridge"),
             TrainingPlanCandidate(priority=2, model_key="random_forest_regressor"),
         ],
-        trial_budget=TrialBudget(
-            total_trials=4, allocation_strategy="equal",
-            min_trials_per_candidate=2, max_trials_per_candidate=2,
-        ),
     )
 
 

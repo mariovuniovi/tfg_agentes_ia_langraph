@@ -10,7 +10,6 @@ from mlops_agents.contracts.training import (
     SearchParamOverride,
     TrainingPlan,
     TrainingPlanCandidate,
-    TrialBudget,
 )
 from mlops_agents.training.executor import run_training_plan
 from mlops_agents.training.override_validation import narrow_search_space
@@ -37,7 +36,6 @@ def test_executor_forecasting_single_series_statistical(air_passengers_csv, tmp_
             TrainingPlanCandidate(priority=1, model_key="seasonal_naive"),
             TrainingPlanCandidate(priority=2, model_key="ets"),
         ],
-        trial_budget=TrialBudget(total_trials=6, min_trials_per_candidate=3, max_trials_per_candidate=5),
     )
     result = run_training_plan(
         plan=plan,
@@ -59,13 +57,12 @@ def test_executor_forecasting_single_series_statistical(air_passengers_csv, tmp_
 
 def test_forecasting_reports_test_metrics_and_selection_score(air_passengers_csv, tmp_path, monkeypatch):
     monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
-    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
     from mlops_agents.training.executor import run_training_plan
 
     plan = TrainingPlan(
         problem_type="forecasting",
         candidates=[TrainingPlanCandidate(priority=1, model_key="ets")],
-        trial_budget=TrialBudget(total_trials=3, min_trials_per_candidate=3, max_trials_per_candidate=3),
     )
     result = run_training_plan(
         plan=plan,
@@ -91,13 +88,12 @@ def test_executor_fallback_resolves_multifold_validation(air_passengers_csv, tmp
     (capacity-driven), NOT a hardcoded single_split. air_passengers (~144 obs) at horizon 12
     => multi-fold expanding_window."""
     monkeypatch.setattr("mlops_agents.training.executor.settings.experience_pool_dir", tmp_path / "pool")
-    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+    from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
     from mlops_agents.training.executor import run_training_plan
 
     plan = TrainingPlan(
         problem_type="forecasting",
         candidates=[TrainingPlanCandidate(priority=1, model_key="seasonal_naive")],
-        trial_budget=TrialBudget(total_trials=2, min_trials_per_candidate=2, max_trials_per_candidate=2),
     )  # NOTE: no forecasting_settings -> exercises the executor fallback
     result = run_training_plan(
         plan=plan,

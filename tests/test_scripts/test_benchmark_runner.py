@@ -30,7 +30,6 @@ def test_benchmark_runner_iris_smoke(tmp_path, monkeypatch):
         audit_dir=tmp_path / "pool",
         splits_dir=tmp_path / "splits",
         staged_dir=tmp_path / "staged",
-        n_trials_override=4,
     )
 
     assert n_ok == 1

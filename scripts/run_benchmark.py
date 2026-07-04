@@ -2,7 +2,7 @@
 
 Usage:
     uv run python scripts/run_benchmark.py
-    uv run python scripts/run_benchmark.py --manifest scripts/benchmark_manifest.yaml --trials 8
+    uv run python scripts/run_benchmark.py --manifest scripts/benchmark_manifest.yaml
 """
 from __future__ import annotations
 import argparse
@@ -32,7 +32,6 @@ from mlops_agents.experience.schema import ExperienceRecord
 from mlops_agents.training.default_plans import default_training_plan
 from mlops_agents.training.executor import run_training_plan
 from mlops_agents.training.profiler import build_dataset_profile
-from mlops_agents.contracts.training import TrialBudget
 from mlops_agents.utils.logging import get_logger
 from scripts._dataset_sources import fetch_dataset
 
@@ -132,7 +131,6 @@ def run_benchmark(
     audit_dir: Path | None = None,
     splits_dir: Path | None = None,
     staged_dir: Path | None = None,
-    n_trials_override: int | None = None,
     reset_forecasting: bool = False,
     strict: bool = False,
 ) -> tuple[int, int]:
@@ -168,16 +166,6 @@ def run_benchmark(
             if skip_models:
                 filtered = [c for c in plan.candidates if c.model_key not in skip_models]
                 plan = plan.model_copy(update={"candidates": filtered})
-
-            if n_trials_override is not None:
-                plan = plan.model_copy(update={
-                    "trial_budget": TrialBudget(
-                        total_trials=n_trials_override * len(plan.candidates),
-                        allocation_strategy="equal",
-                        min_trials_per_candidate=max(2, n_trials_override // 2),
-                        max_trials_per_candidate=n_trials_override,
-                    )
-                })
 
             result = run_training_plan(
                 plan=plan,
@@ -233,7 +221,6 @@ def run_benchmark(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=Path("scripts/benchmark_manifest.yaml"))
-    parser.add_argument("--trials", type=int, default=8)
     parser.add_argument("--reset-forecasting", action="store_true",
                         help="Delete all forecasting pool experiences before re-seeding")
     parser.add_argument("--strict", action="store_true",
@@ -241,7 +228,6 @@ def main() -> None:
     args = parser.parse_args()
     n_ok, n_fail = run_benchmark(
         manifest_path=args.manifest,
-        n_trials_override=args.trials,
         reset_forecasting=args.reset_forecasting,
         strict=args.strict,
     )

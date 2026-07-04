@@ -23,7 +23,6 @@ from mlops_agents.contracts.training import (
     TrainingPlan,
     TrainingPlanCandidate,
     TrainingResult,
-    TrialBudget,
     ValidationStrategy,
 )
 from mlops_agents.forecasting.seasonality import max_season_length, season_length_grid
@@ -36,7 +35,7 @@ from mlops_agents.training.experience import build_task_id, write_experience_rec
 from mlops_agents.training.override_validation import narrow_search_space
 from mlops_agents.training.profiler import build_dataset_profile
 from mlops_agents.training.splitter import split_dataset
-from mlops_agents.training.trial_budget import allocate_trials
+from mlops_agents.training.trial_budget import deterministic_trials
 from mlops_agents.training.validation_folds import iter_folds
 from mlops_agents.training.validation_policy import (
     resolve_rolling_window_size,
@@ -144,18 +143,17 @@ def _fc_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
-def _make_sampler(narrowed: Any, requested_trials: int) -> tuple[optuna.samplers.BaseSampler, int]:
+def _make_sampler(narrowed: Any, n_trials: int) -> tuple[optuna.samplers.BaseSampler, int]:
     """Pick an Optuna sampler + trial count for a candidate's (narrowed) search space.
 
     When the space is small and fully enumerable (every param categorical, and the
     Cartesian product is at most GRID_SAMPLER_MAX_COMBOS), use an exhaustive
-    GridSampler so *every* configuration is always evaluated, regardless of how many
-    trials the planner allocated. This keeps champion selection deterministic and
-    decoupled from the (LLM-decided) trial budget. For statistical forecasters this
-    sweeps the frequency-narrowed season_length grid, usually a single canonical
-    value such as 7 for daily data or 52 for weekly data. Larger int/float spaces or
-    a categorical grid that would explode past the cap keep the seeded TPE sampler
-    with the requested budget.
+    GridSampler so *every* configuration is always evaluated, regardless of n_trials.
+    For statistical forecasters this sweeps the frequency-narrowed season_length grid,
+    usually a single canonical value such as 7 for daily data or 52 for weekly data.
+    Larger int/float spaces or a categorical grid that would explode past the cap keep
+    the seeded TPE sampler with the deterministic trial count (see
+    trial_budget.deterministic_trials).
 
     Returns (sampler, effective_n_trials).
     """
@@ -167,7 +165,7 @@ def _make_sampler(narrowed: Any, requested_trials: int) -> tuple[optuna.samplers
             n_grid *= len(choices)
         if n_grid <= GRID_SAMPLER_MAX_COMBOS:
             return optuna.samplers.GridSampler(grid, seed=42), n_grid
-    return optuna.samplers.TPESampler(seed=42), requested_trials
+    return optuna.samplers.TPESampler(seed=42), n_trials
 
 
 def _pick_champion(results: list[dict], direction: str, tol: float) -> dict:
@@ -584,8 +582,6 @@ def _run_candidate_forecasting(
     throwaway = TrainingPlan(
         problem_type="forecasting",
         candidates=[candidate],
-        trial_budget=TrialBudget(total_trials=1, allocation_strategy="equal",
-                                 min_trials_per_candidate=1, max_trials_per_candidate=1),
         forecasting_settings=forecasting_settings,
     )
 
@@ -1032,7 +1028,7 @@ def run_training_plan(
         train_pool[target_column] = label_encoder.fit_transform(train_pool[target_column])
         logger.info(f"[executor] label-encoded target '{target_column}': {list(label_encoder.classes_)}")
 
-    allocations = allocate_trials(plan.candidates, plan.trial_budget)
+    allocations = {c.model_key: deterministic_trials(c.model_key) for c in plan.candidates}
 
     mlflow.set_experiment(mlflow_experiment)
     candidate_results: list[dict] = []

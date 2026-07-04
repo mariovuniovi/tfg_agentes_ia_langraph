@@ -11,6 +11,12 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 @pytest.mark.integration
 @pytest.mark.llm
+@pytest.mark.skip(
+    reason=(
+        "Deprecated direct PlannerOutput structured-output path; the live planner "
+        "integration is the tool-using planning.node flow."
+    )
+)
 def test_planner_produces_valid_plan_for_regression(tmp_path: Path) -> None:
     """Real LLM call — produces a valid plan for a medium regression dataset.
 

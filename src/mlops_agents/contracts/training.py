@@ -72,7 +72,6 @@ class CandidateSpec(BaseModel):
     priority: int = Field(ge=1)
     model_key: str
     search_space_override: dict[str, SearchParamOverride] | None = None
-    requested_trials: int | None = None
     reason: str = ""
     evidence_refs: list[EvidenceReference] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
@@ -100,13 +99,6 @@ class RejectedModelSpec(BaseModel):
 RejectedModel = RejectedModelSpec
 
 
-class TrialBudget(BaseModel):
-    total_trials: int = 60
-    allocation_strategy: Literal["priority_weighted", "equal"] = "priority_weighted"
-    max_trials_per_candidate: int = 30
-    min_trials_per_candidate: int = 5
-
-
 class PlannerTrainingPlan(BaseModel):
     """The planner agent's *decision surface* — only the fields the LLM controls.
 
@@ -121,7 +113,6 @@ class PlannerTrainingPlan(BaseModel):
     metric_to_optimize: str | None = None
     candidates: list[CandidateSpec]
     models_not_recommended: list[RejectedModelSpec] = Field(default_factory=list)
-    trial_budget: TrialBudget = Field(default_factory=TrialBudget)
 
     @model_validator(mode="after")
     def priorities_unique(self):

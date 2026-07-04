@@ -1,34 +1,27 @@
-"""Distribute total_trials across candidates per the TrialBudget policy."""
+"""Deterministic per-candidate Optuna trial budget.
+
+The trial count is fixed in code, independent of the dataset and of the planner
+LLM (which no longer emits a budget). Rationale: the number of trials needed is a
+function of the *search space* you explore, not the dataset — and per-trial cost on
+large series is already bounded by the rolling-window validation policy.
+"""
 from __future__ import annotations
-from mlops_agents.contracts.training import TrainingPlanCandidate, TrialBudget
+
+from mlops_agents.models.loader import get_model
+
+# Calibrated to the magnitude the pipeline already used (~3-6 trials per ML model),
+# so existing timing results carry over. Raise for a more thorough search.
+TRIALS_PER_ML_MODEL = 5
 
 
-def allocate_trials(candidates: list[TrainingPlanCandidate], budget: TrialBudget) -> dict[str, int]:
-    n = len(candidates)
-    if n == 0:
-        return {}
+def deterministic_trials(model_key: str) -> int:
+    """Fixed Optuna trial count for a candidate.
 
-    if budget.allocation_strategy == "priority_weighted":
-        weights = [n + 1 - c.priority for c in candidates]
-        total_weight = sum(weights)
-        base = [int(round(budget.total_trials * w / total_weight)) for w in weights]
-    else:
-        base = [budget.total_trials // n] * n
-
-    final = []
-    for cand, b in zip(candidates, base):
-        final.append(cand.requested_trials if cand.requested_trials is not None else b)
-
-    final = [max(budget.min_trials_per_candidate, min(budget.max_trials_per_candidate, x)) for x in final]
-
-    if sum(final) > budget.total_trials:
-        slack = sum(final) - budget.total_trials
-        reducible = [(i, x - budget.min_trials_per_candidate) for i, x in enumerate(final)
-                     if x > budget.min_trials_per_candidate]
-        if reducible:
-            total_reducible = sum(r for _, r in reducible)
-            for i, r in reducible:
-                cut = int(round(slack * r / total_reducible))
-                final[i] = max(budget.min_trials_per_candidate, final[i] - cut)
-
-    return {c.model_key: t for c, t in zip(candidates, final)}
+    - 0-parameter models (e.g. ``naive``): 1 — nothing to tune.
+    - categorical-only search spaces (``season_length`` for seasonal_naive/ets/
+      auto_arima): the GridSampler in ``executor._make_sampler`` sweeps the grid
+      exhaustively regardless, so this value is only an upper bound.
+    - multi-parameter ML forecasters: ``TRIALS_PER_ML_MODEL`` via TPE.
+    """
+    n_params = len(get_model(model_key).search_space.params)
+    return 1 if n_params == 0 else TRIALS_PER_ML_MODEL

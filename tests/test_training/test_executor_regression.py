@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from sklearn.datasets import fetch_california_housing
-from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, TrialBudget
+from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 from mlops_agents.training.executor import run_training_plan
 
 
@@ -25,7 +25,6 @@ def test_executor_housing_regression_endtoend(housing_csv, tmp_path, monkeypatch
             TrainingPlanCandidate(priority=1, model_key="ridge"),
             TrainingPlanCandidate(priority=2, model_key="random_forest_regressor"),
         ],
-        trial_budget=TrialBudget(total_trials=10, min_trials_per_candidate=3, max_trials_per_candidate=10),
     )
     result = run_training_plan(
         plan=plan,

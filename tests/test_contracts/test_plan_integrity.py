@@ -7,7 +7,6 @@ from mlops_agents.contracts.training import (
     RejectedModel,
     TrainingPlan,
     TrainingPlanCandidate,
-    TrialBudget,
 )
 
 
@@ -18,10 +17,6 @@ def _plan(*, problem_type="forecasting", candidates=None, rejected=None):
             TrainingPlanCandidate(priority=1, model_key="naive"),
         ],
         models_not_recommended=rejected or [],
-        trial_budget=TrialBudget(
-            total_trials=2, allocation_strategy="equal",
-            min_trials_per_candidate=1, max_trials_per_candidate=2,
-        ),
     )
 
 
