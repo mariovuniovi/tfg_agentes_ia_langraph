@@ -125,7 +125,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "api/tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
 python_files = ["test_*.py"]

@@ -13,13 +13,13 @@ from mlops_agents.config.settings import settings
 from mlops_agents.contracts.planner import (
     EvidenceReference,
     PlannerOutput,
-    PlannerValidationContext,
 )
 from mlops_agents.contracts.training import (
     ForecastingSettings,
     PlannerTrainingPlan,
     TrainingPlan,
 )
+from mlops_agents.planning.context import PlannerValidationContext
 from mlops_agents.planning.trace import ToolTrace
 
 REQUIRED_TOOLS = {

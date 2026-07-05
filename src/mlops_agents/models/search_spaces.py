@@ -40,9 +40,3 @@ def build_suggest_fn(spec: SearchSpaceSpec) -> Callable[[optuna.Trial], dict[str
 
     return suggest
 
-
-# Populated incrementally as model entries are added: each model's search_space.name
-# from registry.yaml becomes a key here pointing to a "build" function. With the generic
-# builder above, every entry maps to the same factory call: `build_suggest_fn(spec)`.
-# We expose the registry for symmetry with FACTORY_REGISTRY (validation path).
-SEARCH_SPACE_REGISTRY: dict[str, Callable[..., Any]] = {}

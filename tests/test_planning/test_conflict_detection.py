@@ -13,9 +13,9 @@ from mlops_agents.contracts.planner import (
     EvidenceReference,
     ExperienceSummary,
     PlannerOutput,
-    PlannerValidationContext,
 )
 from mlops_agents.contracts.training import CandidateSpec, RejectedModelSpec, TrainingPlan
+from mlops_agents.planning.context import PlannerValidationContext
 from mlops_agents.planning.trace import ToolTrace
 from mlops_agents.planning.validation import (
     PlannerValidationError,

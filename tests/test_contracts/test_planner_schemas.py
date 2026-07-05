@@ -231,8 +231,8 @@ def test_planner_output_has_decision_basis_and_evidence_conflicts():
 # --- PlannerValidationContext ---
 
 def test_planner_validation_context_minimal():
-    from mlops_agents.contracts.planner import PlannerValidationContext
     from mlops_agents.models.loader import get_models_for
+    from mlops_agents.planning.context import PlannerValidationContext
 
     specs = get_models_for("forecasting")
     ctx = PlannerValidationContext(

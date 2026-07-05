@@ -12,9 +12,10 @@ from mlops_agents.contracts.training import (
     PlannerTrainingPlan,
     RejectedModelSpec,
 )
-from mlops_agents.models.loader import ModelSpec
 
 # Re-export for consumers that import from planner
+# (PlannerValidationContext moved to planning/context.py — it carries domain
+# objects (ModelSpec), and contracts/ must stay free of domain imports.)
 __all__ = [
     "CandidateSpec",
     "RejectedModelSpec",
@@ -25,7 +26,6 @@ __all__ = [
     "ExperienceSummary",
     "PlannerContext",
     "PlannerOutput",
-    "PlannerValidationContext",
 ]
 
 PlannerStatus = Literal["ok", "retry_ok", "failed"]
@@ -101,17 +101,3 @@ class PlannerOutput(BaseModel):
     evidence_conflicts: list[EvidenceConflict] = Field(default_factory=list)
     risks_or_warnings: list[str] = Field(default_factory=list)
     plan: PlannerTrainingPlan
-
-
-class PlannerValidationContext(BaseModel):
-    """Deterministic ground-truth context — independent of agent behavior."""
-
-    problem_type: str
-    task_metadata: dict[str, Any]
-    available_model_keys: list[str]
-    available_model_specs: list[ModelSpec]
-    similar_experiences: list[ExperienceSummary]
-    matched_rules: list[dict[str, Any]]
-    rules_by_id: dict[str, dict[str, Any]]
-
-    model_config = {"arbitrary_types_allowed": True}  # for ModelSpec
