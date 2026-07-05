@@ -1,216 +1,261 @@
-# Multi-Agent MLOps System — TFG
+# Sistema MLOps Multiagente — TFG
 
-A multi-agent MLOps system that takes a dataset from validation to production-ready model with a human-in-the-loop deployment gate. Built on a **custom LangGraph supervisor** orchestrating four specialist agents (data, training, evaluation, deployment) plus a deterministic training spine that handles classification, regression, and forecasting (with leakage-safe validation for exogenous time series).
+Sistema MLOps multiagente que lleva un dataset desde la validación hasta un modelo
+registrado en producción, con aprobación humana (HITL) en dos puntos del proceso.
+Construido sobre un **StateGraph de LangGraph con enrutado determinista**: los agentes
+LLM se usan únicamente donde aportan razonamiento (validación de datos, planificación
+de modelos y auditoría del resultado); el entrenamiento, la evaluación y el despliegue
+son código Python determinista y reproducible.
 
-## Status
+> Trabajo de Fin de Grado — Universidad de Oviedo, 2026.
+> La memoria (LaTeX) vive en [`docs/thesis/`](docs/thesis/).
 
-| Sub-project | Description | State |
+---
+
+## 1. Arquitectura
+
+### El grafo
+
+Un router determinista (`workflow_controller`, **sin LLM**) lee el estado tras cada
+nodo y decide el siguiente paso. Ningún LLM decide el flujo; cada decisión de enrutado
+queda registrada en el log.
+
+```
+                                ┌───────────────────────┐
+           START ──────────────►│  workflow_controller  │◄──── (cada nodo vuelve
+                                │  (router determinista)│       al controller)
+                                └───────────┬───────────┘
+                                            │
+   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐  ┌─────────────┐
+   │ data_validator 🤖│─►│ dataset_approval👤│─►│  planner 🤖  │─►│ executor ⚙️ │
+   │ react agent + 11 │  │ gate HITL 1       │  │ react agent, │  │ entrena los │
+   │ tools de datos   │  │ (interrupt)       │  │ plan top-5   │  │ candidatos  │
+   └──────────────────┘  └──────────────────┘  └──────────────┘  └──────┬──────┘
+                                                                        │
+   ┌──────────────┐  ┌──────────────────────┐  ┌─────────────────┐  ┌───▼─────────┐
+   │ deployer ⚙️  │◄─│ deployment_approval👤│◄─│ report_writer 🤖│◄─│evaluation ⚙️│
+   │ registro en  │  │ gate HITL 2          │  │ auditoría LLM   │  │ decisión de │
+   │ MLflow → END │  │ (interrupt)          │  │ estructurada    │  │ promoción   │
+   └──────────────┘  └──────────────────────┘  └─────────────────┘  └─────────────┘
+
+        🤖 etapa con LLM        ⚙️ determinista        👤 aprobación humana
+```
+
+### Principios de diseño
+
+1. **Determinista primero.** Carga de datos, entrenamiento, métricas y decisión de
+   promoción son Python puro. Los LLM solo intervienen para interpretar datos crudos,
+   razonar la estrategia de modelado y redactar la auditoría.
+2. **Cada etapa es un paquete de dominio profundo.** El grafo
+   ([`mlops_graph.py`](src/mlops_agents/graphs/mlops_graph.py), ~150 líneas) es pura
+   topología: consume cada etapa a través de una interfaz de un símbolo
+   (`data_validator_node`, `planner_node`, `run_training_plan`, …).
+3. **Contratos tipados.** Cada nodo devuelve su porción de estado mediante un contrato
+   Pydantic ([`contracts/outputs.py`](src/mlops_agents/contracts/outputs.py)); el
+   paquete `contracts/` no importa ningún módulo de dominio (regla de capas).
+4. **HITL con `interrupt()`.** Las dos aprobaciones humanas viven en nodos-gate del
+   grafo; todo el código previo a un `interrupt()` es idempotente (el nodo se
+   re-ejecuta al reanudar).
+5. **Experiencia acumulada + evidencia verificable.** Cada ejecución escribe un
+   registro de experiencia (SQLite); el planner recupera experiencias similares y
+   reglas ML estáticas como *evidencia citada*, y una capa de validación híbrida
+   comprueba que el plan cite evidencia real (con detección de conflictos duros y
+   blandos) antes de aceptarlo — si no, reintento acotado.
+
+### Tres puertas de entrada al mismo dominio
+
+| Entrada | Camino | Uso |
 |---|---|---|
-| **SP1** | Schema-driven data validation + HITL auto-fix | ✅ Complete |
-| **SP2** | Forecasting-aware data validator (frequency, gaps, exog) | ✅ Complete |
-| **SP3** | Model registry + training pipeline (Optuna, MLflow) | ✅ Complete |
-| **SP4** | Experience pool + offline benchmark runner (21 datasets seeded) | ✅ Complete |
-| **SP4.1** | Forecasting exogenous handling + leakage-safe validation | ✅ Complete (Tasks 1–11) |
-| **SP5** | LLM model_agent (retrieves experiences, proposes plans) | ⬜ Next |
-| **Frontend** | Next.js UI on top of the FastAPI backend | 🔄 In progress |
+| **UI web** | `frontend/` (Next.js) → `api/` (FastAPI, REST + WebSocket) → grafo | demo interactiva con HITL por navegador |
+| **CLI** | `scripts/run_pipeline.py` → `graphs/cli.py` → grafo | ejecución por consola con HITL interactivo |
+| **Medición** | `scripts/measure_agentic_cost.py` → grafo (headless, auto-aprueba) | experimentos de coste/tiempo del capítulo 6 de la memoria |
 
-See [PLAN.md](PLAN.md) for the full status board and [ARCHITECTURE.md](ARCHITECTURE.md) for the system shape.
+---
 
-## Tech stack
+## 2. Árbol de módulos
 
-- **Python 3.12 + UV** (src-layout)
-- **LangGraph + LangChain** for agent orchestration
-- **OpenAI API** (gpt-4.1-mini) — LLM provider (GitHub Models free tier also supported, see Getting started)
-- **scikit-learn, LightGBM, XGBoost, CatBoost** for tabular models
-- **statsforecast + skforecast** for forecasting (AutoETS, AutoARIMA, recursive multi-series ML)
-- **Optuna** for hyperparameter search
-- **MLflow** for experiment tracking + model registry
-- **Evidently AI** for data quality + drift reports
-- **FastAPI + Next.js** for the user-facing API and UI
-- **SQLite** for the experience pool (`storage/mlops_metadata.db`)
+```
+src/mlops_agents/            ← dominio (76 ficheros, mypy estricto en verde)
+├── graphs/                  topología y control de flujo
+│   ├── mlops_graph.py         StateGraph: nodos + wrappers finos (~150 líneas)
+│   ├── workflow_controller.py router determinista (las reglas de enrutado viven aquí)
+│   ├── approval_nodes.py      los 2 gates HITL (interrupt())
+│   ├── cli.py                 entrada CLI (estado inicial + streaming + prompt HITL)
+│   └── taxonomy.py            categorías de nodo (agente / determinista / HITL)
+│
+├── data_validation/          ETAPA LLM 1 — validación de datos
+│   ├── node.py                nodo del grafo: contexto → agente → extracción tipada
+│   ├── agent.py               react agent (11 tools: carga, joins, schema, calidad,
+│   │                          imputación, gaps temporales)
+│   ├── context.py             construcción del contexto + extracción de tool-results
+│   └── schema_contract.py     validación determinista del schema subido
+│
+├── planning/                 ETAPA LLM 2 — planificación de modelos
+│   ├── node.py                nodo: contexto → agente (máx. 2 intentos) → plan validado
+│   ├── agent.py               constructor del react agent (salida estructurada)
+│   ├── tools.py               4 tools con traza (modelos, experiencias, reglas)
+│   ├── validation.py          validación híbrida: integridad del plan, referencias de
+│   │                          evidencia, conflictos duros/blandos
+│   ├── context.py             ground-truth determinista para validar al agente
+│   └── trace.py / prompts.py  traza de tools / mensajes de reintento
+│
+├── training/                 ETAPA DETERMINISTA — entrenamiento multi-candidato
+│   ├── executor.py            orquestación: run_training_plan (única interfaz),
+│   │                          selección de campeón, MLflow padre/hijos (~360 líneas)
+│   ├── tabular_runner.py      clasificación + regresión (validación, retrain)
+│   ├── forecasting_runner.py  todo lo específico de series temporales: folds
+│   │                          temporales, exógenas sin leakage, evaluación en test
+│   ├── profiler.py            perfil del dataset (buckets para el experience pool)
+│   ├── splitter.py            split train-pool / test
+│   ├── validation_policy.py   estrategia de validación para forecasting
+│   ├── exog_policy.py · exog_extender.py · validation_folds.py
+│   ├── trial_budget.py        nº de trials determinista + sampler Optuna (Grid/TPE)
+│   ├── override_validation.py estrechado seguro de search spaces del planner
+│   └── experience_record.py   escritura del registro de experiencia por ejecución
+│
+├── evaluation/               promotion.py (decisión determinista: umbrales + campeón
+│   │                         actual en MLflow) · report_writer.py (auditoría LLM
+│   │                         estructurada) · champion.py (resolución de nombre)
+├── deployment/               deployer.py — registro en MLflow Model Registry
+│
+├── experience/               pool.py (SQLite) + retrieval.py (similitud por buckets)
+├── knowledge/                reader.py — base de reglas ML estática (ml_rules.yaml)
+├── models/                   loader.py (registro de 20 modelos vía YAML) +
+│                             factories.py + search_spaces.py
+├── forecasting/              seasonality.py — política de season length por frecuencia
+│
+├── contracts/                contratos Pydantic (salidas de nodo → estado, planes,
+│                             perfiles, schema, evidencia); SIN imports de dominio
+├── state/                    agent_state.py — AgentState (TypedDict del grafo)
+├── tools/                    data_tools.py · join_discovery_tools.py · mlflow_tools.py
+├── prompts/                  YAML por agente (modelo + prompt) + loader.py
+├── config/                   settings.py (pydantic-settings, lee .env) + constants.py
+├── observability/            pricing.py — coste por tokens (model_pricing.yaml)
+└── utils/                    llm.py (factoría ChatOpenAI) + logging.py
 
-## What runs inside Docker
+api/                          backend FastAPI (la frontera HTTP/WebSocket)
+├── main.py                   app + CORS + /health
+├── routers/                  runs.py (POST /runs, WS /ws/{id}, aprobación HITL) ·
+│                             experiments.py (proxy MLflow) · uploads.py (CSV+schema)
+├── services/                 pipeline.py (tarea async: stream del grafo → eventos
+│                             WebSocket) · run_store.py · mlflow_client.py
+└── tests/                    suite del backend (incluida en pytest por defecto)
 
-`docker compose up --build` starts three containers on a shared private network (`mlops-net`):
+frontend/                     UI Next.js — cliente tipado del WebSocket (~15 tipos de
+                              evento): stepper del pipeline, gates HITL, experimentos
 
-| Container | Port | Role |
+scripts/                      run_pipeline.py · run_benchmark.py (benchmark offline del
+                              experience pool) · seed_mlflow.py · measure_agentic_cost.py
+                              + agentic_cost_aggregate.py (medición coste/tiempo, cap. 6)
+                              · generadores de datasets sintéticos
+
+tests/                        espeja src/ 1:1 (test_data_validation/, test_planning/,
+                              test_training/, …) + test_api/ + test_integration/
+docs/thesis/                  memoria en LaTeX (capítulos + anexos)
+docs/superpowers/             specs y planes de diseño (registro histórico por feature)
+data/ · storage/ · mlruns/    datasets de muestra · experience pool (SQLite) · MLflow
+```
+
+---
+
+## 3. Calidad verificable
+
+Cada afirmación se comprueba con un comando:
+
+| Afirmación | Comando | Resultado esperado |
 |---|---|---|
-| `mlops-mlflow` | **5000** | MLflow tracking server — stores experiment runs, metrics, artefacts, and the model registry. Data persists in a named Docker volume (`mlflow_data`) so it survives container restarts. |
-| `mlops-api` | **8000** | FastAPI backend + LangGraph agents. This is the Python brain of the system: it calls the LLM, runs the MLOps pipeline, and exposes a REST + SSE API consumed by the frontend. Uploads and benchmark CSVs are mounted from `./data` so they survive restarts. |
-| `mlops-frontend` | **3000** | Next.js UI (standalone mode). Talks to the FastAPI backend at `http://localhost:8000`. The API URL is baked into the build at image-build time — it must be `localhost` because the browser runs outside Docker. |
+| Suite de tests | `uv run pytest -m "not integration"` | **638 passed** (los unitarios no llaman a ningún LLM real) |
+| Tipado estricto | `uv run mypy src/` | **0 errores** (modo strict + plugin de Pydantic) |
+| Lint | `uv run ruff check .` | **0 errores** (excepciones por-fichero documentadas en `pyproject.toml`) |
+| Integración (LLM real) | `uv run pytest -m integration` | requiere `OPENAI_API_KEY` |
 
-**Key fact:** `mlops-api` and `mlops-mlflow` talk to each other over the Docker-internal hostname `mlflow:5000`. Your browser always uses `localhost:<port>`.
+Convenciones: `tests/` espeja la estructura de `src/`; los tests unitarios mockean el
+LLM; `contracts/` no importa dominio; los nodos devuelven estado parcial tipado y
+nunca mutan `AgentState` in situ.
 
-## Getting started
+---
 
-**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) — no Python, Node, or any other tool needed on your machine.
+## 4. Stack tecnológico
 
-### First time
+- **Python 3.12 + UV** (src-layout) · **LangGraph + LangChain** (orquestación)
+- **OpenAI API** — `gpt-5.4-mini` (validador de datos y planner) + `gpt-5.4-nano`
+  (report writer); modelo y reasoning effort se configuran por agente en `prompts/*.yaml`
+- **scikit-learn, LightGBM, XGBoost, CatBoost** (tabular) · **statsforecast +
+  skforecast** (forecasting: AutoETS, AutoARIMA, ML recursivo)
+- **Optuna** — búsqueda de hiperparámetros determinista (GridSampler exhaustivo para
+  espacios enumerables, TPE con semilla para el resto)
+- **MLflow** (tracking + Model Registry) · **SQLite** (experience pool)
+- **FastAPI + Next.js** (API y UI)
+
+---
+
+## 5. Cómo ejecutarlo
+
+### Con Docker (recomendado — no requiere Python ni Node locales)
 
 ```bash
 git clone https://github.com/mariovuniovi/tfg_agentes_ia_langraph.git
 cd tfg_agentes_ia_langraph
-cp .env.example .env        # fill in OPENAI_API_KEY (see .env.example for details)
-docker compose up --build   # builds images and starts all three services
-```
-
-Open **http://localhost:3000** — the pipeline UI is ready.
-
-| Service | URL | What you'll find |
-|---|---|---|
-| Next.js UI | http://localhost:3000 | Pipeline submission, experiments, monitoring |
-| FastAPI backend | http://localhost:8000/docs | Auto-generated OpenAPI docs (Swagger UI) |
-| MLflow | http://localhost:5000 | Experiment runs, metrics, model registry |
-
-### Day-to-day workflow
-
-```bash
-# Start all services (skips rebuild if images are unchanged)
-docker compose up
-
-# Start and rebuild images (needed after code changes)
+cp .env.example .env          # rellenar OPENAI_API_KEY
 docker compose up --build
-
-# Stop all services (keeps data volumes intact)
-docker compose down
-
-# Stop and also wipe the MLflow data volume (full reset)
-docker compose down -v
-
-# Watch logs for a specific service
-docker compose logs -f api
-docker compose logs -f frontend
-docker compose logs -f mlflow
 ```
 
-After making **backend code changes** (`src/`, `api/`): `docker compose up --build` — only the `api` image rebuilds (~1 min).
+| Contenedor | Puerto | Rol |
+|---|---|---|
+| `mlops-frontend` | **3000** | UI Next.js — abrir <http://localhost:3000> |
+| `mlops-api` | **8000** | FastAPI + grafo LangGraph (docs OpenAPI en `/docs`) |
+| `mlops-mlflow` | **5000** | Servidor MLflow (runs, métricas, registry; volumen persistente) |
 
-After making **frontend code changes** (`frontend/`): `docker compose up --build` — only the `frontend` image rebuilds (~1–2 min).
+Día a día: `docker compose up` (sin rebuild) · `docker compose up --build` (tras
+cambios de código) · `docker compose down -v` (reset completo, borra el volumen de
+MLflow) · `docker compose logs -f api`.
+
+### En local (desarrollo)
+
+```bash
+uv sync                                          # dependencias Python
+docker compose up mlflow                         # solo el contenedor de MLflow
+uv run uvicorn api.main:app --reload --port 8000 # backend (otra terminal)
+cd frontend && npm install && npm run dev        # frontend (otra terminal)
+```
+
+O sin interfaz web, por consola:
+
+```bash
+uv run python scripts/run_pipeline.py data/samples/iris_measurements.csv data/samples/iris_labels.csv
+```
+
+### Sembrar el experience pool (opcional)
+
+El planner recupera experiencias de entrenamientos pasados. Para poblarlas con el
+benchmark offline (21 datasets públicos: sklearn / OpenML / yfinance / CSV locales):
+
+```bash
+uv run python scripts/run_benchmark.py
+uv run python scripts/seed_mlflow.py             # runs de ejemplo en MLflow
+```
 
 ---
 
-### Using GitHub Models (free alternative)
+## 6. Forecasting sin leakage (resumen)
 
-> **Note on model quality:** This project was developed and tested against OpenAI's API. GitHub Models offers compatible model names but is a different hosted service with a **150 requests/day rate limit** on the free tier. Agent reliability — especially the data validator and planner, which require precise instruction-following — may be lower than with OpenAI's API. Use GitHub Models to explore the system; use OpenAI's API for consistent results.
+El caso central del executor de forecasting: **una serie objetivo + varias exógenas**,
+donde algunos valores exógenos no se conocerán en el momento de predecir. Cada columna
+exógena se etiqueta con `future_availability` (`known_future` / `unknown_future`):
 
-1. Create a free [GitHub Personal Access Token](https://github.com/settings/tokens) (no special scopes needed)
-2. In your `.env`, make these changes:
-   ```bash
-   OPENAI_API_KEY=your_github_personal_access_token
-   OPENAI_BASE_URL=https://models.inference.ai.azure.com
-   OPENAI_MODEL_SUPERVISOR=openai/gpt-4.1-mini
-   OPENAI_MODEL_DATA_VALIDATOR=openai/gpt-4.1-mini
-   OPENAI_MODEL_PLANNER=openai/gpt-4.1-mini
-   OPENAI_MODEL_EVALUATOR=openai/gpt-4.1-mini
-   OPENAI_MODEL_DEPLOYER=openai/gpt-4.1-mini
-   ```
-3. Run `docker compose up --build` — no code changes needed. The OpenAI SDK reads `OPENAI_BASE_URL` automatically.
+1. La estrategia de validación se elige de forma determinista según longitud de
+   historia y drift esperado (single split / rolling / expanding).
+2. En cada fold, las columnas `unknown_future` se extienden **solo con historia de
+   entrenamiento** (naive carry / ETS / AutoARIMA).
+3. **Nunca** se usan valores futuros realizados de una columna `unknown_future` —
+   este es el cortafuegos anti-leakage.
+4. Estrategias aplicadas y métricas por fold quedan en el registro de experiencia.
+
+Implementación en [`training/forecasting_runner.py`](src/mlops_agents/training/forecasting_runner.py)
+y [`training/exog_extender.py`](src/mlops_agents/training/exog_extender.py).
 
 ---
 
-### Local development (without Docker)
-
-Use this when you want fast iteration without rebuilding images — e.g., while developing the Python backend.
-
-```bash
-uv sync                    # install all Python dependencies into .venv
-cp .env.example .env       # fill in OPENAI_API_KEY
-```
-
-You still need MLflow running. The easiest way is to start just that container:
-
-```bash
-docker compose up mlflow   # only the MLflow service
-```
-
-Then two more terminals:
-
-```bash
-# Terminal 2 — FastAPI backend (port 8000)
-uv run uvicorn api.main:app --reload --port 8000
-
-# Terminal 3 — Next.js frontend (port 3000)
-cd frontend && npm install && npm run dev
-```
-
-## Seeding the experience pool
-
-The model_agent (SP5) will retrieve from a pool of past training experiences. Seed it with 21 public benchmark datasets:
-
-```bash
-uv run python scripts/run_benchmark.py --trials 8
-```
-
-This:
-- Fetches datasets from sklearn / OpenML / yfinance / local CSVs
-- Runs the full training executor on each (classification, regression, forecasting)
-- For forecasting: chooses validation strategy (single_split / rolling / expanding) by deterministic policy, applies leakage-safe exogenous extension (naive_carry / ETS / AutoARIMA), records per-fold metrics
-- Inserts an `ExperienceRecord` into `storage/mlops_metadata.db` for each dataset
-
-Inspect the pool:
-
-```bash
-uv run python -c "
-import sqlite3, json
-from mlops_agents.config.settings import settings
-conn = sqlite3.connect(settings.experience_db_path)
-for r in conn.execute('SELECT dataset_name, selected_model_key, validation_score FROM experiences ORDER BY dataset_name'):
-    print(r)
-"
-```
-
-## Tests
-
-```bash
-uv run python -m pytest -m "not integration"   # unit (~369 tests, no LLM calls)
-uv run python -m pytest                        # all (+ slow LLM-touching integration tests)
-uv run ruff check . && uv run ruff format .    # lint + format
-```
-
-## Forecasting at a glance
-
-The forecasting executor handles the case you actually care about: **one target series + many exogenous predictors**, where some exogenous values won't be known at prediction time. The user (or the upcoming SP5 LLM planner) tags each exog column with `future_availability`:
-
-```yaml
-# In task_metadata for a forecasting task:
-exogenous_columns:
-  - { name: holiday_flag,  future_availability: known_future }
-  - { name: oil_price,     future_availability: unknown_future }
-  - { name: usd_index,     future_availability: unknown_future }
-expected_drift: high  # → rolling-window backtesting
-```
-
-The executor then:
-1. Picks a validation strategy based on `history_length` + `expected_drift` (short history → single split; medium+drift=high → rolling 3-fold; medium+low drift → expanding 3-fold).
-2. For each fold, extends `unknown_future` columns from training history via the chosen strategy (default `naive_carry`).
-3. **Never** uses realized future exog values for `unknown_future` columns — this is the leakage firewall.
-4. Records per-fold scores, strategies actually applied, and any extender failures in the `ExperienceRecord`.
-
-See [docs/superpowers/specs/2026-05-11-forecasting-exogenous-leakage-safe-validation-design.md](docs/superpowers/specs/2026-05-11-forecasting-exogenous-leakage-safe-validation-design.md) for the design spec.
-
-## Project structure
-
-```
-src/mlops_agents/   ← Python package (agents, graph, contracts, training, knowledge, experience)
-api/                ← FastAPI backend (REST + SSE for the frontend)
-frontend/           ← Next.js UI (pipeline, experiments, monitoring)
-dashboard/          ← Streamlit alternative UI
-scripts/            ← run_pipeline, run_benchmark, seed_mlflow
-data/               ← benchmark CSVs + user uploads + schemas
-docs/superpowers/   ← brainstorming specs and implementation plans
-tests/              ← 369 unit tests (mirrors src/ layout)
-```
-
-See [STRUCTURE.md](STRUCTURE.md) for the file-by-file breakdown.
-
-## Key documents
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) — system shape, agent graph, contracts, data flow
-- [PLAN.md](PLAN.md) — sub-project status and roadmap
-- [STRUCTURE.md](STRUCTURE.md) — what each file is for
-- [`docs/superpowers/specs/`](docs/superpowers/specs/) — design specs (one per feature)
-- [`docs/superpowers/plans/`](docs/superpowers/plans/) — implementation plans (one per feature)
-
-## License
+## Licencia
 
 TFG — Universidad de Oviedo, 2026.
