@@ -3,11 +3,11 @@ import pandas as pd
 
 from mlops_agents.contracts.training import ExogStrategySettings, ForecastingSettings, ValidationStrategy
 from mlops_agents.models.loader import get_model
-from mlops_agents.training.executor import (
-    _build_series_dict,
-    _build_test_exog,
-    _forecast_champion_on_test,
-    _retrain_forecasting,
+from mlops_agents.training.forecasting_runner import (
+    build_series_dict,
+    build_test_exog,
+    forecast_champion_on_test,
+    retrain_forecasting,
 )
 
 
@@ -26,7 +26,7 @@ def _task_meta() -> dict:
         "series_id_columns": [],
         "frequency": "W",
         "forecast_horizon": 3,
-        # _resolve_exog_availability reads `exogenous_columns` (list of {name, future_availability}).
+        # resolve_exog_availability reads `exogenous_columns` (list of {name, future_availability}).
         # 'holiday' is known-future (calendar); 'temp' is unknown-future.
         "exogenous_columns": [
             {"name": "temp", "future_availability": "unknown_future"},
@@ -49,8 +49,8 @@ def test_build_test_exog_extends_unknown_future_uses_actual_known_future():
         "temp": [100.0, 101.0, 102.0],             # very different from naive extension
         "holiday": [1.0, 0.0, 1.0],
     })
-    series_dict = _build_series_dict(train, "ds", "y", [], "W")
-    exog = _build_test_exog(train, test, _task_meta(), _fs(), horizon, "W", series_dict)
+    series_dict = build_series_dict(train, "ds", "y", [], "W")
+    exog = build_test_exog(train, test, _task_meta(), _fs(), horizon, "W", series_dict)
 
     # unknown-future temp must be the naive_carry extension (last train value 9.0), NOT the test actuals
     assert np.allclose(exog["temp"].to_numpy(), 9.0)
@@ -78,13 +78,13 @@ def test_forecast_champion_on_test_statsforecast(tmp_path):
     spec = get_model("ets")
     models_dir = tmp_path / "models"
     models_dir.mkdir()
-    champ_path = _retrain_forecasting(spec, champion, train_pool, task_meta, models_dir)
+    champ_path = retrain_forecasting(spec, champion, train_pool, task_meta, models_dir)
 
     fs = ForecastingSettings(
         validation_strategy=ValidationStrategy(type="single_split", n_folds=1, horizon=horizon),
         exog_strategies=ExogStrategySettings(),
     )
-    metrics, preview = _forecast_champion_on_test(
+    metrics, preview = forecast_champion_on_test(
         champion, champ_path, train_pool, test_path, task_meta, fs, "rmse",
     )
     assert "rmse" in metrics and metrics["rmse"] >= 0.0

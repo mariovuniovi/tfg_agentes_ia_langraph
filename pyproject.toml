@@ -102,6 +102,7 @@ ignore = [
 "src/mlops_agents/training/profiler.py" = ["E701"]
 # sklearn X/y naming convention (X, X_tr, X_val locals)
 "src/mlops_agents/training/executor.py" = ["N806"]
+"src/mlops_agents/training/tabular_runner.py" = ["N806"]
 # sklearn X/y naming convention (X, Xa locals)
 "tests/test_models/test_factories.py" = ["N806"]
 # MockClient/MockSvc: uppercase aliases for patched classes in `with patch(...)` blocks

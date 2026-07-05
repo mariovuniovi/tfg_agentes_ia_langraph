@@ -130,7 +130,7 @@ def validate_forecasting_settings(fs: ForecastingSettings, task_metadata: dict[s
         )
     exog_strats = getattr(fs.exog_strategies, "per_column", {}) or {}
     # Derive known-future columns from the canonical metadata shape used everywhere
-    # else (exog_policy.resolve_exog_strategies, executor._resolve_exog_availability):
+    # else (exog_policy.resolve_exog_strategies, forecasting_runner.resolve_exog_availability):
     # exogenous_columns: [{"name": ..., "future_availability": "known_future" | ...}].
     known_future = {
         e["name"]
