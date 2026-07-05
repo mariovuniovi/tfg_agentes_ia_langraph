@@ -17,9 +17,15 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM — OpenAI API
+    # LLM — OpenAI API (or any OpenAI-compatible endpoint, e.g. GitHub Models)
     openai_api_key: str = ""
     openai_model: str = "gpt-5.4-mini"   # fallback when no YAML config found
+    # Point at an OpenAI-compatible endpoint (empty = OpenAI). Setting this
+    # switches the factory to plain chat-completions (no Responses/reasoning API).
+    openai_base_url: str = ""
+    # Force every agent onto one model, ignoring the per-agent prompt YAML.
+    # Needed for GitHub Models, whose model names (openai/gpt-4.1-mini) differ.
+    openai_model_override: str = ""
 
     # MLflow
     mlflow_tracking_uri: str = "sqlite:///./mlflow.db"

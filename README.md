@@ -225,6 +225,29 @@ O sin interfaz web, por consola:
 uv run python scripts/run_pipeline.py data/samples/iris_measurements.csv data/samples/iris_labels.csv
 ```
 
+### Usar GitHub Models (gratis, sin coste de OpenAI)
+
+El sistema habla con la API de OpenAI, pero también con **cualquier endpoint
+compatible**. [GitHub Models](https://github.com/marketplace/models) ofrece modelos
+gratuitos (con límite de peticiones/día) usando solo un token de GitHub — ideal para
+probar la app sin gastar dinero. Basta con tres variables en el `.env`, sin tocar código:
+
+```bash
+OPENAI_API_KEY=ghp_tu_github_token          # un Personal Access Token de GitHub
+OPENAI_BASE_URL=https://models.github.ai/inference
+OPENAI_MODEL_OVERRIDE=openai/gpt-4.1-mini   # fuerza este modelo en todos los agentes
+```
+
+`OPENAI_BASE_URL` redirige las llamadas al endpoint de GitHub Models y
+`OPENAI_MODEL_OVERRIDE` impone un modelo compatible en todos los agentes (los nombres
+de GitHub Models difieren de los de OpenAI). Definir un `base_url` desactiva
+automáticamente la Responses API de OpenAI, que GitHub Models no soporta.
+
+> **Nota:** GitHub Models es un servicio distinto con límite de peticiones diario en el
+> nivel gratuito; la fiabilidad de los agentes que requieren seguir instrucciones con
+> precisión (validador y planner) puede ser algo menor que con la API de OpenAI. Úsalo
+> para explorar el sistema; usa OpenAI para resultados consistentes.
+
 ### Sembrar el experience pool (opcional)
 
 El planner recupera experiencias de entrenamientos pasados. Para poblarlas con el
