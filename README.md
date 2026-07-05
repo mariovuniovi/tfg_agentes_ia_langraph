@@ -152,7 +152,6 @@ scripts/                      run_pipeline.py · run_benchmark.py (benchmark off
 tests/                        espeja src/ 1:1 (test_data_validation/, test_planning/,
                               test_training/, …) + test_api/ + test_integration/
 docs/thesis/                  memoria en LaTeX (capítulos + anexos)
-docs/superpowers/             specs y planes de diseño (registro histórico por feature)
 data/ · storage/ · mlruns/    datasets de muestra · experience pool (SQLite) · MLflow
 ```
 

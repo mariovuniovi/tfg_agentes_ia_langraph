@@ -31,10 +31,6 @@ mlflow.db
 checkpoints.db
 evidently_workspace/
 
-# Claude Code — local overrides only, not shared config
-CLAUDE.local.md
-.claude/settings.local.json
-
 # Data — large raw files
 data/raw/
 data/uploads/
@@ -48,24 +44,6 @@ data/uploads/
 # OS
 .DS_Store
 Thumbs.db
-
-# folder
-.claude/
-!.claude/agents/
-!.claude/agents/**
-
-# files
-CLAUDE.md
-CLAUDE_backup.md
-.worktrees/
-.superpowers/
-
-# Claude working docs — research notes (not project artifacts)
-human_in_the_loop_agents_restrain.md
-langraph_supervisor_pattern.md
-multiagent_project_folders_structure.md
-multiagent_resume.md
-test_output.txt
 
 # Pipeline-generated data dirs
 data/merged/
@@ -104,9 +82,6 @@ data/benchmarks/dominicks_cookies_raw.csv
 
 # SP2 — temporal gap reports
 artifacts/
-
-# User planning notes
-plan_model_agent.md
 
 # Log files (rotation-managed, not committed)
 logs/*.log
