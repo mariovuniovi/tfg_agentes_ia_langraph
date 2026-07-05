@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import runs, experiments, uploads
+from api.routers import experiments, runs, uploads
 
 app = FastAPI(title="MLOps Backend API", version="0.1.0")
 
@@ -24,8 +24,9 @@ async def health():
     mlflow_ok = True
     graph_ok = True
     try:
-        from mlops_agents.config.settings import settings
         import mlflow
+
+        from mlops_agents.config.settings import settings
         mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
         mlflow.search_experiments()
     except Exception:

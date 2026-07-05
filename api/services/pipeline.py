@@ -12,8 +12,8 @@ from api.services.pipeline_helpers import (
     parse_stream_event,
     reset_tool_start_times,
 )
-from mlops_agents.graphs.taxonomy import NODE_CATEGORIES
 from mlops_agents.graphs.mlops_graph import graph
+from mlops_agents.graphs.taxonomy import NODE_CATEGORIES
 from mlops_agents.observability.pricing import estimate_cost
 
 _STREAM_TIMEOUT = 1000.0  # seconds before a hung LLM call is declared a failure

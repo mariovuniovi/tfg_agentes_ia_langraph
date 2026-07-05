@@ -5,7 +5,6 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import ValidationError
-from typing import Optional
 
 from mlops_agents.contracts.schema import SchemaContract
 
@@ -17,7 +16,7 @@ router = APIRouter()
 @router.post("/uploads")
 async def upload_files(
     # Optional so handler can return 400 — required list[UploadFile] would raise FastAPI's own 422 first
-    files: Optional[list[UploadFile]] = None,
+    files: list[UploadFile] | None = None,
 ) -> dict:
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
@@ -51,10 +50,10 @@ async def validate_schema(file: UploadFile) -> dict:
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=422, detail=f"Not valid JSON: {exc}")
+        raise HTTPException(status_code=422, detail=f"Not valid JSON: {exc}") from exc
     try:
         SchemaContract.model_validate(data)
     except ValidationError as exc:
         first = exc.errors()[0]["msg"]
-        raise HTTPException(status_code=422, detail=f"Schema contract violation: {first}")
+        raise HTTPException(status_code=422, detail=f"Schema contract violation: {first}") from exc
     return {"schema_json": raw.decode("utf-8"), "problem_type": data["problem_type"]}

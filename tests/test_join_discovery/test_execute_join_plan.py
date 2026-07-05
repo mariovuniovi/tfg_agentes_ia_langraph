@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-import pytest
-import pandas as pd
-from mlops_agents.tools.join_discovery_tools import execute_join_plan
 
+import pandas as pd
+import pytest
+
+from mlops_agents.tools.join_discovery_tools import execute_join_plan
 
 EVALUATION = {
     "candidate_id": "join_001",

@@ -1,5 +1,6 @@
 """Tests for SQLite migration runner."""
 import sqlite3
+
 from mlops_agents.experience.migrations._runner import apply_pending_migrations
 
 

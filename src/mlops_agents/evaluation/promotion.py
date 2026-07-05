@@ -6,7 +6,7 @@ No LLM involved — pure number comparison.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from mlflow.tracking import MlflowClient
 
@@ -62,7 +62,7 @@ def _apply_thresholds(
     champ_value = champion.get(metric) if champion else None
     if champ_value is None:
         return True
-    return cand_value <= champ_value if ascending else cand_value >= champ_value
+    return cast(bool, cand_value <= champ_value if ascending else cand_value >= champ_value)
 
 
 def _get_client() -> MlflowClient:

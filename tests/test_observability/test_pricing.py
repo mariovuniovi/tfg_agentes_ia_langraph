@@ -1,5 +1,6 @@
 import pytest
-from mlops_agents.observability.pricing import estimate_cost, _normalize
+
+from mlops_agents.observability.pricing import _normalize, estimate_cost
 
 
 def test_normalize_strips_date_suffix():

@@ -1,6 +1,11 @@
 """LLM factory — returns a ChatOpenAI instance pointed at the OpenAI API."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from langchain_openai import ChatOpenAI
+
 from mlops_agents.config.settings import settings
 from mlops_agents.prompts.loader import get_agent_config
 from mlops_agents.utils.logging import get_logger
@@ -19,7 +24,7 @@ def get_llm(agent: str = "") -> ChatOpenAI:
     # timeout bounds a stuck connection (else the SDK default lets a hung call
     # stall for minutes); max_retries then re-issues it. 240s sits well above
     # legitimate reasoning-call latency (~30-150s) so it never cuts a real call.
-    kwargs: dict = {"model": model, "api_key": settings.openai_api_key, "max_retries": 3, "timeout": 240}
+    kwargs: dict[str, Any] = {"model": model, "api_key": settings.openai_api_key, "max_retries": 3, "timeout": 240}
     if reasoning_effort := config.get("reasoning_effort"):
         kwargs["use_responses_api"] = True
         kwargs["output_version"] = "responses/v1"

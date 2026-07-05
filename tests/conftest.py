@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pandas as pd
 import pytest
+
 from mlops_agents.experience.schema import ExperienceRecord, SelectedSolution
 
 
@@ -158,24 +159,24 @@ def labels_csv(tmp_path: Path) -> Path:
 def minimal_experience_record():
     """Factory: build a minimal ExperienceRecord with overrideable fields."""
     def _make(**overrides):
-        base = dict(
-            task_id="test_t_fixture_001",
-            problem_type="forecasting",
-            dataset_profile={"schema_version": 1, "problem_type": "forecasting",
-                             "n_rows": "medium"},
-            training_plan_input={},
-            split_artifacts={},
-            mlflow={"parent_run_id": "abc123"},
-            metric_to_optimize="rmse",
-            models_tested=[],
-            selected_solution=SelectedSolution(
+        base = {
+            "task_id": "test_t_fixture_001",
+            "problem_type": "forecasting",
+            "dataset_profile": {"schema_version": 1, "problem_type": "forecasting",
+                                "n_rows": "medium"},
+            "training_plan_input": {},
+            "split_artifacts": {},
+            "mlflow": {"parent_run_id": "abc123"},
+            "metric_to_optimize": "rmse",
+            "models_tested": [],
+            "selected_solution": SelectedSolution(
                 model_key="naive",
                 hyperparameters={},
                 validation_score=1.0,
                 validation_std=0.0,
                 complexity_rank=1,
             ),
-        )
+        }
         base.update(overrides)
         return ExperienceRecord(**base)
     return _make

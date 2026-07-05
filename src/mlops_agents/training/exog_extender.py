@@ -23,7 +23,7 @@ def extend_exog(
     horizon: int,
     strategy: Strategy,
     freq: str | None,
-) -> tuple[pd.Series, dict | None]:
+) -> tuple[pd.Series, dict[str, str] | None]:
     """Return (predicted_future_values, failure_info_or_None).
 
     naive_carry never fails. ets / auto_arima fall back to naive_carry on
@@ -49,7 +49,7 @@ def _try_statistical(
     freq: str | None,
     fit_fn: Callable[[pd.Series, int, str | None], pd.Series | object],
     strategy_name: str,
-) -> tuple[pd.Series, dict | None]:
+) -> tuple[pd.Series, dict[str, str] | None]:
     try:
         preds = fit_fn(history, horizon, freq)
         return pd.Series(preds, name=history.name), None

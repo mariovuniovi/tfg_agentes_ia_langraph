@@ -1,9 +1,11 @@
 """End-to-end test: executor on iris classification."""
 import json
 from pathlib import Path
+
 import pandas as pd
 import pytest
 from sklearn.datasets import load_iris
+
 from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 from mlops_agents.training.executor import run_training_plan
 

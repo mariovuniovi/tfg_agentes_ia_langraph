@@ -129,7 +129,7 @@ def test_agent_state_has_task_metadata_field():
     from mlops_agents.state.agent_state import AgentState
     hints = typing.get_type_hints(AgentState)
     assert "task_metadata" in hints
-    assert hints["task_metadata"] is dict
+    assert hints["task_metadata"] == dict[str, typing.Any]
 
 
 def test_agent_state_has_schema_json_field():
@@ -386,8 +386,9 @@ def test_executor_node_returns_to_supervisor(tmp_path):
     """executor_node (deterministic) routes to workflow_controller and populates training state fields."""
     import pandas as pd
     from sklearn.datasets import load_iris
-    from mlops_agents.graphs.mlops_graph import executor_node
+
     from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
+    from mlops_agents.graphs.mlops_graph import executor_node
 
     data = load_iris(as_frame=True)
     df = pd.concat([data.data, data.target.rename("target")], axis=1)
@@ -681,8 +682,9 @@ def test_executor_node_uses_plan_from_state(tmp_path):
     """executor_node must use training_plan from state (planner-generated)."""
     import pandas as pd
     from sklearn.datasets import load_iris
-    from mlops_agents.graphs.mlops_graph import executor_node
+
     from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
+    from mlops_agents.graphs.mlops_graph import executor_node
 
     data = load_iris(as_frame=True)
     df = pd.concat([data.data, data.target.rename("target")], axis=1)

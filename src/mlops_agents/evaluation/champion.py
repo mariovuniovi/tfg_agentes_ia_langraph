@@ -1,4 +1,7 @@
 """Single source of truth for the human-readable champion model name."""
+
+from __future__ import annotations
+
 from typing import Any
 
 

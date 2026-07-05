@@ -1,5 +1,5 @@
 """Tests for retrieval helper functions."""
-from mlops_agents.experience.retrieval import derive_relevance_tier, compare_target_scales
+from mlops_agents.experience.retrieval import compare_target_scales, derive_relevance_tier
 
 
 def test_high_tier_ge_0_7():

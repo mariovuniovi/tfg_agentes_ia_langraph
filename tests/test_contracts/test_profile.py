@@ -1,6 +1,7 @@
 """Tests for DatasetProfile Pydantic schema."""
 import pytest
 from pydantic import ValidationError
+
 from mlops_agents.contracts.profile import DatasetProfile
 
 

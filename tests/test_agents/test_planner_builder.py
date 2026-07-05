@@ -1,6 +1,6 @@
 """build_planner_agent now lives in mlops_agents.planning.agent (see planning/agent.py).
 The shim agents/planner.py no longer exports it — these tests now point to the new module."""
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from mlops_agents.planning.agent import build_planner_agent
 from mlops_agents.planning.tools import build_planner_tools

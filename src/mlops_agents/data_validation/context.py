@@ -1,15 +1,17 @@
 """Context building and tool-result extraction for the data validation agent."""
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.messages import HumanMessage, ToolMessage
 
 from mlops_agents.state.agent_state import AgentState
 
 
-def extract_tool_json(messages: list, tool_name: str) -> Any:
+def extract_tool_json(messages: list[Any], tool_name: str) -> Any:
     """Return the parsed JSON content of the last ToolMessage matching tool_name.
 
     Returns {} if no matching message is found or JSON parsing fails.
@@ -18,7 +20,8 @@ def extract_tool_json(messages: list, tool_name: str) -> Any:
     for msg in reversed(messages):
         if isinstance(msg, ToolMessage) and getattr(msg, "name", None) == tool_name:
             try:
-                return json.loads(msg.content)
+                # content is str | list in langchain typing; a non-str raises TypeError below
+                return json.loads(cast(str, msg.content))
             except (json.JSONDecodeError, TypeError):
                 return {}
     return {}

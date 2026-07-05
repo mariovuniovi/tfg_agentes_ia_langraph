@@ -1,5 +1,6 @@
 """Tests for POST /uploads endpoint."""
 import io
+
 import pytest
 
 

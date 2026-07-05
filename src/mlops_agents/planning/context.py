@@ -1,5 +1,8 @@
 """build_planner_validation_context — deterministic ground-truth context built ONCE
 before the planner agent's retry loop. Independent of agent behavior."""
+
+from __future__ import annotations
+
 from typing import Any
 
 from mlops_agents.config.settings import settings
@@ -7,9 +10,9 @@ from mlops_agents.contracts.planner import (
     PlannerValidationContext,
 )
 from mlops_agents.experience.pool import ExperiencePool
+from mlops_agents.experience.retrieval import to_experience_summary  # moved out of agents/planner in Task 2.3
 from mlops_agents.knowledge.reader import match_rules
 from mlops_agents.models.loader import get_models_for
-from mlops_agents.experience.retrieval import to_experience_summary  # moved out of agents/planner in Task 2.3
 
 
 def build_planner_validation_context(

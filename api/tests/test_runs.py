@@ -1,9 +1,11 @@
 """Tests for /runs endpoints."""
 from unittest.mock import patch
+
 import pytest
-from httpx import AsyncClient, ASGITransport
-from api.main import app
+from httpx import ASGITransport, AsyncClient
+
 import api.services.run_store as run_store_module
+from api.main import app
 
 
 @pytest.fixture()

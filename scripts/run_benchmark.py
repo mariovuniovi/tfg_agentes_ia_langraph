@@ -5,12 +5,18 @@ Usage:
     uv run python scripts/run_benchmark.py --manifest scripts/benchmark_manifest.yaml
 """
 from __future__ import annotations
+
 import argparse
 import json
 import sys
 import warnings
 from pathlib import Path
+from typing import TYPE_CHECKING
+
 import yaml
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message=".*lbfgs failed to converge.*")
@@ -55,7 +61,7 @@ def _check_family(model_key: str, expected_family: str) -> bool:
     return False
 
 
-def _preprocess_benchmark_df(df: "pd.DataFrame", entry: dict) -> "pd.DataFrame":  # type: ignore[name-defined]
+def _preprocess_benchmark_df(df: pd.DataFrame, entry: dict) -> pd.DataFrame:
     """Label-encode categoricals; drop high-cardinality string columns."""
     import pandas as pd
     from sklearn.preprocessing import LabelEncoder
@@ -115,7 +121,7 @@ def build_task_metadata(entry: dict) -> dict:
     return meta
 
 
-def stage_dataset(df: "pd.DataFrame", entry: dict, staged_dir: Path) -> Path:  # type: ignore[name-defined]
+def stage_dataset(df: pd.DataFrame, entry: dict, staged_dir: Path) -> Path:
     staged_dir.mkdir(parents=True, exist_ok=True)
     target = entry["target_column"]
     if target not in df.columns and "target" in df.columns:

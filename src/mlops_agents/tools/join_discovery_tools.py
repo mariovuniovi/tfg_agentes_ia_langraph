@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from langchain_core.tools import tool
@@ -92,7 +93,7 @@ def evaluate_join_candidates(candidates_json: str, raw_paths_json: str) -> str:
     from mlops_agents.contracts.join_discovery import JoinCandidateEvaluation
 
     try:
-        candidates: list[dict] = json.loads(candidates_json)
+        candidates: list[dict[str, Any]] = json.loads(candidates_json)
     except json.JSONDecodeError as e:
         return json.dumps({"error": f"candidates_json is not valid JSON: {e}"})
     try:
@@ -265,15 +266,19 @@ def execute_join_plan(
         JSON with {success, output_path, row_count, columns, columns_added_by_join, warnings, join_plan} or {error}.
     """
     from mlops_agents.contracts.join_discovery import (
-        JoinPlan, BaseDatasetSelection, SelectedJoin, RejectedJoinCandidate, JoinCandidateEvaluation,
+        BaseDatasetSelection,
+        JoinCandidateEvaluation,
+        JoinPlan,
+        RejectedJoinCandidate,
+        SelectedJoin,
     )
 
     try:
-        selections: dict = json.loads(selections_json)
+        selections: dict[str, Any] = json.loads(selections_json)
     except json.JSONDecodeError as e:
         return json.dumps({"error": f"selections_json is not valid JSON: {e}"})
     try:
-        eval_data: dict = json.loads(evaluations_json)
+        eval_data: dict[str, Any] = json.loads(evaluations_json)
     except json.JSONDecodeError as e:
         return json.dumps({"error": f"evaluations_json is not valid JSON: {e}. Pass the exact string returned by evaluate_join_candidates."})
     try:
@@ -282,7 +287,11 @@ def execute_join_plan(
         return json.dumps({"error": f"raw_paths_json is not valid JSON: {e}"})
 
     # Build evaluation lookup by candidate_id
-    eval_by_id: dict[str, dict] = {e["candidate_id"]: e for e in eval_data.get("evaluations", [])}
+    eval_by_id: dict[str, dict[str, Any]] = {e["candidate_id"]: e for e in eval_data.get("evaluations", [])}
+
+    # `ev` is reused across the loops below with different shapes (raw eval dict,
+    # parsed JoinCandidateEvaluation, or None for unevaluated rejections).
+    ev: JoinCandidateEvaluation | dict[str, Any] | None
 
     # Validate all selected candidates have evaluations
     for sel in selections.get("selected", []):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import cast
 
 from mlops_agents.contracts.training import SearchParamOverride
 from mlops_agents.models.loader import SearchParamSpec, SearchSpaceSpec, get_model
@@ -40,7 +41,14 @@ def validate_override(model_key: str, overrides: dict[str, SearchParamOverride])
                             f"range [{lo}, {hi}]"
                         )
             else:
-                if not (lo <= override.low <= override.high <= hi):
+                # casts: int/float registry params always define low/high, and the
+                # override's model_validator guarantees low/high when choices is None.
+                if not (
+                    cast("float", lo)
+                    <= cast("float", override.low)
+                    <= cast("float", override.high)
+                    <= cast("float", hi)
+                ):
                     raise ValueError(
                         f"{model_key}.{param_name}: override range [{override.low}, {override.high}] "
                         f"is wider than or disjoint from registry range [{lo}, {hi}]"

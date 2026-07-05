@@ -1,3 +1,6 @@
+from unittest.mock import MagicMock, patch
+
+
 def test_evaluation_report_schema_fields():
     from mlops_agents.evaluation.report_writer import EvaluationReport
     fields = EvaluationReport.model_fields
@@ -29,9 +32,6 @@ def test_evaluation_report_required_minimum_construction():
         human_review_notes=[],
     )
     assert rep.summary == "ok"
-
-
-from unittest.mock import patch, MagicMock
 
 
 def test_build_report_writer_returns_structured_llm():

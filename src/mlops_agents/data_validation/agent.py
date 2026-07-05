@@ -1,5 +1,7 @@
 """Data Validation Agent — validates datasets before they enter the pipeline."""
 
+from __future__ import annotations
+
 from functools import cache
 from typing import Any
 

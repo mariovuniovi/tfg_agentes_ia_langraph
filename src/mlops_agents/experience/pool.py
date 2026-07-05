@@ -1,10 +1,12 @@
 """ExperiencePool — SQLite-backed read/write layer for experience records."""
 from __future__ import annotations
+
 import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
 from mlops_agents.experience.migrations._runner import apply_pending_migrations
 from mlops_agents.experience.schema import ExperienceRecord, RetrievalView
 from mlops_agents.utils.logging import get_logger
@@ -100,7 +102,7 @@ class ExperiencePool:
         Returns the number of experience rows deleted.
         """
         with self._conn() as conn:
-            n = conn.execute(
+            n: int = conn.execute(
                 "SELECT COUNT(*) FROM experiences WHERE problem_type = 'forecasting'"
             ).fetchone()[0]
             if n == 0:
@@ -153,10 +155,13 @@ class ExperiencePool:
     def count(self, problem_type: str | None = None) -> int:
         with self._conn() as conn:
             if problem_type:
-                return conn.execute(
-                    "SELECT COUNT(*) FROM experiences WHERE problem_type = ?", (problem_type,)
-                ).fetchone()[0]
-            return conn.execute("SELECT COUNT(*) FROM experiences").fetchone()[0]
+                return cast(
+                    "int",
+                    conn.execute(
+                        "SELECT COUNT(*) FROM experiences WHERE problem_type = ?", (problem_type,)
+                    ).fetchone()[0],
+                )
+            return cast("int", conn.execute("SELECT COUNT(*) FROM experiences").fetchone()[0])
 
     def find_similar(self, profile: dict[str, Any], problem_type: str, k: int = 5) -> list[RetrievalView]:
         """Weighted-overlap retrieval — implemented in Task 4."""

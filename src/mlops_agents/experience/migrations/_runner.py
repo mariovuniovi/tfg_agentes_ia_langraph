@@ -1,7 +1,9 @@
 """Apply pending SQLite migrations in version order."""
 from __future__ import annotations
+
 import sqlite3
 from pathlib import Path
+
 from mlops_agents.utils.logging import get_logger
 
 logger = get_logger(__name__)

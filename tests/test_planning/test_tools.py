@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock
+
 import pytest
+
+from mlops_agents.config.settings import settings
 from mlops_agents.planning.tools import build_planner_tools
 from mlops_agents.planning.trace import ToolTrace
-from mlops_agents.config.settings import settings
-from unittest.mock import MagicMock
 
 
 @pytest.fixture

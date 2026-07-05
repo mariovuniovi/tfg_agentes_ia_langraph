@@ -49,53 +49,53 @@ def _tabular_pipeline(estimator: Any) -> Pipeline:
     return Pipeline([("pre", pre), ("model", estimator)])
 
 
-def build_logistic_regression(params: dict[str, Any]):
+def build_logistic_regression(params: dict[str, Any]) -> Pipeline:
     return _tabular_pipeline(LogisticRegression(**params))
 
 
-def build_random_forest_classifier(params: dict[str, Any]):
+def build_random_forest_classifier(params: dict[str, Any]) -> Pipeline:
     return _tabular_pipeline(RandomForestClassifier(**params))
 
 
-def build_lightgbm_classifier(params: dict[str, Any]):
+def build_lightgbm_classifier(params: dict[str, Any]) -> Pipeline:
     from lightgbm import LGBMClassifier
     return _tabular_pipeline(LGBMClassifier(**{**params, "verbosity": -1}))
 
 
-def build_xgboost_classifier(params: dict[str, Any]):
+def build_xgboost_classifier(params: dict[str, Any]) -> Pipeline:
     from xgboost import XGBClassifier
     return _tabular_pipeline(XGBClassifier(**{**params, "verbosity": 0}))
 
 
-def build_catboost_classifier(params: dict[str, Any]):
+def build_catboost_classifier(params: dict[str, Any]) -> Pipeline:
     from catboost import CatBoostClassifier
     return _tabular_pipeline(CatBoostClassifier(**{**params, "verbose": 0}))
 
 
-def build_ridge(params: dict[str, Any]):
+def build_ridge(params: dict[str, Any]) -> Pipeline:
     return _tabular_pipeline(Ridge(**params))
 
 
-def build_random_forest_regressor(params: dict[str, Any]):
+def build_random_forest_regressor(params: dict[str, Any]) -> Pipeline:
     return _tabular_pipeline(RandomForestRegressor(**params))
 
 
-def build_lightgbm_regressor(params: dict[str, Any]):
+def build_lightgbm_regressor(params: dict[str, Any]) -> Pipeline:
     from lightgbm import LGBMRegressor
     return _tabular_pipeline(LGBMRegressor(**{**params, "verbosity": -1}))
 
 
-def build_xgboost_regressor(params: dict[str, Any]):
+def build_xgboost_regressor(params: dict[str, Any]) -> Pipeline:
     from xgboost import XGBRegressor
     return _tabular_pipeline(XGBRegressor(**{**params, "verbosity": 0}))
 
 
-def build_catboost_regressor(params: dict[str, Any]):
+def build_catboost_regressor(params: dict[str, Any]) -> Pipeline:
     from catboost import CatBoostRegressor
     return _tabular_pipeline(CatBoostRegressor(**{**params, "verbose": 0}))
 
 
-def build_naive(spec: dict[str, Any]):
+def build_naive(spec: dict[str, Any]) -> Any:
     """Naive forecaster: predicts the last observed value."""
     from statsforecast import StatsForecast
     from statsforecast.models import Naive
@@ -103,7 +103,7 @@ def build_naive(spec: dict[str, Any]):
     return StatsForecast(models=[Naive()], freq=freq, n_jobs=1)
 
 
-def build_seasonal_naive(spec: dict[str, Any]):
+def build_seasonal_naive(spec: dict[str, Any]) -> Any:
     """Seasonal naive: predicts the value from one season ago."""
     from statsforecast import StatsForecast
     from statsforecast.models import SeasonalNaive
@@ -112,7 +112,7 @@ def build_seasonal_naive(spec: dict[str, Any]):
     return StatsForecast(models=[SeasonalNaive(season_length=season_length)], freq=freq, n_jobs=1)
 
 
-def build_ets(spec: dict[str, Any]):
+def build_ets(spec: dict[str, Any]) -> Any:
     from statsforecast import StatsForecast
     from statsforecast.models import AutoETS
     freq = spec["task_metadata"]["frequency"]
@@ -120,7 +120,7 @@ def build_ets(spec: dict[str, Any]):
     return StatsForecast(models=[AutoETS(season_length=season_length)], freq=freq, n_jobs=1)
 
 
-def build_auto_arima(spec: dict[str, Any]):
+def build_auto_arima(spec: dict[str, Any]) -> Any:
     from statsforecast import StatsForecast
     from statsforecast.models import AutoARIMA
     task_metadata = spec["task_metadata"]
@@ -147,36 +147,36 @@ def _wrap_with_skforecast(estimator: Any, lags: int) -> Any:
     return ForecasterRecursiveMultiSeries(estimator=estimator, lags=lags)
 
 
-def build_random_forest_forecaster(spec: dict[str, Any]):
+def build_random_forest_forecaster(spec: dict[str, Any]) -> Any:
     lags, p = _split_lags_from_params(spec["params"])
     return _wrap_with_skforecast(RandomForestRegressor(**p), lags)
 
 
-def build_extra_trees_forecaster(spec: dict[str, Any]):
+def build_extra_trees_forecaster(spec: dict[str, Any]) -> Any:
     from sklearn.ensemble import ExtraTreesRegressor
     lags, p = _split_lags_from_params(spec["params"])
     return _wrap_with_skforecast(ExtraTreesRegressor(**p), lags)
 
 
-def build_gbm_forecaster(spec: dict[str, Any]):
+def build_gbm_forecaster(spec: dict[str, Any]) -> Any:
     from sklearn.ensemble import GradientBoostingRegressor
     lags, p = _split_lags_from_params(spec["params"])
     return _wrap_with_skforecast(GradientBoostingRegressor(**p), lags)
 
 
-def build_lightgbm_forecaster(spec: dict[str, Any]):
+def build_lightgbm_forecaster(spec: dict[str, Any]) -> Any:
     from lightgbm import LGBMRegressor
     lags, p = _split_lags_from_params(spec["params"])
     return _wrap_with_skforecast(LGBMRegressor(**{**p, "verbosity": -1}), lags)
 
 
-def build_xgboost_forecaster(spec: dict[str, Any]):
+def build_xgboost_forecaster(spec: dict[str, Any]) -> Any:
     from xgboost import XGBRegressor
     lags, p = _split_lags_from_params(spec["params"])
     return _wrap_with_skforecast(XGBRegressor(**p), lags)
 
 
-def build_svr_forecaster(spec: dict[str, Any]):
+def build_svr_forecaster(spec: dict[str, Any]) -> Any:
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.svm import SVR

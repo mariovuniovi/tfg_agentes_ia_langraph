@@ -1,6 +1,9 @@
 """YAML prompt loader."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 from langchain_core.prompts import PromptTemplate
@@ -27,10 +30,10 @@ def get_prompt(name: str) -> PromptTemplate:
     )
 
 
-def get_agent_config(name: str) -> dict:
+def get_agent_config(name: str) -> dict[str, Any]:
     """Return the config dict from a prompt YAML, or {} if absent."""
     path = PROMPTS_DIR / f"{name}.yaml"
     if not path.exists():
         return {}
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return data.get("config", {})
+    return cast("dict[str, Any]", data.get("config", {}))

@@ -1,6 +1,8 @@
 """Dataset fetchers for the benchmark runner."""
 from __future__ import annotations
+
 from typing import Any
+
 import pandas as pd
 
 
@@ -200,12 +202,11 @@ def _fetch_uci_url(entry: dict[str, Any]) -> pd.DataFrame:
 
     if dataset_id == "bike_sharing_daily":
         # UCI 275 — daily Bike Sharing packaged as zip; day.csv has dteday + all exog
+        import io as _io
         import urllib.request
         import zipfile
-        import io as _io
-        with urllib.request.urlopen(url) as resp:
-            with zipfile.ZipFile(_io.BytesIO(resp.read())) as zf:
-                df = pd.read_csv(zf.open("day.csv"), parse_dates=["dteday"])
+        with urllib.request.urlopen(url) as resp, zipfile.ZipFile(_io.BytesIO(resp.read())) as zf:
+            df = pd.read_csv(zf.open("day.csv"), parse_dates=["dteday"])
         df["dteday"] = df["dteday"].dt.strftime("%Y-%m-%d")
         return df
 

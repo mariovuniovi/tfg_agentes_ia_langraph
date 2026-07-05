@@ -86,7 +86,7 @@ def test_get_models_for_filters_by_problem_type(monkeypatch):
 
 def test_load_actual_registry_has_20_entries():
     """Smoke test: the shipped registry.yaml loads cleanly with all expected models."""
-    from mlops_agents.models.loader import load_registry, get_models_for
+    from mlops_agents.models.loader import get_models_for, load_registry
     registry = load_registry(force_reload=True)
     assert len(registry) == 20
     assert len(get_models_for("classification")) == 5

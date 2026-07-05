@@ -47,15 +47,16 @@ class DataValidationStateUpdate(StateUpdate):
     """
 
     validation_passed: bool = False
-    validation_report: dict = Field(default_factory=dict)
+    validation_report: dict[str, Any] = Field(default_factory=dict)
     processed_dataset_path: str = ""
-    dataset_summary: dict = Field(default_factory=dict)
+    dataset_summary: dict[str, Any] = Field(default_factory=dict)
     problem_type: str = ""
-    task_metadata: dict = Field(default_factory=dict)
-    schema_json: str = ""
-    data_join_plan: dict | None = None
+    task_metadata: dict[str, Any] = Field(default_factory=dict)
+    # Field shadows deprecated BaseModel.schema_json classmethod; runtime-safe in pydantic v2.
+    schema_json: str = ""  # type: ignore[assignment]
+    data_join_plan: dict[str, Any] | None = None
     data_join_base_nrows: int | None = None
-    data_join_evaluations: list[dict] = Field(default_factory=list)
+    data_join_evaluations: list[dict[str, Any]] = Field(default_factory=list)
     error_message: str = ""
     dataset_rejection_comment: str = ""
 
@@ -71,15 +72,15 @@ class PlannerStateUpdate(StateUpdate):
     """planner node — success path."""
 
     planner_analysis: str | None = None
-    planner_evidence_used: list[dict] = Field(default_factory=list)
+    planner_evidence_used: list[dict[str, Any]] = Field(default_factory=list)
     planner_warnings: list[str] = Field(default_factory=list)
     planner_status: str | None = None
     planner_retry_used: bool | None = None
-    training_plan: dict | None = None
-    planner_tool_trace: dict = Field(default_factory=dict)
-    planner_validation_context: dict = Field(default_factory=dict)
+    training_plan: dict[str, Any] | None = None
+    planner_tool_trace: dict[str, Any] = Field(default_factory=dict)
+    planner_validation_context: dict[str, Any] = Field(default_factory=dict)
     # State key has a leading underscore — emit via serialization alias.
-    planner_output_record: dict | None = Field(
+    planner_output_record: dict[str, Any] | None = Field(
         default=None, serialization_alias="_planner_output_record"
     )
 
@@ -95,22 +96,22 @@ class PlannerErrorStateUpdate(StateUpdate):
 class TrainingStateUpdate(StateUpdate):
     """executor node — maps TrainingResult → state keys."""
 
-    training_plan: dict | None = None
+    training_plan: dict[str, Any] | None = None
     train_pool_path: str | None = None
     test_path: str | None = None
     split_metadata_path: str | None = None
     trained_model_path: str = ""
     training_run_id: str = ""
-    training_metrics: dict = Field(default_factory=dict)
-    champion_candidate: dict | None = None
+    training_metrics: dict[str, Any] = Field(default_factory=dict)
+    champion_candidate: dict[str, Any] | None = None
     experience_record_path: str | None = None
     forecast_chart_png: str | None = None
     selection_score: float | None = None
 
     @classmethod
     def from_training_result(
-        cls, result: TrainingResult, *, training_plan: dict
-    ) -> "TrainingStateUpdate":
+        cls, result: TrainingResult, *, training_plan: dict[str, Any]
+    ) -> TrainingStateUpdate:
         return cls(
             training_plan=training_plan,
             train_pool_path=result.train_pool_path,
@@ -130,16 +131,16 @@ class EvaluationStateUpdate(StateUpdate):
     """evaluation node — deterministic promotion decision."""
 
     evaluation_passed: bool | None = None
-    candidate_metrics: dict = Field(default_factory=dict)
-    champion_metrics: dict = Field(default_factory=dict)
-    thresholds_applied: dict = Field(default_factory=dict)
-    evaluation_report: dict = Field(default_factory=dict)
+    candidate_metrics: dict[str, Any] = Field(default_factory=dict)
+    champion_metrics: dict[str, Any] = Field(default_factory=dict)
+    thresholds_applied: dict[str, Any] = Field(default_factory=dict)
+    evaluation_report: dict[str, Any] = Field(default_factory=dict)
 
 
 class AuditStateUpdate(StateUpdate):
     """report_writer node — LLM audit report."""
 
-    evaluation_report_audit: dict | None = None
+    evaluation_report_audit: dict[str, Any] | None = None
     evaluation_report_audit_status: str = ""
 
 

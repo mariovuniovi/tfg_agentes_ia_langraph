@@ -11,7 +11,8 @@ import pandas as pd
 import pytest
 
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate,
+    TrainingPlan,
+    TrainingPlanCandidate,
 )
 
 

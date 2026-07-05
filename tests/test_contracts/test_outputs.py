@@ -3,7 +3,19 @@
 import pytest
 from pydantic import ValidationError
 
-from mlops_agents.contracts.outputs import StateUpdate
+from mlops_agents.contracts.outputs import (
+    AuditStateUpdate,
+    DatasetApprovalStateUpdate,
+    DataValidationStateUpdate,
+    DeploymentApprovalStateUpdate,
+    DeploymentStateUpdate,
+    EvaluationStateUpdate,
+    PlannerErrorStateUpdate,
+    PlannerStateUpdate,
+    StateUpdate,
+    TrainingStateUpdate,
+)
+from mlops_agents.contracts.training import TrainingResult
 
 
 class _Sample(StateUpdate):
@@ -25,20 +37,6 @@ def test_to_update_omits_messages_key_when_none():
 def test_extra_keys_are_forbidden():
     with pytest.raises(ValidationError):
         _Sample(foo="hello", bogus=1)
-
-
-from mlops_agents.contracts.outputs import (
-    AuditStateUpdate,
-    DataValidationStateUpdate,
-    DatasetApprovalStateUpdate,
-    DeploymentApprovalStateUpdate,
-    DeploymentStateUpdate,
-    EvaluationStateUpdate,
-    PlannerErrorStateUpdate,
-    PlannerStateUpdate,
-    TrainingStateUpdate,
-)
-from mlops_agents.contracts.training import TrainingResult
 
 
 def test_evaluation_contract_accepts_helper_dict_shape():

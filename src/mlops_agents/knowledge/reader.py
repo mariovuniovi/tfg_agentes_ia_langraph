@@ -1,10 +1,13 @@
 """MLRule loader and match_rules() for the static knowledge base."""
 from __future__ import annotations
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
 import yaml
 from pydantic import BaseModel, Field, model_validator
+
 from mlops_agents.config.settings import settings
 
 
@@ -19,7 +22,7 @@ class MLRule(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_applies_when_fields(self) -> "MLRule":
+    def validate_applies_when_fields(self) -> MLRule:
         from mlops_agents.contracts.profile import DatasetProfile
         valid = set(DatasetProfile.model_fields.keys())
         for field in self.applies_when:
@@ -31,7 +34,7 @@ class MLRule(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_model_keys(self) -> "MLRule":
+    def validate_model_keys(self) -> MLRule:
         from mlops_agents.models.loader import load_registry
         registry = load_registry()
         rule_pt = self.applies_when.get("problem_type")

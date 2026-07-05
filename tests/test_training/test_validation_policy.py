@@ -1,6 +1,7 @@
 """Tests for resolve_validation_strategy and validate_forecasting_plan."""
 import pytest
 
+from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.contracts.training import (
     ExogStrategySettings,
     ForecastingSettings,
@@ -8,7 +9,6 @@ from mlops_agents.contracts.training import (
     TrainingPlanCandidate,
     ValidationStrategy,
 )
-from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.training.validation_policy import (
     resolve_rolling_window_size,
     resolve_validation_strategy,

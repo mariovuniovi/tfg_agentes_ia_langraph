@@ -1,7 +1,11 @@
 """Deterministic validation of the uploaded schema's ML dataset contract."""
 
+from __future__ import annotations
 
-def validate_schema_contract(schema_data: dict) -> None:
+from typing import Any
+
+
+def validate_schema_contract(schema_data: dict[str, Any]) -> None:
     """Validate ML dataset contract fields. Raises ValueError on any violation."""
     column_names = {c["name"] for c in schema_data.get("columns", [])}
 

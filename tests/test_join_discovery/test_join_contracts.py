@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
-from mlops_agents.contracts.join_discovery import JoinPlan, BaseDatasetSelection
+
+from mlops_agents.contracts.join_discovery import BaseDatasetSelection, JoinPlan
 
 
 def test_join_plan_valid() -> None:

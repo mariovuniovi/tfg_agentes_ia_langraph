@@ -17,10 +17,12 @@ Output layout:
       too_small_for_horizon.csv     15 rows  (6.2.5 – too few rows for horizon=12)
 """
 from __future__ import annotations
+
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from pathlib import Path
 
 rng = np.random.default_rng(42)
 
@@ -132,7 +134,7 @@ pd.DataFrame({
     "stock_units":   rng.integers(0, 500, 50),
     "supplier_code": [f"SUP-{rng.integers(10, 99)}" for _ in range(50)],
 }).to_csv("data/samples/join_discovery/product_catalog.csv", index=False)
-print(f"[join_discovery] product_catalog.csv       :     50 rows  (no-join trap)")
+print("[join_discovery] product_catalog.csv       :     50 rows  (no-join trap)")
 
 # ── 7. BROKEN — all-NaN target  ───────────────────────────────────────────
 dates_nan = pd.date_range("2023-01-01", periods=120, freq="MS")
@@ -140,7 +142,7 @@ pd.DataFrame({
     "month":   dates_nan.strftime("%Y-%m-%d"),
     "revenue": [float("nan")] * 120,
 }).to_csv("data/samples/broken/all_nan_target.csv", index=False)
-print(f"[broken] all_nan_target.csv              :    120 rows  (revenue = all NaN)")
+print("[broken] all_nan_target.csv              :    120 rows  (revenue = all NaN)")
 
 # ── 8. BROKEN — missing declared target column  ───────────────────────────
 # The user is expected to declare target='sales', but the column is absent.
@@ -151,7 +153,7 @@ pd.DataFrame({
     "feature_b": rng.integers(0, 10, 60),
     # 'sales' column intentionally absent
 }).to_csv("data/samples/broken/missing_target_col.csv", index=False)
-print(f"[broken] missing_target_col.csv          :     60 rows  ('sales' absent)")
+print("[broken] missing_target_col.csv          :     60 rows  ('sales' absent)")
 
 # ── 9. BROKEN — too small for horizon  ────────────────────────────────────
 # 15 rows; with horizon=12 there are only 3 training rows after val split.
@@ -159,6 +161,6 @@ pd.DataFrame({
     "month": pd.date_range("2023-01-01", periods=15, freq="MS").strftime("%Y-%m-%d"),
     "sales": rng.integers(100, 500, 15),
 }).to_csv("data/samples/broken/too_small_for_horizon.csv", index=False)
-print(f"[broken] too_small_for_horizon.csv       :     15 rows  (horizon=12 -> crash)")
+print("[broken] too_small_for_horizon.csv       :     15 rows  (horizon=12 -> crash)")
 
 print("\nDone. All datasets written.")

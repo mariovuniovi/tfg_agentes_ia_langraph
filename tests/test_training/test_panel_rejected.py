@@ -1,11 +1,15 @@
 """Verify that multi-target panel forecasting is rejected at the executor entry."""
-import pytest
-import pandas as pd
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate,
-    ValidationStrategy, ExogStrategySettings, ForecastingSettings,
+    ExogStrategySettings,
+    ForecastingSettings,
+    TrainingPlan,
+    TrainingPlanCandidate,
+    ValidationStrategy,
 )
 from mlops_agents.training.executor import run_training_plan
 

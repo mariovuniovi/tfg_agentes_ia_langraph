@@ -4,11 +4,14 @@ Handler registration happens once at module level. get_logger() only
 binds a name into the context — it never touches global handler state.
 """
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
 from mlops_agents.config.settings import settings
 
 _LOG_FILE = Path("logs/pipeline.log")

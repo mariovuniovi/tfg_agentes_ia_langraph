@@ -2,7 +2,13 @@ import numpy as np
 import pandas as pd
 
 from mlops_agents.contracts.training import ExogStrategySettings, ForecastingSettings, ValidationStrategy
-from mlops_agents.training.executor import _build_series_dict, _build_test_exog
+from mlops_agents.models.loader import get_model
+from mlops_agents.training.executor import (
+    _build_series_dict,
+    _build_test_exog,
+    _forecast_champion_on_test,
+    _retrain_forecasting,
+)
 
 
 def _fs() -> ForecastingSettings:
@@ -53,10 +59,6 @@ def test_build_test_exog_extends_unknown_future_uses_actual_known_future():
     assert np.array_equal(exog["holiday"].to_numpy(), test["holiday"].to_numpy())
 
 
-from mlops_agents.training.executor import _forecast_champion_on_test, _retrain_forecasting
-from mlops_agents.models.loader import get_model
-
-
 def test_forecast_champion_on_test_statsforecast(tmp_path):
     horizon = 4
     n = 40
@@ -74,7 +76,8 @@ def test_forecast_champion_on_test_statsforecast(tmp_path):
     }
     champion = {"model_key": "ets", "best_params": {"season_length": 1}, "best_score": 1.23}
     spec = get_model("ets")
-    models_dir = tmp_path / "models"; models_dir.mkdir()
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
     champ_path = _retrain_forecasting(spec, champion, train_pool, task_meta, models_dir)
 
     fs = ForecastingSettings(

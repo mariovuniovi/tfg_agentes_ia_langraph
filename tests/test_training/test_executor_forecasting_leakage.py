@@ -1,13 +1,17 @@
 """End-to-end leakage and fold tests for the rewritten forecasting executor."""
 import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
-from pathlib import Path
 
 from mlops_agents.contracts.training import (
-    TrainingPlan, TrainingPlanCandidate,
-    ValidationStrategy, ExogStrategySettings, ForecastingSettings,
+    ExogStrategySettings,
+    ForecastingSettings,
+    TrainingPlan,
+    TrainingPlanCandidate,
+    ValidationStrategy,
 )
 from mlops_agents.training.executor import run_training_plan
 

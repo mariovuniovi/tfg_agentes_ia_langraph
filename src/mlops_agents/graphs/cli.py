@@ -6,12 +6,19 @@ or via the installed console script:
     mlops-pipeline
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import HumanMessage
 
 from mlops_agents.config.constants import GRAPH_RECURSION_LIMIT
 from mlops_agents.graphs.mlops_graph import graph
+
+if TYPE_CHECKING:
+    from langchain_core.runnables import RunnableConfig
+
+    from mlops_agents.state.agent_state import AgentState
 
 
 def main() -> None:
@@ -22,7 +29,7 @@ def main() -> None:
     paths_display = ", ".join(dataset_paths)
 
     config = {"configurable": {"thread_id": "pipeline-1"}, "recursion_limit": GRAPH_RECURSION_LIMIT}
-    initial_state: dict = {
+    initial_state: dict[str, Any] = {
         "messages": [
             HumanMessage(content=f"Run the full MLOps pipeline on these raw files: {paths_display}")
         ],
@@ -58,7 +65,9 @@ def main() -> None:
     print(f"MLOps Pipeline — files: {paths_display}")
     print(f"{'='*60}\n")
 
-    for event in graph.stream(initial_state, config=config):
+    for event in graph.stream(
+        cast("AgentState", initial_state), config=cast("RunnableConfig", config)
+    ):
         if "__interrupt__" in event:
             interrupt_value = event["__interrupt__"][0].value
             _handle_hitl(graph, config, interrupt_value)

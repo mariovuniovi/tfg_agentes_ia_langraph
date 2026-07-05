@@ -13,7 +13,7 @@ async def list_experiments():
         svc = MlflowService()
         return svc.list_experiments()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"MLflow unavailable: {exc}")
+        raise HTTPException(status_code=502, detail=f"MLflow unavailable: {exc}") from exc
 
 
 @router.get("/experiments/{experiment_id}/runs", response_model=list[RunOut])
@@ -22,4 +22,4 @@ async def get_experiment_runs(experiment_id: str):
         svc = MlflowService()
         return svc.get_runs(experiment_id)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"MLflow unavailable: {exc}")
+        raise HTTPException(status_code=502, detail=f"MLflow unavailable: {exc}") from exc

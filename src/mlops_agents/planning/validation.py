@@ -5,15 +5,22 @@ Hybrid validation (A1):
 - Citation honesty (experience + rule refs) → agent's observed ToolTrace
 """
 from __future__ import annotations
-from typing import Iterable
+
+from collections.abc import Iterable
+from typing import Any
 
 from mlops_agents.config.settings import settings
 from mlops_agents.contracts.planner import (
-    EvidenceReference, PlannerOutput, PlannerValidationContext,
+    EvidenceReference,
+    PlannerOutput,
+    PlannerValidationContext,
 )
-from mlops_agents.contracts.training import ForecastingSettings, TrainingPlan
+from mlops_agents.contracts.training import (
+    ForecastingSettings,
+    PlannerTrainingPlan,
+    TrainingPlan,
+)
 from mlops_agents.planning.trace import ToolTrace
-
 
 REQUIRED_TOOLS = {
     "list_available_models",
@@ -107,7 +114,7 @@ def _check_plan_integrity(
             )
 
 
-def validate_forecasting_settings(fs: ForecastingSettings, task_metadata: dict) -> None:
+def validate_forecasting_settings(fs: ForecastingSettings, task_metadata: dict[str, Any]) -> None:
     """Defense-in-depth check on the *code-resolved* forecasting settings.
 
     These come from resolve_validation_strategy / resolve_exog_strategies (not from
@@ -195,11 +202,11 @@ def _check_evidence_references_hybrid(
 def _detect_conflicts(
     ctx: PlannerValidationContext,
     trace: ToolTrace,
-    plan: TrainingPlan,
+    plan: PlannerTrainingPlan,
     output: PlannerOutput,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Deterministic HARD conflict detection. Returns list of flagged conflicts."""
-    hard: list[dict] = []
+    hard: list[dict[str, Any]] = []
     candidate_keys = {c.model_key for c in plan.candidates}
 
     # NOTE: "cited experience winner not selected" is intentionally NOT a hard conflict.
@@ -232,9 +239,9 @@ def detect_soft_conflicts(
     trace: ToolTrace,
     plan: TrainingPlan,
     output: PlannerOutput,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Non-blocking conflicts surfaced as info in the UI. Excludes anything already in hard."""
-    soft: list[dict] = []
+    soft: list[dict[str, Any]] = []
     candidate_keys = {c.model_key for c in plan.candidates}
 
     retrieved_winners = {

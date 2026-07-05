@@ -3,8 +3,10 @@
 Run with: uv run pytest api/tests/test_integration.py -m integration -v
 """
 import asyncio
+
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from api.main import app
 
 
@@ -25,8 +27,9 @@ async def test_health_endpoint_with_real_services():
 @pytest.mark.asyncio
 async def test_full_pipeline_run_streams_events():
     """Start a real pipeline run and consume WebSocket events until run_complete."""
-    import websockets
     import json
+
+    import websockets
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(

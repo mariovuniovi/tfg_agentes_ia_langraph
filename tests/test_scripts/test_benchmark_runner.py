@@ -1,14 +1,15 @@
 """Smoke test for the benchmark runner — iris classification only (fast)."""
-import yaml
 import pytest
+import yaml
+
 from mlops_agents.experience.pool import ExperiencePool
 
 
 @pytest.mark.slow
 def test_benchmark_runner_iris_smoke(tmp_path, monkeypatch):
     """Run the benchmark runner on iris only and verify the pool is populated."""
-    from mlops_agents.config.settings import settings as _settings
     import mlops_agents.training.executor as _executor
+    from mlops_agents.config.settings import settings as _settings
 
     monkeypatch.setattr(_settings, "experience_db_path", tmp_path / "bench.db")
     monkeypatch.setattr(_settings, "experience_audit_dir", tmp_path / "pool")

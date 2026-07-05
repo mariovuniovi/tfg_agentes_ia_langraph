@@ -5,6 +5,8 @@ The training and evaluation agents call these to log runs and
 query results; the deployment agent uses them to register models.
 """
 
+from __future__ import annotations
+
 import json
 import pickle
 
@@ -133,6 +135,6 @@ def set_model_alias(model_name: str, alias: str, version: int) -> str:
         JSON confirming the alias was set.
     """
     client = _get_client()
-    client.set_registered_model_alias(model_name, alias, version)
+    client.set_registered_model_alias(model_name, alias, version)  # type: ignore[arg-type]  # mlflow accepts int versions at runtime; tool schema keeps version: int
     logger.info(f"Set alias '{alias}' → {model_name} v{version}")
     return json.dumps({"model_name": model_name, "alias": alias, "version": version})

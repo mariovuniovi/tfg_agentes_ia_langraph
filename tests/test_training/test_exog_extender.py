@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 
 from mlops_agents.training.exog_extender import (
-    extend_exog,
     align_val_exog_index,
+    extend_exog,
 )
 
 

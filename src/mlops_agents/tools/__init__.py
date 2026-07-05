@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from mlops_agents.tools.data_tools import (
     apply_column_mapping,
     check_data_quality,
@@ -7,8 +9,8 @@ from mlops_agents.tools.data_tools import (
     validate_against_schema,
 )
 from mlops_agents.tools.mlflow_tools import (
-    log_experiment,
     get_best_run,
+    log_experiment,
     register_model,
     set_model_alias,
 )

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+
 import pytest
+
 from mlops_agents.tools.join_discovery_tools import evaluate_join_candidates
 
 

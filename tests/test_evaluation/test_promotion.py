@@ -1,5 +1,8 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from mlops_agents.evaluation.promotion import _metric_for_problem_type, _thresholds_for
+
+from mlops_agents.evaluation.promotion import _apply_thresholds, _metric_for_problem_type, _thresholds_for
 
 
 @pytest.mark.parametrize("problem_type,expected_metric,expected_ascending", [
@@ -31,9 +34,6 @@ def test_thresholds_for_regression():
 def test_thresholds_for_forecasting():
     t = _thresholds_for("forecasting")
     assert t == {}
-
-
-from mlops_agents.evaluation.promotion import _apply_thresholds
 
 
 def test_apply_thresholds_classification_pass():
@@ -84,9 +84,6 @@ def test_apply_thresholds_forecasting_with_champion_pass():
 
 def test_apply_thresholds_forecasting_missing_rmse():
     assert _apply_thresholds("forecasting", {}, {}) is False
-
-
-from unittest.mock import MagicMock, patch
 
 
 def _fake_runs(metric_values: list[float]):

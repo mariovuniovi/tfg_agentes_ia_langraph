@@ -62,7 +62,7 @@ school_term = [0 if m in (7, 8) else 1 for m in months]  # summer break
 # ~7 public-holiday weeks per year at fixed week-of-year positions
 holiday_woys = {0, 14, 18, 30, 47, 51}
 public_holidays = [(1 if w in holiday_woys else 0) for w in woy]
-working_days = [5 - ph - (1 if w in (25, 26) else 0) for ph, w in zip(public_holidays, woy)]
+working_days = [5 - ph - (1 if w in (25, 26) else 0) for ph, w in zip(public_holidays, woy, strict=False)]
 working_days = [max(3, d) for d in working_days]
 dst_change = [(1 if w in (12, 43) else 0) for w in woy]
 

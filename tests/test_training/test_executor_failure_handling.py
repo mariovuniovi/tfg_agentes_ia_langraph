@@ -1,12 +1,14 @@
 """Tests for executor failure handling: skip+retry+continue."""
 import json
 from pathlib import Path
+
 import pandas as pd
 import pytest
 from sklearn.datasets import load_iris
+
 from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
-from mlops_agents.training.executor import run_training_plan
 from mlops_agents.models import factories as factories_module
+from mlops_agents.training.executor import run_training_plan
 
 
 @pytest.fixture

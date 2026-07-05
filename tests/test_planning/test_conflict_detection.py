@@ -7,19 +7,22 @@ from __future__ import annotations
 
 import pytest
 
-from mlops_agents.planning.validation import (
-    _detect_conflicts,
-    detect_soft_conflicts,
-    _check_conflict_resolution_present_if_flagged,
-    PlannerValidationError,
-)
 from mlops_agents.contracts.planner import (
-    EvidenceReference, DecisionBasis, PlannerOutput,
-    PlannerValidationContext, EvidenceConflict, ExperienceSummary,
+    DecisionBasis,
+    EvidenceConflict,
+    EvidenceReference,
+    ExperienceSummary,
+    PlannerOutput,
+    PlannerValidationContext,
 )
 from mlops_agents.contracts.training import CandidateSpec, RejectedModelSpec, TrainingPlan
 from mlops_agents.planning.trace import ToolTrace
-
+from mlops_agents.planning.validation import (
+    PlannerValidationError,
+    _check_conflict_resolution_present_if_flagged,
+    _detect_conflicts,
+    detect_soft_conflicts,
+)
 
 # --- helpers ---
 

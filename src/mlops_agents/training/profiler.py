@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -61,8 +61,9 @@ def _bucket_target_distribution(s: pd.Series) -> str:
     n_unique = s.nunique()
     if n_unique > 0 and n_unique < max(len(s) / 20, 5):
         return "discrete_like"
-    skew = abs(s.skew())
-    kurt = s.kurt()
+    # pandas-stubs types skew()/kurt() as a wide Scalar union; numeric series -> float
+    skew = abs(cast("float", s.skew()))
+    kurt = cast("float", s.kurt())
     if kurt > 3 and skew < 1: return "heavy_tailed"
     if skew >= 1: return "skewed"
     return "near_normal"
@@ -111,8 +112,8 @@ def _bucket_horizon_difficulty(freq: str, horizon: int) -> str:
 
 def _detect_per_series(series: pd.Series, freq: str) -> tuple[bool, bool, bool]:
     """Return (seasonality, trend, stationarity) for one series."""
-    from statsmodels.tsa.stattools import adfuller, acf
     from scipy.stats import kendalltau
+    from statsmodels.tsa.stattools import acf, adfuller
 
     seasonality = False
     if len(series) >= 24:

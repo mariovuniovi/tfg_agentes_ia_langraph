@@ -3,9 +3,9 @@ import pytest
 from pydantic import ValidationError
 
 from mlops_agents.contracts.training import (
-    ValidationStrategy,
     ExogStrategySettings,
     ForecastingSettings,
+    ValidationStrategy,
 )
 
 

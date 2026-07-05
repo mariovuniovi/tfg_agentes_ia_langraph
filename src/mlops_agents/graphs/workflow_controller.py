@@ -15,7 +15,7 @@ from mlops_agents.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def workflow_controller(state: dict[str, Any]) -> Command:
+def workflow_controller(state: dict[str, Any]) -> Command[str]:
     counts = state.get("agent_attempt_counts") or {}
     max_attempts = settings.max_attempts_per_agent
 

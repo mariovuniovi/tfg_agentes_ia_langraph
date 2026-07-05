@@ -6,6 +6,8 @@ and malformed tool calls), and extracts the validation results from the
 agent's tool messages into a typed DataValidationStateUpdate.
 """
 
+from __future__ import annotations
+
 import contextlib
 import json
 from pathlib import Path
@@ -113,12 +115,12 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
         )
     final_message = result["messages"][-1].content
 
-    quality_report: dict = extract_tool_json(result["messages"], "check_data_quality")
-    mapping_result: dict = extract_tool_json(result["messages"], "apply_column_mapping")
-    validation_result: dict = extract_tool_json(result["messages"], "validate_against_schema")
-    imputation_result: dict = extract_tool_json(result["messages"], "impute_missing_values")
-    join_exec_result: dict = extract_tool_json(result["messages"], "execute_join_plan")
-    eval_result: dict = extract_tool_json(result["messages"], "evaluate_join_candidates")
+    quality_report: dict[str, Any] = extract_tool_json(result["messages"], "check_data_quality")
+    mapping_result: dict[str, Any] = extract_tool_json(result["messages"], "apply_column_mapping")
+    validation_result: dict[str, Any] = extract_tool_json(result["messages"], "validate_against_schema")
+    imputation_result: dict[str, Any] = extract_tool_json(result["messages"], "impute_missing_values")
+    join_exec_result: dict[str, Any] = extract_tool_json(result["messages"], "execute_join_plan")
+    eval_result: dict[str, Any] = extract_tool_json(result["messages"], "evaluate_join_candidates")
 
     data_join_plan = join_exec_result.get("join_plan")
     data_join_evaluations = eval_result.get("evaluations", [])
@@ -140,7 +142,7 @@ def data_validator_node(state: AgentState) -> Command[Literal["workflow_controll
     )
     validation_passed = bool(validation_result.get("passed", False))
 
-    dataset_summary: dict = {}
+    dataset_summary: dict[str, Any] = {}
     if processed_path:
         try:
             df = pd.read_csv(processed_path)

@@ -15,8 +15,10 @@ Run with:
     uv run python scripts/run_pipeline.py
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
@@ -41,6 +43,10 @@ from mlops_agents.graphs.workflow_controller import workflow_controller
 from mlops_agents.planning.node import PlannerError, planner_node
 from mlops_agents.state.agent_state import AgentState
 from mlops_agents.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
+    from langgraph.graph.state import CompiledStateGraph
 
 logger = get_logger(__name__)
 
@@ -101,7 +107,7 @@ def _planner_node_with_error_handling(
 
 def evaluation_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Deterministic promotion decision — no LLM."""
-    result = evaluate_promotion(state)
+    result = evaluate_promotion(cast("dict[str, Any]", state))
     logger.info(f"[evaluation] passed={result['evaluation_passed']}")
     return Command(
         update=EvaluationStateUpdate(**result).to_update(), goto="workflow_controller"
@@ -110,7 +116,7 @@ def evaluation_node(state: AgentState) -> Command[Literal["workflow_controller"]
 
 def report_writer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Audit LLM node — produces structured EvaluationReport."""
-    result = run_report_writer(state)
+    result = run_report_writer(cast("dict[str, Any]", state))
     return Command(
         update=AuditStateUpdate(**result).to_update(), goto="workflow_controller"
     )
@@ -118,7 +124,7 @@ def report_writer_node(state: AgentState) -> Command[Literal["workflow_controlle
 
 def deployer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Deterministic deployment — Gate 2 has already approved upstream."""
-    result = run_deployer_module(state)
+    result = run_deployer_module(cast("dict[str, Any]", state))
     return Command(
         update=DeploymentStateUpdate(**result).to_update(), goto="workflow_controller"
     )
@@ -128,18 +134,20 @@ def deployer_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
 # Graph construction
 # =============================================================================
 
-def _build_graph(checkpointer=None) -> StateGraph:
+def _build_graph(
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
+) -> CompiledStateGraph[AgentState, None, AgentState, AgentState]:
     """Build the refactored MLOps StateGraph."""
     builder = StateGraph(AgentState)
 
-    builder.add_node("workflow_controller", workflow_controller)
+    builder.add_node("workflow_controller", workflow_controller)  # type: ignore[type-var]  # node takes dict[str, Any]; LangGraph API friction
     builder.add_node("data_validator", data_validator_node)
-    builder.add_node("dataset_approval", dataset_approval_node)
+    builder.add_node("dataset_approval", dataset_approval_node)  # type: ignore[type-var]  # node takes dict[str, Any]; LangGraph API friction
     builder.add_node("planner", _planner_node_with_error_handling)
     builder.add_node("executor", executor_node)
     builder.add_node("evaluation", evaluation_node)
     builder.add_node("report_writer", report_writer_node)
-    builder.add_node("deployment_approval", deployment_approval_node)
+    builder.add_node("deployment_approval", deployment_approval_node)  # type: ignore[type-var]  # node takes dict[str, Any]; LangGraph API friction
     builder.add_node("deployer", deployer_node)
 
     builder.add_edge(START, "workflow_controller")

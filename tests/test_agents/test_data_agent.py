@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 
-
 @patch("mlops_agents.data_validation.agent.get_llm")
 def test_build_data_agent_returns_compiled_graph(mock_get_llm):
     """build_data_agent() should return a compiled react agent without errors."""

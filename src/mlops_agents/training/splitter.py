@@ -81,7 +81,7 @@ def split_dataset(
             df = df[~df[sid_cols].apply(tuple, axis=1).isin(short_keys)]
             n_total = grouped.ngroups
             dropped = [
-                {"series_id": dict(zip(sid_cols, name)) if isinstance(name, tuple) else {sid_cols[0]: name},
+                {"series_id": dict(zip(sid_cols, name, strict=False)) if isinstance(name, tuple) else {sid_cols[0]: name},
                  "n_obs": n}
                 for name, n in short
             ]

@@ -6,7 +6,15 @@ planner reasoning, training results, and empirical metrics.
 """
 from __future__ import annotations
 
+from functools import cache
+from typing import Any
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
+
+from mlops_agents.prompts import get_prompt
+from mlops_agents.utils.llm import get_llm
+from mlops_agents.utils.logging import get_logger
 
 
 class EvaluationReport(BaseModel):
@@ -21,21 +29,12 @@ class EvaluationReport(BaseModel):
     human_review_notes: list[str] = Field(default_factory=list)
 
 
-from functools import cache
-from typing import Any
-
-from langchain_core.messages import HumanMessage, SystemMessage
-
-from mlops_agents.prompts import get_prompt
-from mlops_agents.utils.llm import get_llm
-from mlops_agents.utils.logging import get_logger
-
 logger = get_logger(__name__)
 
 _report_prompt = get_prompt("report_writer").template
 
 
-def build_report_writer():
+def build_report_writer() -> Any:  # structured-output Runnable; Any matches the cached accessor below
     """Return an LLM bound to the EvaluationReport structured output schema."""
     llm = get_llm("report_writer")
     return llm.with_structured_output(EvaluationReport, method="function_calling")

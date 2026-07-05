@@ -1,21 +1,29 @@
 """Tests for planning/validation.py."""
 import pytest
+
+from mlops_agents.contracts.planner import (
+    CandidateSpec,
+    DecisionBasis,
+    EvidenceReference,
+    PlannerOutput,
+    PlannerValidationContext,
+    RejectedModelSpec,
+)
+from mlops_agents.contracts.training import (
+    ExogStrategySettings,
+    ForecastingSettings,
+    TrainingPlan,
+    ValidationStrategy,
+)
+from mlops_agents.planning.trace import ToolTrace
 from mlops_agents.planning.validation import (
     PlannerValidationError,
-    _check_plan_integrity,
-    _check_plan_exhaustiveness,
     _check_evidence_references_hybrid,
+    _check_plan_exhaustiveness,
+    _check_plan_integrity,
     _collect_all_refs,
     validate_forecasting_settings,
 )
-from mlops_agents.contracts.planner import (
-    CandidateSpec, RejectedModelSpec, EvidenceReference,
-    DecisionBasis, PlannerOutput, PlannerValidationContext,
-)
-from mlops_agents.contracts.training import (
-    ExogStrategySettings, ForecastingSettings, TrainingPlan, ValidationStrategy,
-)
-from mlops_agents.planning.trace import ToolTrace
 
 # ---------------------------------------------------------------------------
 # Real model keys from the registry (classification problem_type).

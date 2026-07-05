@@ -3,6 +3,8 @@
 Threaded through the pipeline as ``AgentState.schema_json`` (serialised form).
 """
 
+from __future__ import annotations
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -32,7 +34,7 @@ class SchemaContract(BaseModel):
     frequency: str | None = None
 
     @model_validator(mode="after")
-    def validate_contract(self) -> "SchemaContract":
+    def validate_contract(self) -> SchemaContract:
         column_names = {c.name for c in self.columns}
         if self.target_column not in column_names:
             raise ValueError(

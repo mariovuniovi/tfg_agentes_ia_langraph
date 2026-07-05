@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
 from langchain.agents.structured_output import StructuredOutputError
@@ -36,6 +36,9 @@ from mlops_agents.training.profiler import build_dataset_profile
 from mlops_agents.training.validation_policy import resolve_validation_strategy
 from mlops_agents.utils.logging import get_logger
 
+if TYPE_CHECKING:
+    from mlops_agents.contracts.planner import EvidenceReference
+
 logger = get_logger(__name__)
 
 
@@ -60,8 +63,8 @@ def _emit_planner_event(payload: dict[str, Any]) -> None:
 def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     """Entry: build profile + validation context once, run agent up to 2 attempts."""
     processed_path = Path(state["processed_dataset_path"])
-    problem_type: str = state.get("problem_type", "")  # type: ignore[union-attr]
-    task_meta: dict[str, Any] = state.get("task_metadata") or {}  # type: ignore[union-attr]
+    problem_type: str = state.get("problem_type", "")
+    task_meta: dict[str, Any] = state.get("task_metadata") or {}
 
     raw_profile = build_dataset_profile(
         processed_path, {**task_meta, "problem_type": problem_type}
@@ -109,7 +112,7 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
         tools = build_planner_tools(profile, task_meta, problem_type, trace)
         agent = build_planner_agent(tools)
 
-        messages: list = [
+        messages: list[Any] = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=format_planner_inputs(profile, task_meta, problem_type, policy_summary)),
         ]
@@ -201,11 +204,11 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
 
 # Helpers — placed below so test file imports cleanly
 
-def _collect_refs_for_record(output: Any) -> list:
+def _collect_refs_for_record(output: Any) -> list[EvidenceReference]:
     return _collect_all_refs(output)
 
 
-def _audit_subset(ctx: Any) -> dict:
+def _audit_subset(ctx: Any) -> dict[str, Any]:
     """Compact, JSON-serializable subset of validation context for state/audit."""
     return {
         "problem_type": ctx.problem_type,
@@ -219,13 +222,13 @@ def _build_planner_output_record(
     output: Any,
     trace: ToolTrace,
     validation_ctx: Any,
-    soft_conflicts: list,
-    cited_experience_ids: list,
-    cited_rule_ids: list,
+    soft_conflicts: list[dict[str, Any]],
+    cited_experience_ids: list[str],
+    cited_rule_ids: list[str],
     status: str,
     last_error: str,
     plan: Any,
-) -> dict:
+) -> dict[str, Any]:
     """Compose the rich record consumed by the SSE pipeline & frontend PlannerPanel.
 
     ``plan`` is the executable :class:`TrainingPlan` (decision + resolved settings) so

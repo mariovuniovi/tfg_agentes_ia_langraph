@@ -119,16 +119,16 @@ async def run_pipeline_once(paths: list[str], schema_json: str) -> list[dict[str
     shaping for the events the aggregator needs (run_info, routing, token_usage,
     run_complete) plus archival events (hitl_request/resolved, training_complete).
     """
-    from mlops_agents.graphs.taxonomy import NODE_CATEGORIES
-    from mlops_agents.config.settings import settings
-    from mlops_agents.graphs.mlops_graph import graph
-    from mlops_agents.observability.pricing import estimate_cost
-    from mlops_agents.prompts.loader import get_agent_config
     from api.services.pipeline_helpers import (
         build_initial_state,
         parse_stream_event,
         reset_tool_start_times,
     )
+    from mlops_agents.config.settings import settings
+    from mlops_agents.graphs.mlops_graph import graph
+    from mlops_agents.graphs.taxonomy import NODE_CATEGORIES
+    from mlops_agents.observability.pricing import estimate_cost
+    from mlops_agents.prompts.loader import get_agent_config
 
     _agent_yaml = {"data_validator": "data_agent", "planner": "planner", "report_writer": "report_writer"}
     node_model_map = {

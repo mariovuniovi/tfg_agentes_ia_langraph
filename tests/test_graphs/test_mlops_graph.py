@@ -1,8 +1,9 @@
 """Tests for the main MLOps graph structure."""
 
 import json
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from langchain_core.messages import HumanMessage, ToolMessage
 
 
@@ -45,6 +46,7 @@ def test_graph_contains_all_refactored_nodes():
 
 def _make_validator_state(tmp_path=None):
     from pathlib import Path
+
     import pandas as pd
 
     processed = ""
@@ -195,6 +197,7 @@ def _make_executor_state(tmp_path, problem_type="classification"):
 def test_executor_node_raises_without_training_plan(tmp_path):
     """executor_node must raise RuntimeError when training_plan is None."""
     import pandas as pd
+
     from mlops_agents.graphs.mlops_graph import executor_node
 
     csv = tmp_path / "data.csv"
@@ -213,7 +216,8 @@ def test_executor_node_raises_without_training_plan(tmp_path):
 
 def test_executor_node_injects_problem_type_into_task_metadata(tmp_path, monkeypatch):
     """executor_node must add problem_type from state into task_metadata before calling run_training_plan."""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     from mlops_agents.contracts.training import TrainingResult
 
     state = _make_executor_state(tmp_path)

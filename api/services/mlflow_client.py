@@ -1,5 +1,5 @@
 """Typed wrapper over MLflow's MlflowClient — returns Pydantic models shaped for charts."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 import mlflow
@@ -50,7 +50,7 @@ class MlflowService:
             run_name=run.info.run_name or run.info.run_id[:8],
             status=run.info.status,
             start_time=datetime.fromtimestamp(
-                run.info.start_time / 1000, tz=timezone.utc
+                run.info.start_time / 1000, tz=UTC
             ),
             params=dict(run.data.params),
             metrics=metrics,

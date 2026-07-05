@@ -15,7 +15,6 @@ import pytest
 from langchain_core.messages import HumanMessage
 from sklearn.datasets import load_iris
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------

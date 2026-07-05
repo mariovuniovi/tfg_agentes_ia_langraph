@@ -1,6 +1,7 @@
 """Tests for ML rules reader."""
 import pytest
 from pydantic import ValidationError
+
 from mlops_agents.knowledge.reader import MLRule, match_rules
 
 

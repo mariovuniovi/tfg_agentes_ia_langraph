@@ -1,5 +1,6 @@
 """Generate a default TrainingPlan from the registry when no agent is involved."""
 from __future__ import annotations
+
 from mlops_agents.contracts.profile import DatasetProfile
 from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 from mlops_agents.models.loader import ModelSpec, get_models_for
@@ -12,10 +13,7 @@ def _row_count_lower_bound(bucket: str) -> int:
 def _is_eligible(model: ModelSpec, profile: DatasetProfile) -> bool:
     requires = model.requires or {}
     n_rows_bucket = profile.n_rows
-    if "min_rows" in requires:
-        if _row_count_lower_bound(n_rows_bucket) < requires["min_rows"]:
-            return False
-    return True
+    return not ("min_rows" in requires and _row_count_lower_bound(n_rows_bucket) < requires["min_rows"])
 
 
 def default_training_plan(problem_type: str, dataset_profile: DatasetProfile) -> TrainingPlan:

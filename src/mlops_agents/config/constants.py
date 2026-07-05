@@ -1,5 +1,7 @@
 """Application-wide constants."""
 
+from __future__ import annotations
+
 # MLflow model registry stages / aliases
 MLFLOW_ALIAS_CHAMPION = "champion"
 MLFLOW_ALIAS_CHALLENGER = "challenger"

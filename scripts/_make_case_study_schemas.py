@@ -7,8 +7,10 @@ Writes one *_schema.json next to each CSV in:
   data/samples/broken/
 """
 from __future__ import annotations
+
 import json
 from pathlib import Path
+
 
 def write(path: str, schema: dict) -> None:
     Path(path).write_text(json.dumps(schema, indent=2, ensure_ascii=False), encoding="utf-8")

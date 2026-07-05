@@ -1,9 +1,11 @@
 """End-to-end test: executor on California Housing regression."""
 import json
 from pathlib import Path
+
 import pandas as pd
 import pytest
 from sklearn.datasets import fetch_california_housing
+
 from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate
 from mlops_agents.training.executor import run_training_plan
 

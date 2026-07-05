@@ -1,6 +1,6 @@
 """Tests for Pydantic API models."""
-from api.models.run import RunCreate, RunStatus, PipelineEventModel, HITLDecision
 from api.models.experiment import MetricSeries
+from api.models.run import HITLDecision, PipelineEventModel, RunCreate, RunStatus
 
 
 def test_run_create_requires_dataset_paths():

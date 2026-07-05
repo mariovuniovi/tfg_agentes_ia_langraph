@@ -3,9 +3,9 @@
 All tests are offline — they mock HTTP and use only statsmodels (static data).
 """
 from __future__ import annotations
+
 import pandas as pd
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # statsmodels source handlers
@@ -75,7 +75,9 @@ def _make_metro_raw() -> str:
 
 def test_fetch_uci_url_metro(monkeypatch):
     import io
+
     import pandas as pd
+
     from scripts._dataset_sources import fetch_dataset
 
     raw_csv = _make_metro_raw()

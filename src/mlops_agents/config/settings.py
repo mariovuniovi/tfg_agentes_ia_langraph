@@ -1,7 +1,9 @@
 """Application configuration via Pydantic Settings (reads from .env)."""
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -59,7 +61,7 @@ class Settings(BaseSettings):
     data_benchmarks_dir: Path = Path("data/benchmarks")
     ml_rules_path: Path = Path("src/mlops_agents/knowledge/ml_rules.yaml")
     retrieval_default_k: int = 5
-    retrieval_weights_override: dict = Field(default_factory=dict)
+    retrieval_weights_override: dict[str, Any] = Field(default_factory=dict)
 
     # Planner (SP5)
     planner_max_iterations: int = 10

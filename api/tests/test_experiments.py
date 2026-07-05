@@ -1,9 +1,13 @@
 """Tests for MlflowService."""
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
+
 import pytest
-from api.services.mlflow_client import MlflowService
+from httpx import ASGITransport, AsyncClient
+
+from api.main import app
 from api.models.experiment import ExperimentOut, RunOut
+from api.services.mlflow_client import MlflowService
 
 
 def _mock_experiment(exp_id="1", name="mlops-agents"):
@@ -71,11 +75,6 @@ def test_get_runs_empty():
 
 
 # ── Router-level tests ─────────────────────────────────────────────────────────
-from datetime import timezone
-from httpx import AsyncClient, ASGITransport
-from api.main import app
-
-
 @pytest.mark.asyncio
 async def test_get_experiments_endpoint():
     with patch("api.routers.experiments.MlflowService") as MockSvc:
@@ -99,7 +98,7 @@ async def test_get_experiment_runs_endpoint():
                 run_id="abc",
                 run_name="run-1",
                 status="FINISHED",
-                start_time=datetime.now(timezone.utc),
+                start_time=datetime.now(UTC),
                 params={},
                 metrics={"accuracy": 0.94},
                 metric_series=[

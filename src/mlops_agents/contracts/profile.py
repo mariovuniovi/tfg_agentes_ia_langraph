@@ -1,6 +1,8 @@
 """Pydantic schema for the dataset profile — the retrieval join key for SP4/SP5."""
 from __future__ import annotations
+
 from typing import Literal
+
 from pydantic import BaseModel
 
 

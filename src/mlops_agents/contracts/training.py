@@ -9,7 +9,7 @@ Used by:
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -50,12 +50,12 @@ class SearchParamOverride(BaseModel):
     choices: list[Any] | None = None
 
     @model_validator(mode="after")
-    def either_range_or_choices(self):
+    def either_range_or_choices(self) -> Self:
         has_range = self.low is not None and self.high is not None
         has_choices = self.choices is not None
         if has_range == has_choices:
             raise ValueError("Provide exactly one of {low, high} or {choices}.")
-        if has_range and self.low > self.high:
+        if has_range and self.low > self.high:  # type: ignore[operator]  # has_range guarantees low/high are not None
             raise ValueError(f"low ({self.low}) must be <= high ({self.high}).")
         return self
 
@@ -115,14 +115,14 @@ class PlannerTrainingPlan(BaseModel):
     models_not_recommended: list[RejectedModelSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def priorities_unique(self):
+    def priorities_unique(self) -> Self:
         priorities = [c.priority for c in self.candidates]
         if len(priorities) != len(set(priorities)):
             raise ValueError(f"Candidate priorities must be unique. Got: {priorities}")
         return self
 
     @model_validator(mode="after")
-    def _check_plan_integrity(self):
+    def _check_plan_integrity(self) -> Self:
         cand = {c.model_key for c in self.candidates}
         rej = {r.model_key for r in self.models_not_recommended}
 

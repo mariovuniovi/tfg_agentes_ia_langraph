@@ -158,7 +158,7 @@ def test_training_plan_backward_compat_no_reason():
 # --- Aliases (backward compat) ---
 
 def test_training_plan_candidate_alias():
-    from mlops_agents.contracts.training import TrainingPlanCandidate, CandidateSpec
+    from mlops_agents.contracts.training import CandidateSpec, TrainingPlanCandidate
     assert TrainingPlanCandidate is CandidateSpec
 
 

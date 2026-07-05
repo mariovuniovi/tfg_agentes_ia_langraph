@@ -1,12 +1,13 @@
 """Integration test for the full planner flow — requires GITHUB_TOKEN + --llm flag."""
-import pytest
 from pathlib import Path
 
-from mlops_agents.planning.context import build_planner_validation_context
+import pytest
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from mlops_agents.contracts.planner import PlannerOutput
+from mlops_agents.planning.context import build_planner_validation_context
 from mlops_agents.prompts import get_prompt
 from mlops_agents.utils.llm import get_llm
-from langchain_core.messages import HumanMessage, SystemMessage
 
 
 @pytest.mark.integration

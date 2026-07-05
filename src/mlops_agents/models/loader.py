@@ -13,7 +13,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
-from mlops_agents.models.factories import FACTORY_REGISTRY  # noqa: F401 — re-exported for monkeypatch
+from mlops_agents.models.factories import FACTORY_REGISTRY as FACTORY_REGISTRY  # explicit re-export for monkeypatch
 from mlops_agents.models.search_spaces import SEARCH_SPACE_REGISTRY  # noqa: F401 — re-exported for monkeypatch
 
 DEFAULT_REGISTRY_PATH = Path(__file__).parent / "registry.yaml"

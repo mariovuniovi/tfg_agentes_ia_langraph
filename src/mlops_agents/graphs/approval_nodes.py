@@ -6,7 +6,7 @@ so the existing SSE event shape stays backward compatible.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from langgraph.types import Command, interrupt
 
@@ -16,7 +16,7 @@ from mlops_agents.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def dataset_approval_node(state: dict[str, Any]) -> Command:
+def dataset_approval_node(state: dict[str, Any]) -> Command[Literal["workflow_controller"]]:
     import pandas as pd
     counts = state.get("agent_attempt_counts") or {}
     attempt = counts.get("data_validator", 1)
@@ -78,7 +78,7 @@ def dataset_approval_node(state: dict[str, Any]) -> Command:
     )
 
 
-def deployment_approval_node(state: dict[str, Any]) -> Command:
+def deployment_approval_node(state: dict[str, Any]) -> Command[Literal["workflow_controller"]]:
     from mlops_agents.evaluation.champion import resolve_champion_model_name
     champion = resolve_champion_model_name(state)
 

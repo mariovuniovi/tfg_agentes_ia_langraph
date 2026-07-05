@@ -107,11 +107,11 @@ class PlannerValidationContext(BaseModel):
     """Deterministic ground-truth context — independent of agent behavior."""
 
     problem_type: str
-    task_metadata: dict
+    task_metadata: dict[str, Any]
     available_model_keys: list[str]
     available_model_specs: list[ModelSpec]
     similar_experiences: list[ExperienceSummary]
-    matched_rules: list[dict]
-    rules_by_id: dict[str, dict]
+    matched_rules: list[dict[str, Any]]
+    rules_by_id: dict[str, dict[str, Any]]
 
     model_config = {"arbitrary_types_allowed": True}  # for ModelSpec

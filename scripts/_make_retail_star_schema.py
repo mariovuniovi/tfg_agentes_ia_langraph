@@ -19,9 +19,11 @@ Join #5 is a non-obvious geographic match: customers live in the same cities as 
 No join key is a date column.
 """
 from __future__ import annotations
+
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 rng = np.random.default_rng(0)
 Path("data/samples/retail_star_schema").mkdir(parents=True, exist_ok=True)
@@ -80,7 +82,7 @@ formats = rng.choice(["express", "supermarket", "hypermarket"], 20, p=[0.4, 0.4,
 stores = pd.DataFrame({
     "store_id":    range(1, 21),
     "store_name":  [f"{city_names[c]} {fmt.capitalize()} {i+1}"
-                    for i, (c, fmt) in enumerate(zip(store_city_codes, formats))],
+                    for i, (c, fmt) in enumerate(zip(store_city_codes, formats, strict=False))],
     "city_code":   store_city_codes,                   # shared attr → dim_customers
     "region":      [regions[c] for c in store_city_codes],
     "format":      formats,

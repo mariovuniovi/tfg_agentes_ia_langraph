@@ -1,8 +1,9 @@
 """Tests for the new history_length field and DatasetProfile typing."""
-import pandas as pd
 from pathlib import Path
 
-from mlops_agents.training.profiler import build_dataset_profile, DatasetProfile
+import pandas as pd
+
+from mlops_agents.training.profiler import DatasetProfile, build_dataset_profile
 
 
 def _write_csv(rows: int, tmp_path: Path) -> Path:

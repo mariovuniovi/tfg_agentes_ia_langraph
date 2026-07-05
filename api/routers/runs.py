@@ -1,5 +1,6 @@
 """Runs router: pipeline execution, WebSocket streaming, HITL approval."""
 import asyncio
+import contextlib
 from uuid import uuid4
 
 import pandas as pd
@@ -90,10 +91,8 @@ async def pipeline_ws(websocket: WebSocket, run_id: str):
                 cursor += 1
                 if event.get("type") == "run_complete":
                     return
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(entry.queue.get(), timeout=1.0)
-            except TimeoutError:
-                pass
     except WebSocketDisconnect:
         pass
 

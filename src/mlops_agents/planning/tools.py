@@ -3,7 +3,8 @@
 Each tool records observations to a shared ToolTrace so validation can later
 verify the agent only cited what it actually retrieved (hybrid validation A1)."""
 from __future__ import annotations
-from typing import Any
+
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.tools import tool
 
@@ -15,6 +16,8 @@ from mlops_agents.knowledge.reader import match_rules
 from mlops_agents.models.loader import get_model, get_models_for
 from mlops_agents.planning.trace import ToolTrace
 
+if TYPE_CHECKING:
+    from langchain_core.tools import BaseTool
 
 _MAX_CALLS_ERR = {
     "error": "max_tool_calls exceeded — terminate and produce final PlannerOutput"
@@ -47,7 +50,7 @@ def build_planner_tools(
     task_metadata: dict[str, Any],
     problem_type: str,
     trace: ToolTrace,
-) -> list:
+) -> list[BaseTool]:
     """Build closure-bound planner tools that record observations to the shared trace.
 
     `problem_type` is bound at closure time — the agent cannot override it.
@@ -66,7 +69,7 @@ def build_planner_tools(
         return sorted(set(field) | new_items)
 
     @tool
-    def list_available_models() -> list[dict] | dict:
+    def list_available_models() -> list[dict[str, Any]] | dict[str, str]:
         """List all models in the registry for the current problem type. Returns one entry
         per model with headline fields (model_key, family, complexity_rank,
         supports_exogenous, supports_missing, use_when, avoid_when). Call this once at the
@@ -81,7 +84,7 @@ def build_planner_tools(
         return out
 
     @tool
-    def retrieve_similar_experiences(top_k: int = 5) -> list[dict] | dict:
+    def retrieve_similar_experiences(top_k: int = 5) -> list[dict[str, Any]] | dict[str, str]:
         """Retrieve the top-k most similar past training experiences for the current dataset.
         Similarity is deterministic (bucket-based, no embeddings). Each result includes
         experience_id, similarity_score, relevance_tier, matched_buckets, mismatched_buckets,
@@ -105,7 +108,7 @@ def build_planner_tools(
         return out
 
     @tool
-    def retrieve_ml_knowledge() -> list[dict] | dict:
+    def retrieve_ml_knowledge() -> list[dict[str, Any]] | dict[str, str]:
         """Retrieve static ML rules that match the current dataset profile + task metadata.
         Each rule returns rule_id, prefer, avoid_or_deprioritize, recommend, summary.
         Call this once."""
@@ -114,7 +117,7 @@ def build_planner_tools(
         # NOTE: if task_metadata keys collide with profile keys, task_metadata wins.
         rule_input = {**dataset_profile, **task_metadata, "problem_type": problem_type}
         matched = match_rules(rule_input)
-        out = [{
+        out: list[dict[str, Any]] = [{
             "rule_id": r.rule_id,
             "prefer": r.prefer,
             "avoid_or_deprioritize": r.avoid_or_deprioritize,
@@ -127,7 +130,7 @@ def build_planner_tools(
         return out
 
     @tool
-    def inspect_model_details(model_key: str) -> dict:
+    def inspect_model_details(model_key: str) -> dict[str, Any]:
         """Get full registry metadata for one model. Use sparingly — only when
         list_available_models doesn't give you enough info to decide. Hard cap of 3
         inspect CALLS per planner run (repeated calls on same key still burn budget).

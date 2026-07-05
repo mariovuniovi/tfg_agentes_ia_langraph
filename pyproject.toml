@@ -60,6 +60,7 @@ dev = [
     "mypy>=1.13",
     "pre-commit>=4.0",
     "types-PyYAML>=6.0",
+    "pandas-stubs>=3.0.3.260530",
 ]
 
 [build-system]
@@ -97,6 +98,24 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "PLR0913"]
+# 24 one-line `if cond: stmt` bucketing rules — deliberate compact tabular style
+"src/mlops_agents/training/profiler.py" = ["E701"]
+# sklearn X/y naming convention (X, X_tr, X_val locals)
+"src/mlops_agents/training/executor.py" = ["N806"]
+# sklearn X/y naming convention (X, Xa locals)
+"tests/test_models/test_factories.py" = ["N806"]
+# MockClient/MockSvc: uppercase aliases for patched classes in `with patch(...)` blocks
+"api/tests/test_experiments.py" = ["N806"]
+# UR_THRESHOLD: constant-style local for a fixed uniqueness-ratio cutoff
+"src/mlops_agents/tools/join_discovery_tools.py" = ["N806"]
+# sys.path bootstrap must run before mlops_agents imports — standard script pattern
+"scripts/run_benchmark.py" = ["E402"]
+# intentional broad `pytest.raises(Exception)` assertions (any failure is a pass)
+"tests/test_planning/test_validation.py" = ["B017"]
+# local single-user backend; blocking I/O acceptable
+"api/routers/uploads.py" = ["ASYNC230"]
+# local single-user measurement harness; blocking pathlib I/O acceptable
+"scripts/measure_agentic_cost.py" = ["ASYNC240"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mlops_agents"]
@@ -121,6 +140,7 @@ markers = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
+plugins = ["pydantic.mypy"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -135,5 +155,11 @@ module = [
     "loguru.*",
     "optuna.*",
     "sklearn.*",
+    # ML libraries shipped without stubs or py.typed marker
+    "statsforecast.*",
+    "skforecast.*",
+    "statsmodels.*",
+    "catboost.*",
+    "scipy.*",
 ]
 ignore_missing_imports = true

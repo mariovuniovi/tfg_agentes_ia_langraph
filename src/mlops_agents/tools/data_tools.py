@@ -5,8 +5,11 @@ data validation agent's tool-calling loop to gather facts; the agent
 then interprets the results.
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import pandas as pd
 from langchain_core.tools import tool
@@ -191,7 +194,7 @@ def merge_datasets(join_spec_json: str, output_path: str) -> str:
     Returns:
         JSON with {success, output_path, row_count, columns} or {error}.
     """
-    spec: dict = json.loads(join_spec_json)
+    spec: dict[str, Any] = json.loads(join_spec_json)
     join_key: str = spec["join_key"]
     file_specs: list[dict[str, str]] = spec["files"]
 
@@ -290,8 +293,8 @@ def detect_temporal_gaps(
     # Validate frequency alias — to_offset raises ValueError for bad aliases
     try:
         offset = to_offset(frequency)
-    except ValueError:
-        raise ValueError(f"Invalid pandas frequency alias: {frequency!r}")
+    except ValueError as exc:
+        raise ValueError(f"Invalid pandas frequency alias: {frequency!r}") from exc
     if offset is None:
         raise ValueError(f"Invalid pandas frequency alias: {frequency!r}")
 
@@ -305,7 +308,7 @@ def detect_temporal_gaps(
         )
 
     # Gap detection per series
-    def _gaps_for_group(grp: pd.DataFrame, series_id: dict) -> dict | None:
+    def _gaps_for_group(grp: pd.DataFrame, series_id: dict[str, Any]) -> dict[str, Any] | None:
         actual = set(grp[datetime_col])
         expected = pd.date_range(
             grp[datetime_col].min(), grp[datetime_col].max(), freq=frequency
@@ -322,12 +325,12 @@ def detect_temporal_gaps(
             "sample_missing_dates": [str(d.date()) for d in missing[:3]],
         }
 
-    all_gaps: list[dict] = []
+    all_gaps: list[dict[str, Any]] = []
     if series_id_cols:
         for keys, grp in df.groupby(series_id_cols):
             if not isinstance(keys, tuple):
                 keys = (keys,)
-            gap = _gaps_for_group(grp, dict(zip(series_id_cols, keys)))
+            gap = _gaps_for_group(grp, dict(zip(series_id_cols, keys, strict=False)))
             if gap:
                 all_gaps.append(gap)
     else:
@@ -439,9 +442,10 @@ def _interpolate_short_internal_gaps(s: pd.Series, max_gap: int) -> tuple[pd.Ser
     group_id = (missing != missing.shift()).cumsum()
 
     for _, idx in s[missing].groupby(group_id[missing]).groups.items():
-        idx = list(idx)
+        idx = list(idx)  # type: ignore[assignment]  # pandas-stubs types .groups values as Index; materializing to list is intentional
         gap_size = len(idx)
-        positions = [s.index.get_loc(i) for i in idx]
+        # get_loc returns int for a unique index (int | slice | ndarray in pandas-stubs)
+        positions = [cast(int, s.index.get_loc(i)) for i in idx]
         min_pos, max_pos = min(positions), max(positions)
         has_before = min_pos > 0 and pd.notna(s.iloc[min_pos - 1])
         has_after = max_pos < len(s) - 1 and pd.notna(s.iloc[max_pos + 1])
@@ -454,7 +458,7 @@ def _interpolate_short_internal_gaps(s: pd.Series, max_gap: int) -> tuple[pd.Ser
     return result, large_gaps
 
 
-def _tabular_impute(df: pd.DataFrame, target_column: str) -> dict:
+def _tabular_impute(df: pd.DataFrame, target_column: str) -> dict[str, Any]:
     """Mean/mode imputation for classification and regression datasets.
 
     Target column rows with missing values are dropped (not imputed).
@@ -503,7 +507,7 @@ def _forecasting_impute(
     series_id_columns: list[str],
     max_interpolation_gap: int,
     temporal_cols: set[str] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Role-aware imputation for forecasting datasets.
 
     The target — and any exogenous column explicitly declared time-varying in the
@@ -529,7 +533,7 @@ def _forecasting_impute(
     protected = {datetime_column} | set(series_id_columns)
     imputed_cols: set[str] = set()
     rows_affected = 0
-    target_large_gaps: list[dict] = []
+    target_large_gaps: list[dict[str, Any]] = []
 
     def _is_temporal(col: str) -> bool:
         if col == target_column:
@@ -558,7 +562,7 @@ def _forecasting_impute(
             imputed_cols.add(col)
             rows_affected += filled
 
-    def _process(grp: pd.DataFrame, series_id: dict) -> pd.DataFrame:
+    def _process(grp: pd.DataFrame, series_id: dict[str, Any]) -> pd.DataFrame:
         nonlocal rows_affected
         g = grp.copy()
         for col in g.columns:
@@ -597,7 +601,7 @@ def _forecasting_impute(
         for keys, grp in df.groupby(series_id_columns, group_keys=False):
             if not isinstance(keys, tuple):
                 keys = (keys,)
-            parts.append(_process(grp, dict(zip(series_id_columns, keys))))
+            parts.append(_process(grp, dict(zip(series_id_columns, keys, strict=False))))
         df = pd.concat(parts).reset_index(drop=True)
     else:
         df = _process(df, {})

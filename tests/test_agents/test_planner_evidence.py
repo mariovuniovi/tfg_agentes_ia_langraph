@@ -7,13 +7,14 @@ updated signatures. Full coverage is in tests/test_planning/test_validation.py.
 This file is kept as a smoke-test to confirm the new imports resolve correctly.
 """
 import pytest
+
+from mlops_agents.contracts.training import RejectedModel, TrainingPlan, TrainingPlanCandidate
+from mlops_agents.planning.node import PlannerError
 from mlops_agents.planning.validation import (
     PlannerValidationError,
-    _check_plan_exhaustiveness,
     _check_evidence_references_hybrid,
+    _check_plan_exhaustiveness,
 )
-from mlops_agents.planning.node import PlannerError
-from mlops_agents.contracts.training import TrainingPlan, TrainingPlanCandidate, RejectedModel
 
 
 def test_planning_validation_imports_resolve():

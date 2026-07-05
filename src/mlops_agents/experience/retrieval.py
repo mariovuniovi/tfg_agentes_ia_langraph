@@ -1,11 +1,14 @@
 """Weighted-overlap retrieval for experience records."""
 from __future__ import annotations
+
 import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
+
 from mlops_agents.experience.schema import CandidateResultView, RetrievalView, SelectedSolutionView
 
 if TYPE_CHECKING:
+    from mlops_agents.contracts.planner import ExperienceSummary
     from mlops_agents.experience.pool import ExperiencePool
 
 RETRIEVAL_WEIGHTS: dict[str, int] = {
@@ -49,11 +52,11 @@ def _parse_ts(iso: str | None) -> float:
 
 def _build_view(
     row: Any,
-    cand_rows: list,
+    cand_rows: list[Any],
     score: int,
     ratio: float,
-    matched: list,
-    profile: dict | None = None,
+    matched: list[str],
+    profile: dict[str, Any] | None = None,
 ) -> RetrievalView | None:
     exp_profile = json.loads(row["dataset_profile_json"])
     candidates = [
@@ -122,7 +125,7 @@ def compare_target_scales(
     )
 
 
-def to_experience_summary(view: RetrievalView) -> "ExperienceSummary":
+def to_experience_summary(view: RetrievalView) -> ExperienceSummary:
     """Convert a RetrievalView to the compact ExperienceSummary sent to the LLM."""
     from mlops_agents.contracts.planner import CandidateResultCompact, ExperienceSummary
 
@@ -154,7 +157,7 @@ def to_experience_summary(view: RetrievalView) -> "ExperienceSummary":
     )
 
 
-def find_similar_impl(pool: "ExperiencePool", profile: dict[str, Any], problem_type: str, k: int) -> list[RetrievalView]:
+def find_similar_impl(pool: ExperiencePool, profile: dict[str, Any], problem_type: str, k: int) -> list[RetrievalView]:
     max_score = MAX_SCORE_BY_PROBLEM_TYPE.get(problem_type, 10)
     with pool._conn() as conn:
         rows = conn.execute(
@@ -174,7 +177,7 @@ def find_similar_impl(pool: "ExperiencePool", profile: dict[str, Any], problem_t
         scored.append((score, _parse_ts(row["created_at"]), round(score / max_score, 3), matched, row))
     scored.sort(key=lambda x: (-x[0], -x[1]))
     views = []
-    for score, ts, ratio, matched, row in scored[:k]:
+    for score, _ts, ratio, matched, row in scored[:k]:
         with pool._conn() as conn:
             cand_rows = conn.execute(
                 "SELECT * FROM candidate_results WHERE task_id = ?", (row["task_id"],)

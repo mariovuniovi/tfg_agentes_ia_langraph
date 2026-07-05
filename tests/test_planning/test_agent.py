@@ -1,9 +1,9 @@
 """Test build_planner_agent factory."""
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from mlops_agents.planning.agent import build_planner_agent
-from mlops_agents.planning.trace import ToolTrace
 from mlops_agents.planning.tools import build_planner_tools
+from mlops_agents.planning.trace import ToolTrace
 
 
 def test_build_planner_agent_returns_compiled_graph():

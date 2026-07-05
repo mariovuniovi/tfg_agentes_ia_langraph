@@ -1,6 +1,8 @@
 """Pydantic schemas for experience records and retrieval views."""
 from __future__ import annotations
+
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -42,13 +44,13 @@ class ExperienceRecord(BaseModel):
     models_tested: list[CandidateResult] = Field(default_factory=list)
     selected_solution: SelectedSolution | None = None
     experience_summary: str | None = None
-    validation_strategy: dict | None = None
-    exog_availability: dict | None = None
-    exog_strategies: dict | None = None
-    per_fold_metrics: list[dict] | None = None
-    exog_fit_failures: list[dict] | None = None
+    validation_strategy: dict[str, Any] | None = None
+    exog_availability: dict[str, Any] | None = None
+    exog_strategies: dict[str, Any] | None = None
+    per_fold_metrics: list[dict[str, Any]] | None = None
+    exog_fit_failures: list[dict[str, Any]] | None = None
     expected_drift: str | None = None
-    planner_output: dict | None = None
+    planner_output: dict[str, Any] | None = None
     target_mean: float | None = None
     target_std: float | None = None
     target_min: float | None = None
@@ -76,7 +78,7 @@ class RetrievalView(BaseModel):
     dataset_profile: dict[str, Any]
     models_tested: list[CandidateResultView]
     selected_solution: SelectedSolutionView
-    models_not_recommended: list[dict] = Field(default_factory=list)
+    models_not_recommended: list[dict[str, Any]] = Field(default_factory=list)
     experience_summary: str | None
     similarity_score: int
     similarity_ratio: float

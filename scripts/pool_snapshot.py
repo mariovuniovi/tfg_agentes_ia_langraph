@@ -6,6 +6,7 @@ Usage:
     uv run python scripts/pool_snapshot.py
 """
 from __future__ import annotations
+
 import json
 import sqlite3
 import sys

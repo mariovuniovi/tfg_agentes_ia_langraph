@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import pickle
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import mlflow
 import mlflow.sklearn
@@ -44,6 +45,9 @@ from mlops_agents.training.validation_policy import (
 )
 from mlops_agents.utils.logging import get_logger
 
+if TYPE_CHECKING:
+    from mlops_agents.training.exog_extender import Strategy
+
 logger = get_logger(__name__)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -68,7 +72,8 @@ def _narrow_seasonality_to_freq(
     grid = season_length_grid(model_key, freq, n_obs)
     if grid is None or param is None or param.type != "categorical":
         return spec
-    if list(param.choices) == grid:
+    # cast: categorical params always define choices (SearchParamSpec convention)
+    if list(cast("list[Any]", param.choices)) == grid:
         return spec
     new_params = dict(spec.params)
     new_params["season_length"] = param.model_copy(update={"choices": grid})
@@ -126,7 +131,7 @@ def _reg_metrics(y_true: Any, y_pred: Any) -> dict[str, float]:
     }
 
 
-def _fc_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+def _fc_metrics(y_true: Any, y_pred: Any) -> dict[str, float]:
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))
     out: dict[str, float] = {"rmse": rmse, "mae": mae}
@@ -168,7 +173,7 @@ def _make_sampler(narrowed: Any, n_trials: int) -> tuple[optuna.samplers.BaseSam
     return optuna.samplers.TPESampler(seed=42), n_trials
 
 
-def _pick_champion(results: list[dict], direction: str, tol: float) -> dict:
+def _pick_champion(results: list[dict[str, Any]], direction: str, tol: float) -> dict[str, Any]:
     successful = [r for r in results if r["status"] == "successful"]
     if not successful:
         raise RuntimeError(f"All candidates failed: {[r['model_key'] for r in results]}")
@@ -189,7 +194,7 @@ def _pick_champion(results: list[dict], direction: str, tol: float) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _select_cls_validation(y: pd.Series) -> tuple:
+def _select_cls_validation(y: pd.Series) -> tuple[Any, ...]:
     """Return ('single_split',) or ('stratified_kfold', n_folds).
 
     Falls back to single_split when the dataset is too small for reliable CV:
@@ -218,7 +223,7 @@ def _select_cls_validation(y: pd.Series) -> tuple:
     return ("stratified_kfold", n_folds)
 
 
-def _select_reg_validation(y: pd.Series) -> tuple:
+def _select_reg_validation(y: pd.Series) -> tuple[Any, ...]:
     """Return ('single_split',) or ('kfold', n_folds)."""
     n_rows = len(y)
 
@@ -245,7 +250,7 @@ def _run_candidate_classification(
     n_trials: int,
     metric: str,
     direction: str,
-) -> dict:
+) -> dict[str, Any]:
     spec = get_model(candidate.model_key)
     narrowed = (
         narrow_search_space(candidate.model_key, candidate.search_space_override)
@@ -272,7 +277,7 @@ def _run_candidate_classification(
             trial.set_user_attr("fold_scores", [score])
             return float(score)
 
-        fallback_score_fn = lambda p: _cls_metrics(  # noqa: E731
+        fallback_score_fn: Callable[[dict[str, Any]], float] = lambda p: _cls_metrics(  # noqa: E731
             y_val, factory(p).fit(X_tr, y_tr).predict(X_val)
         )[metric]
         val_strategy_label = "single_split"
@@ -346,7 +351,7 @@ def _run_candidate_regression(
     n_trials: int,
     metric: str,
     direction: str,
-) -> dict:
+) -> dict[str, Any]:
     spec = get_model(candidate.model_key)
     narrowed = (
         narrow_search_space(candidate.model_key, candidate.search_space_override)
@@ -369,7 +374,7 @@ def _run_candidate_regression(
             trial.set_user_attr("fold_scores", [score])
             return float(score)
 
-        fallback_score_fn = lambda p: _reg_metrics(  # noqa: E731
+        fallback_score_fn: Callable[[dict[str, Any]], float] = lambda p: _reg_metrics(  # noqa: E731
             y_val, factory(p).fit(X_tr, y_tr).predict(X_val)
         )[metric]
         val_strategy_label = "single_split"
@@ -461,7 +466,7 @@ def _build_series_dict(
     """Build series_dict for skforecast with explicit freq or RangeIndex fallback."""
     def _prep(s: pd.Series) -> pd.Series:
         s = s.sort_index()
-        for freq in ([freq_hint] if freq_hint else []) + ([pd.infer_freq(s.index)] if pd.infer_freq(s.index) else []):
+        for freq in ([freq_hint] if freq_hint else []) + ([pd.infer_freq(s.index)] if pd.infer_freq(s.index) else []):  # type: ignore[list-item, arg-type]  # dt_col is to_datetime'd upstream so the index is datetime-like; the truthiness check filters None
             if not freq:
                 continue
             try:
@@ -474,7 +479,8 @@ def _build_series_dict(
 
     if sid_cols:
         return {
-            sid: _prep(g.set_index(dt_col)[target])
+            # cast: single-column groupby keys are the series-id values (strings)
+            cast("str", sid): _prep(g.set_index(dt_col)[target])
             for sid, g in df.groupby(sid_cols[0])
         }
     return {"__single__": _prep(df.set_index(dt_col)[target])}
@@ -498,7 +504,7 @@ def _align_train_exog_index(
     return exog.reset_index(drop=True)
 
 
-def _resolve_exog_availability(df_columns: list[str], task_metadata: dict) -> dict[str, str]:
+def _resolve_exog_availability(df_columns: list[str], task_metadata: dict[str, Any]) -> dict[str, str]:
     """Return {col: 'known_future' | 'unknown_future'} for every exog column.
 
     If task_metadata['exogenous_columns'] is present, it is authoritative and
@@ -525,7 +531,7 @@ def _run_candidate_forecasting(
     direction: str,
     forecasting_settings: ForecastingSettings,
     profile: DatasetProfile,
-) -> dict:
+) -> dict[str, Any]:
     spec = get_model(candidate.model_key)
     target = task_metadata["target_column"]
     dt_col = task_metadata["datetime_column"]
@@ -580,11 +586,11 @@ def _run_candidate_forecasting(
     exog_columns = list(availability.keys())
     strategies = forecasting_settings.exog_strategies
 
-    exog_cache: dict[tuple, pd.Series] = {}
+    exog_cache: dict[tuple[str, str, int, str], pd.Series] = {}
 
-    def fit_score(params: dict) -> tuple[float, list[float], list[dict]]:
+    def fit_score(params: dict[str, Any]) -> tuple[float, list[float], list[dict[str, Any]]]:
         fold_scores: list[float] = []
-        fold_failures: list[dict] = []
+        fold_failures: list[dict[str, Any]] = []
 
         for fold_id, (train_idx, val_idx) in enumerate(iter_folds(pool, vs, dt_col, sid_cols)):
             cand_train = pool.loc[train_idx].reset_index(drop=True)
@@ -628,17 +634,15 @@ def _run_candidate_forecasting(
                 if cache_key in exog_cache:
                     future_values[col] = exog_cache[cache_key]
                 else:
-                    preds, fail = extend_exog(cand_train[col], horizon, strat, freq)
+                    # cast: avail != "known_future" here, so strat is a Strategy literal
+                    preds, fail = extend_exog(cand_train[col], horizon, cast("Strategy", strat), freq)
                     future_values[col] = preds
                     exog_cache[cache_key] = preds
                     if fail is not None:
                         fold_failures.append(fail | {"fold_id": fold_id, "column": col})
 
             used_cols = list(future_values.keys())
-            if used_cols:
-                train_exog = _align_train_exog_index(cand_train[used_cols], series_dict)
-            else:
-                train_exog = None
+            train_exog = _align_train_exog_index(cand_train[used_cols], series_dict) if used_cols else None
             val_exog = None
             if used_cols:
                 val_exog_raw = pd.DataFrame(future_values)
@@ -728,7 +732,7 @@ def _run_candidate_forecasting(
 
 
 def _retrain_tabular(
-    spec: Any, champion: dict, train_pool: pd.DataFrame, target: str, models_dir: Path
+    spec: Any, champion: dict[str, Any], train_pool: pd.DataFrame, target: str, models_dir: Path
 ) -> Path:
     factory = FACTORY_REGISTRY[spec.factory]
     X = train_pool.drop(columns=[target])
@@ -743,7 +747,7 @@ def _retrain_tabular(
 
 def _retrain_forecasting(
     spec: Any,
-    champion: dict,
+    champion: dict[str, Any],
     train_pool: pd.DataFrame,
     task_metadata: dict[str, Any],
     models_dir: Path,
@@ -769,10 +773,7 @@ def _retrain_forecasting(
     if not sid_cols:
         availability = _resolve_exog_availability(list(train_pool.columns), task_metadata)
         used_cols = [c for c in availability if c in train_pool.columns]
-        if used_cols:
-            train_exog = _align_train_exog_index(train_pool[used_cols], series_dict)
-        else:
-            train_exog = None
+        train_exog = _align_train_exog_index(train_pool[used_cols], series_dict) if used_cols else None
     else:
         train_exog = None
     forecaster.fit(series=series_dict, exog=train_exog)
@@ -812,7 +813,8 @@ def _build_test_exog(
             future_values[col] = test_df[col].reset_index(drop=True)
         else:
             strat = strategies.per_column.get(col, strategies.default_unknown_future)
-            preds_col, _ = extend_exog(train_pool[col], horizon, strat, freq)
+            # cast: avail != "known_future" here, so strat is a Strategy literal
+            preds_col, _ = extend_exog(train_pool[col], horizon, cast("Strategy", strat), freq)
             future_values[col] = preds_col.reset_index(drop=True)
     if not future_values:
         return None
@@ -826,14 +828,14 @@ def _build_test_exog(
 
 
 def _forecast_champion_on_test(
-    champion: dict,
+    champion: dict[str, Any],
     champion_model_path: Path,
     train_pool: pd.DataFrame,
     test_path: Path,
     task_metadata: dict[str, Any],
     forecasting_settings: ForecastingSettings,
     metric: str,
-) -> tuple[dict[str, float], list[dict]]:
+) -> tuple[dict[str, float], list[dict[str, Any]]]:
     """Forecast the retrained champion across the held-out test horizon.
 
     Returns (test_metrics, test_preview) where test_preview is
@@ -892,7 +894,7 @@ def _forecast_champion_on_test(
 
 def _build_forecast_chart_png(
     train_df: pd.DataFrame,
-    val_preview: list[dict],
+    val_preview: list[dict[str, Any]],
     dt_col: str,
     target_col: str,
 ) -> str | None:
@@ -905,7 +907,7 @@ def _build_forecast_chart_png(
         import matplotlib.pyplot as plt
 
         train_ds = pd.to_datetime(train_df[dt_col])
-        train_y = train_df[target_col].values
+        train_y: Any = train_df[target_col].values  # ndarray | ExtensionArray union upsets matplotlib stubs
         val_ds = pd.to_datetime([p["ds"] for p in val_preview])
         val_true = [p["y_true"] for p in val_preview]
         val_pred = [p["y_pred"] for p in val_preview]
@@ -915,7 +917,7 @@ def _build_forecast_chart_png(
         ax.plot(val_ds, val_true, color="#6b7280", linewidth=1.5, label="Test (actual)")
         ax.plot(val_ds, val_pred, color="#f97316", linewidth=1.5, linestyle="--", label="Test (predicted)")
         if len(val_ds):
-            ax.axvline(val_ds[0], color="#d1d5db", linewidth=1, linestyle=":")
+            ax.axvline(val_ds[0], color="#d1d5db", linewidth=1, linestyle=":")  # type: ignore[arg-type]  # matplotlib accepts Timestamps on date axes; stubs only declare float
         ax.set_ylabel(target_col, fontsize=9)
         ax.legend(fontsize=8, framealpha=0.7)
         ax.spines[["top", "right"]].set_visible(False)
@@ -940,7 +942,7 @@ def run_training_plan(
     output_dir: Path,
     mlflow_experiment: str,
     random_state: int = 42,
-    planner_output: dict | None = None,
+    planner_output: dict[str, Any] | None = None,
 ) -> TrainingResult:
     metric = plan.metric_to_optimize or DEFAULT_METRIC[plan.problem_type]
     direction = METRIC_DIRECTION[metric]
@@ -999,7 +1001,7 @@ def run_training_plan(
     allocations = {c.model_key: deterministic_trials(c.model_key) for c in plan.candidates}
 
     mlflow.set_experiment(mlflow_experiment)
-    candidate_results: list[dict] = []
+    candidate_results: list[dict[str, Any]] = []
     ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
 
     dataset_name = task_metadata.get("name", "unknown")
@@ -1023,7 +1025,8 @@ def run_training_plan(
                     res = _run_candidate_forecasting(
                         cand, train_pool, task_metadata,
                         allocations[cand.model_key], metric, direction,
-                        forecasting_settings=fs,
+                        # cast: fs is resolved above for every forecasting plan
+                        forecasting_settings=cast(ForecastingSettings, fs),
                         profile=profile,
                     )
                 res["mlflow_run_id"] = child.info.run_id
@@ -1082,7 +1085,8 @@ def run_training_plan(
             try:
                 all_champion_metrics, _test_preview = _forecast_champion_on_test(
                     champion, champion_path, train_pool, test_path,
-                    task_metadata, fs, metric,
+                    # cast: fs is resolved above for every forecasting plan
+                    task_metadata, cast(ForecastingSettings, fs), metric,
                 )
                 forecast_chart_png = _build_forecast_chart_png(
                     train_pool, _test_preview, task_metadata["datetime_column"], target_column

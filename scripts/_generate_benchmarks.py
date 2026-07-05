@@ -11,9 +11,10 @@ Each dataset is designed to exercise a specific rule in ml_rules.yaml.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 OUT = Path("data/benchmarks")
 OUT.mkdir(parents=True, exist_ok=True)
@@ -42,7 +43,7 @@ for i, sid in enumerate(["M1", "M2", "M3", "M4", "M5"]):
     base = 200 + i * 50
     t = np.arange(120)
     y = base + t * 0.5 + 30 * np.sin(t * 2 * np.pi / 12) + rng.normal(scale=10, size=120)
-    for d, v in zip(pd.date_range("2000-01-01", periods=120, freq="MS"), y):
+    for d, v in zip(pd.date_range("2000-01-01", periods=120, freq="MS"), y, strict=False):
         rows.append({"series_id": sid, "date": d, "value": round(v, 2)})
 pd.DataFrame(rows).to_csv(OUT / "m4_monthly_sample.csv", index=False)
 print("OK m4_monthly_sample.csv")
@@ -52,10 +53,10 @@ print("OK m4_monthly_sample.csv")
 # ---------------------------------------------------------------------------
 try:
     import yfinance as yf
-except ImportError:
+except ImportError as exc:
     raise SystemExit(
         "yfinance not installed. Run:  uv add yfinance  or  pip install yfinance"
-    )
+    ) from exc
 
 
 def _fetch(ticker: str, start: str, end: str, interval: str) -> pd.Series:
