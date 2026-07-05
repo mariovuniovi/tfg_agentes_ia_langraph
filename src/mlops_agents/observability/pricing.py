@@ -18,7 +18,7 @@ def _load() -> dict[str, dict[str, float]]:
         return cast(dict[str, dict[str, float]], yaml.safe_load(f))
 
 
-def _normalize(model: str) -> str:
+def normalize(model: str) -> str:
     """Strip date suffix and provider prefix: 'openai/gpt-5.4-mini-2025-11-01' → 'gpt-5.4-mini'."""
     key = model.split("/")[-1]
     return _DATE_SUFFIX_RE.sub("", key)
@@ -31,7 +31,7 @@ def estimate_cost(
     cached_input_tokens: int = 0,
 ) -> float | None:
     """Return estimated USD cost. Returns None for unknown models (display as 'Unknown')."""
-    p = _load().get(_normalize(model))
+    p = _load().get(normalize(model))
     if not p:
         return None
     return (

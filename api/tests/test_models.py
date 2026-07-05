@@ -1,6 +1,6 @@
 """Tests for Pydantic API models."""
 from api.models.experiment import MetricSeries
-from api.models.run import HITLDecision, PipelineEventModel, RunCreate, RunStatus
+from api.models.run import HITLDecision, RunCreate, RunStatus
 
 
 def test_run_create_requires_dataset_paths():
@@ -27,16 +27,6 @@ def test_run_status_model():
     assert rs.interrupt_value is None
     rs2 = RunStatus(run_id="abc", status="awaiting_approval", interrupt_value={"model": "v1"})
     assert rs2.interrupt_value == {"model": "v1"}
-
-
-def test_pipeline_event_model():
-    ev = PipelineEventModel(
-        type="tool_call",
-        agent="trainer",
-        timestamp_ms=1000.0,
-        data={"tool_name": "train_model", "arguments": {}},
-    )
-    assert ev.type == "tool_call"
 
 
 def test_hitl_decision_has_comment_field():

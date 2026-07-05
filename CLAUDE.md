@@ -46,7 +46,7 @@ src/mlops_agents/
 ├── observability/    pricing.py (token→cost)
 └── utils/            llm.py (LLM factory), logging.py
 api/                  FastAPI backend (imports graph from mlops_agents)
-frontend/             Next.js UI (sub-project 2, not started)
+frontend/             Next.js UI — consumes the run WebSocket event stream (typed PipelineEvent)
 ```
 
 ### Execution flow

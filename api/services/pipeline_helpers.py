@@ -5,7 +5,7 @@ from typing import TypedDict
 
 from langchain_core.messages import AIMessageChunk, HumanMessage, ToolMessage
 
-from mlops_agents.observability.pricing import _normalize, estimate_cost
+from mlops_agents.observability.pricing import estimate_cost, normalize
 
 _tool_start_times: dict[str, float] = {}
 
@@ -146,7 +146,7 @@ def parse_stream_event(
             usage = message_chunk.usage_metadata
             # Normalize: strip provider prefix and date suffix (e.g. "openai/gpt-5.4-mini-2026-03-17" → "gpt-5.4-mini")
             raw_model: str = (message_chunk.response_metadata or {}).get("model_name", "") or ""
-            model_name: str = _normalize(raw_model) if raw_model else ""
+            model_name: str = normalize(raw_model) if raw_model else ""
             input_t: int = usage.get("input_tokens", 0)
             output_t: int = usage.get("output_tokens", 0)
             cached_t: int = (usage.get("input_token_details") or {}).get("cache_read", 0)

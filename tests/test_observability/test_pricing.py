@@ -1,22 +1,22 @@
 import pytest
 
-from mlops_agents.observability.pricing import _normalize, estimate_cost
+from mlops_agents.observability.pricing import estimate_cost, normalize
 
 
 def test_normalize_strips_date_suffix():
-    assert _normalize("gpt-5.4-mini-2025-11-01") == "gpt-5.4-mini"
+    assert normalize("gpt-5.4-mini-2025-11-01") == "gpt-5.4-mini"
 
 
 def test_normalize_strips_provider_prefix():
-    assert _normalize("openai/gpt-5.4-mini") == "gpt-5.4-mini"
+    assert normalize("openai/gpt-5.4-mini") == "gpt-5.4-mini"
 
 
 def test_normalize_strips_both():
-    assert _normalize("openai/gpt-5.4-mini-2025-11-01") == "gpt-5.4-mini"
+    assert normalize("openai/gpt-5.4-mini-2025-11-01") == "gpt-5.4-mini"
 
 
 def test_normalize_plain_name_unchanged():
-    assert _normalize("gpt-5.4-mini") == "gpt-5.4-mini"
+    assert normalize("gpt-5.4-mini") == "gpt-5.4-mini"
 
 
 def test_unknown_model_returns_none():
