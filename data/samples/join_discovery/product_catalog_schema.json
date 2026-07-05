@@ -1,0 +1,54 @@
+{
+  "name": "product_catalog_no_join_trap",
+  "description": "Static product reference table — 50 products with pricing and inventory data. This file has NO date or temporal column and NO foreign key that matches any other uploaded file. It is used as a NEGATIVE CONTROL in the join discovery test: the data_validator agent should return zero join candidates when this file is uploaded alongside a time-series dataset. Any join proposed by the agent on this file would be a false positive.",
+  "problem_type": null,
+  "target_column": null,
+  "columns": [
+    {
+      "name": "product_id",
+      "dtype": "str",
+      "description": "Alphanumeric product identifier (P001–P050). Unique within this table only — does not appear in any companion dataset.",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "product_name",
+      "dtype": "str",
+      "description": "Human-readable product name.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "category",
+      "dtype": "str",
+      "description": "Product category.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["Electronics", "Food", "Clothing", "Tools", "Sports"]
+    },
+    {
+      "name": "unit_price_eur",
+      "dtype": "float",
+      "description": "Retail unit price in euros.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "stock_units",
+      "dtype": "int",
+      "description": "Current warehouse stock in units.",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    },
+    {
+      "name": "supplier_code",
+      "dtype": "str",
+      "description": "Internal supplier reference code (e.g. SUP-42). Does not match any column in companion datasets.",
+      "required": true,
+      "nullable": false
+    }
+  ]
+}

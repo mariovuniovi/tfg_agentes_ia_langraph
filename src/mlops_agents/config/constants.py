@@ -1,5 +1,7 @@
 """Application-wide constants."""
 
+from __future__ import annotations
+
 # MLflow model registry stages / aliases
 MLFLOW_ALIAS_CHAMPION = "champion"
 MLFLOW_ALIAS_CHALLENGER = "challenger"
@@ -17,7 +19,3 @@ GRAPH_RECURSION_LIMIT = 30
 
 # Agent names (must match node names in the graph)
 AGENT_DATA_VALIDATOR = "data_validator"
-AGENT_TRAINER = "trainer"
-AGENT_EVALUATOR = "evaluator"
-AGENT_DEPLOYER = "deployer"
-AGENT_SUPERVISOR = "supervisor"

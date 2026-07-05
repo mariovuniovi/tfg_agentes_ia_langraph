@@ -1,0 +1,644 @@
+[32m23:39:35[0m | [1mINFO    [0m | [36mmlops_agents.experience.pool[0m | [pool] reset_forecasting: deleted 11 experiences
+[32m23:39:35[0m | [1mINFO    [0m | [36m__main__[0m | [benchmark] reset_forecasting: removed 11 stale forecasting experiences
+[32m23:39:35[0m | [1mINFO    [0m | [36m__main__[0m | [air_passengers] Fetching dataset...
+2026/06/25 23:39:58 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:39:58 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:40:01 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:40:02[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 23.919481370648285, 'mae': 18.5158208211263, 'mape': 0.041796920791259164, 'smape': 0.040311780444322744}
+[32m23:40:02[0m | [1mINFO    [0m | [36m__main__[0m | [air_passengers] family_check \u2713 champion=auto_arima expected_family=statistical
+[32m23:40:02[0m | [1mINFO    [0m | [36m__main__[0m | [air_passengers] champion=auto_arima
+[32m23:40:02[0m | [1mINFO    [0m | [36m__main__[0m | [co2_mauna_loa] Fetching dataset...
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+2026/06/25 23:41:10 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:41:10 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:41:12 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:41:13[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 0.18839356818506314, 'mae': 0.15031152183301325, 'mape': 0.00040584562391120764, 'smape': 0.00040577202823341045}
+[32m23:41:13[0m | [1mINFO    [0m | [36m__main__[0m | [co2_mauna_loa] family_check \u2713 champion=ets expected_family=statistical
+[32m23:41:13[0m | [1mINFO    [0m | [36m__main__[0m | [co2_mauna_loa] champion=ets
+[32m23:41:13[0m | [1mINFO    [0m | [36m__main__[0m | [sunspots] Fetching dataset...
+2026/06/25 23:41:43 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:41:43 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:41:46 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:41:46[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 19.299171697468378, 'mae': 14.30960752245212, 'mape': 4.12706092030725, 'smape': 0.8536038385033056}
+[32m23:41:46[0m | [1mINFO    [0m | [36m__main__[0m | [sunspots] family_check \u2717 champion=svr_forecaster expected_family=statistical
+[32m23:41:46[0m | [1mINFO    [0m | [36m__main__[0m | [sunspots] champion=svr_forecaster
+[32m23:41:46[0m | [1mINFO    [0m | [36m__main__[0m | [nile] Fetching dataset...
+2026/06/25 23:42:00 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:42:00 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:42:02 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:42:02[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 168.82144814912638, 'mae': 168.4619839049219, 'mape': 0.232977406691978, 'smape': 0.20854349491402346}
+[32m23:42:03[0m | [1mINFO    [0m | [36m__main__[0m | [nile] family_check \u2717 champion=svr_forecaster expected_family=statistical
+[32m23:42:03[0m | [1mINFO    [0m | [36m__main__[0m | [nile] champion=svr_forecaster
+[32m23:42:03[0m | [1mINFO    [0m | [36m__main__[0m | [bike_sharing_daily] Fetching dataset...
+2026/06/25 23:43:37 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:43:37 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:43:39 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:43:40[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 3001.279454835986, 'mae': 2669.060372488839, 'mape': 2.2400406858662794, 'smape': 0.7936585627796717}
+[32m23:43:40[0m | [1mINFO    [0m | [36m__main__[0m | [bike_sharing_daily] champion=ets
+[32m23:43:40[0m | [1mINFO    [0m | [36m__main__[0m | [beijing_pm25] Fetching dataset...
+2026/06/25 23:47:39 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:47:40 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:47:42 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:47:44[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 77.24379055728532, 'mae': 66.1099480148167, 'mape': 1.9786466445384172, 'smape': 0.8306760166282653}
+[32m23:47:44[0m | [1mINFO    [0m | [36m__main__[0m | [beijing_pm25] family_check \u2713 champion=extra_trees_forecaster expected_family=supervised
+[32m23:47:44[0m | [1mINFO    [0m | [36m__main__[0m | [beijing_pm25] champion=extra_trees_forecaster
+[32m23:47:44[0m | [1mINFO    [0m | [36m__main__[0m | [appliances_energy] Fetching dataset...
+2026/06/25 23:49:25 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:49:25 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:49:27 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:49:27[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 117.97284684448617, 'mae': 74.30555555555556, 'mape': 0.3674926191125558, 'smape': 0.5182673253686136}
+[32m23:49:28[0m | [1mINFO    [0m | [36m__main__[0m | [appliances_energy] champion=seasonal_naive
+[32m23:49:28[0m | [1mINFO    [0m | [36m__main__[0m | [dominicks_cookies] Fetching dataset...
+2026/06/25 23:58:07 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/25 23:58:07 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/25 23:58:09 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m23:58:10[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 246.19121626494953, 'mae': 99.92186649440622, 'mape': 0.6523942130904301, 'smape': 0.582835081759474}
+[32m23:58:10[0m | [1mINFO    [0m | [36m__main__[0m | [dominicks_cookies] family_check \u2713 champion=extra_trees_forecaster expected_family=supervised
+[32m23:58:10[0m | [1mINFO    [0m | [36m__main__[0m | [dominicks_cookies] champion=extra_trees_forecaster
+[32m23:58:10[0m | [1mINFO    [0m | [36m__main__[0m | [sp500_weekly] Fetching dataset...
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+2026/06/26 00:10:55 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:10:55 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:10:59 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:11:06[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 134.10391890008543, 'mae': 113.20004507211539, 'mape': 0.021669491746241037, 'smape': 0.021956598445711902}
+[32m00:11:06[0m | [1mINFO    [0m | [36m__main__[0m | [sp500_weekly] champion=xgboost_forecaster
+[32m00:11:06[0m | [1mINFO    [0m | [36m__main__[0m | [oil_weekly] Fetching dataset...
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+2026/06/26 00:15:55 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:15:55 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:15:58 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:16:05[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 3.5179355995154826, 'mae': 2.7612151573075048, 'mape': 0.03318229215221636, 'smape': 0.033979039966833435}
+[32m00:16:05[0m | [1mINFO    [0m | [36m__main__[0m | [oil_weekly] champion=extra_trees_forecaster
+[32m00:16:05[0m | [1mINFO    [0m | [36m__main__[0m | [gold_macro_weekly] Fetching dataset...
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+C:\Users\mario\discoD\uniovi\TFG\tfg_agentes_ia_langraph\.venv\Lib\site-packages\statsforecast\arima.py:486: UserWarning: possible convergence problem: minimize gave code 2]
+  warnings.warn(
+2026/06/26 00:22:29 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:22:29 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:22:32 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:22:39[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 260.6115281531546, 'mae': 246.18498259434196, 'mape': 0.10591230988816401, 'smape': 0.11250776905828828}
+[32m00:22:39[0m | [1mINFO    [0m | [36m__main__[0m | [gold_macro_weekly] champion=random_forest_forecaster
+[32m00:22:39[0m | [1mINFO    [0m | [36m__main__[0m | [crypto_weekly] Fetching dataset...
+2026/06/26 00:23:56 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:23:56 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:23:59 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:23:59[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 12398.456140152643, 'mae': 12230.75844586895, 'mape': 0.18383394327962005, 'smape': 0.203122547089885}
+[32m00:23:59[0m | [1mINFO    [0m | [36m__main__[0m | [crypto_weekly] champion=random_forest_forecaster
+[32m00:23:59[0m | [1mINFO    [0m | [36m__main__[0m | [fx_weekly] Fetching dataset...
+2026/06/26 00:25:09 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:25:09 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:25:12 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:25:12[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 0.016934594578314262, 'mae': 0.014689150028886839, 'mape': 0.013646365882861927, 'smape': 0.013523542474656602}
+[32m00:25:13[0m | [1mINFO    [0m | [36m__main__[0m | [fx_weekly] champion=gbm_forecaster
+[32m00:25:13[0m | [1mINFO    [0m | [36m__main__[0m | [brent_oil] Fetching dataset...
+2026/06/26 00:25:41 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:25:41 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:25:44 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:25:44[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 3.2612370978271668, 'mae': 2.871826504381445, 'mape': 0.03512017620159702, 'smape': 0.034380479452226415}
+[32m00:25:44[0m | [1mINFO    [0m | [36m__main__[0m | [brent_oil] champion=lightgbm_forecaster
+[32m00:25:44[0m | [1mINFO    [0m | [36m__main__[0m | [henry_hub_gas] Fetching dataset...
+2026/06/26 00:26:15 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:26:15 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:26:18 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:26:18[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 1.2653621983894365, 'mae': 0.9538787878787881, 'mape': 0.4986338220578228, 'smape': 0.33999017836382245}
+[32m00:26:18[0m | [1mINFO    [0m | [36m__main__[0m | [henry_hub_gas] champion=extra_trees_forecaster
+[32m00:26:18[0m | [1mINFO    [0m | [36m__main__[0m | [ppi_chemicals] Fetching dataset...
+2026/06/26 00:27:22 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+2026/06/26 00:27:22 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+2026/06/26 00:27:25 WARNING mlflow.utils.environment: Failed to resolve installed pip version. ``pip`` will be added to conda.yaml environment spec without a version specifier.
+[32m00:27:26[0m | [1mINFO    [0m | [36mmlops_agents.training.executor[0m | [executor] champion metrics: {'rmse': 9.763497662447724, 'mae': 9.649865948814446, 'mape': 0.027468325388418202, 'smape': 0.027087204458221315}
+[32m00:27:26[0m | [1mINFO    [0m | [36m__main__[0m | [ppi_chemicals] champion=extra_trees_forecaster
+[32m00:27:26[0m | [33m[1mWARNING [0m | [36m__main__[0m | [benchmark] 2 family mismatch(es):
+[32m00:27:26[0m | [33m[1mWARNING [0m | [36m__main__[0m |   \u2717 sunspots: champion=svr_forecaster expected=statistical
+[32m00:27:26[0m | [33m[1mWARNING [0m | [36m__main__[0m |   \u2717 nile: champion=svr_forecaster expected=statistical
+[32m00:27:26[0m | [1mINFO    [0m | [36m__main__[0m | Benchmark complete: 16 success, 0 failed

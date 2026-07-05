@@ -1,33 +1,33 @@
-"""LLM factory — returns a ChatOpenAI instance pointed at GitHub Models."""
+"""LLM factory — returns a ChatOpenAI instance pointed at the OpenAI API."""
+
+from __future__ import annotations
+
+from typing import Any
 
 from langchain_openai import ChatOpenAI
+
 from mlops_agents.config.settings import settings
+from mlops_agents.prompts.loader import get_agent_config
+from mlops_agents.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
-def get_llm(temperature: float = 0, max_tokens: int = 4000) -> ChatOpenAI:
-    """Return the primary LLM for worker agents (uses GITHUB_MODEL)."""
-    return ChatOpenAI(
-        model=settings.github_model,
-        base_url=settings.github_api_base,
-        api_key=settings.github_token,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        max_retries=2,
-    )
+def get_llm(agent: str = "") -> ChatOpenAI:
+    """Return the LLM for a named worker agent.
 
-
-def get_router_llm(temperature: float = 0) -> ChatOpenAI:
-    """Return a cheaper model for the supervisor routing node.
-
-    Swaps 'mini' → 'nano' in the model name to save rate limit budget.
-    Falls back to the same model if 'mini' is not in the name.
+    Model and optional reasoning_effort are read from the agent's prompt YAML
+    config block. Falls back to settings.openai_model if no YAML config found.
     """
-    router_model = settings.github_model.replace("mini", "nano")
-    return ChatOpenAI(
-        model=router_model,
-        base_url=settings.github_api_base,
-        api_key=settings.github_token,
-        temperature=temperature,
-        max_tokens=1000,
-        max_retries=2,
-    )
+    config = get_agent_config(agent) if agent else {}
+    model = config.get("model", settings.openai_model)
+    # timeout bounds a stuck connection (else the SDK default lets a hung call
+    # stall for minutes); max_retries then re-issues it. 240s sits well above
+    # legitimate reasoning-call latency (~30-150s) so it never cuts a real call.
+    kwargs: dict[str, Any] = {"model": model, "api_key": settings.openai_api_key, "max_retries": 3, "timeout": 240}
+    if reasoning_effort := config.get("reasoning_effort"):
+        kwargs["use_responses_api"] = True
+        kwargs["output_version"] = "responses/v1"
+        kwargs["reasoning"] = {"effort": reasoning_effort, "summary": "auto"}
+    logger.info(f"LLM init — agent={agent or 'default'} model={model}")
+    return ChatOpenAI(**kwargs)

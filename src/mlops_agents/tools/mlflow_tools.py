@@ -5,9 +5,10 @@ The training and evaluation agents call these to log runs and
 query results; the deployment agent uses them to register models.
 """
 
+from __future__ import annotations
+
 import json
 import pickle
-from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
@@ -50,7 +51,9 @@ def log_experiment(
     mlflow.set_experiment(settings.mlflow_experiment_name)
 
     params = json.loads(hyperparameters_json)
-    metrics = json.loads(metrics_json)
+    raw_metrics = json.loads(metrics_json)
+    # MLflow only accepts scalar floats — skip any nested dicts the agent may pass
+    metrics = {k: float(v) for k, v in raw_metrics.items() if isinstance(v, (int, float))}
 
     with open(model_path, "rb") as f:
         model = pickle.load(f)
@@ -67,12 +70,14 @@ def log_experiment(
 
 
 @tool
-def get_best_run(metric: str = "accuracy", top_n: int = 5) -> str:
+def get_best_run(metric: str = "accuracy", top_n: int = 5, ascending: bool = False) -> str:
     """Query MLflow for the best run in the current experiment by a given metric.
 
     Args:
         metric: The metric name to rank by (default 'accuracy').
         top_n: Number of top runs to return.
+        ascending: If True, sort ascending (use for error metrics like rmse/mae where lower is better).
+                   If False (default), sort descending (use for accuracy/f1/r2 where higher is better).
 
     Returns:
         JSON list of top runs with run_id, metrics, and params.
@@ -82,9 +87,10 @@ def get_best_run(metric: str = "accuracy", top_n: int = 5) -> str:
     if experiment is None:
         return json.dumps({"error": f"Experiment '{settings.mlflow_experiment_name}' not found."})
 
+    direction = "ASC" if ascending else "DESC"
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
-        order_by=[f"metrics.{metric} DESC"],
+        order_by=[f"metrics.{metric} {direction}"],
         max_results=top_n,
     )
     results = [
@@ -110,7 +116,6 @@ def register_model(run_id: str, model_name: str = MLFLOW_REGISTERED_MODEL_NAME) 
     Returns:
         JSON with registered model name and version.
     """
-    client = _get_client()
     model_uri = f"runs:/{run_id}/model"
     mv = mlflow.register_model(model_uri, model_name)
     logger.info(f"Registered model '{model_name}' version {mv.version}")
@@ -130,6 +135,6 @@ def set_model_alias(model_name: str, alias: str, version: int) -> str:
         JSON confirming the alias was set.
     """
     client = _get_client()
-    client.set_registered_model_alias(model_name, alias, version)
+    client.set_registered_model_alias(model_name, alias, version)  # type: ignore[arg-type]  # mlflow accepts int versions at runtime; tool schema keeps version: int
     logger.info(f"Set alias '{alias}' → {model_name} v{version}")
     return json.dumps({"model_name": model_name, "alias": alias, "version": version})

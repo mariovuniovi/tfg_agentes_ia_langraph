@@ -1,10 +1,10 @@
 services:
   # ===========================================================================
-  # MLflow Tracking Server (SQLite backend — simple for thesis)
+  # MLflow Tracking Server (SQLite backend)
   # Access at: http://localhost:5000
   # ===========================================================================
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.18.0
+    image: ghcr.io/mlflow/mlflow:v3.10.1
     container_name: mlops-mlflow
     restart: unless-stopped
     command: >
@@ -14,6 +14,9 @@ services:
         --backend-store-uri sqlite:///mlflow/mlflow.db
         --artifacts-destination /mlflow/artifacts
         --serve-artifacts
+        --allowed-hosts "mlflow:5000,mlflow,localhost,localhost:5000,127.0.0.1,127.0.0.1:5000"
+    environment:
+      TZ: Europe/Madrid
     volumes:
       - mlflow_data:/mlflow
     ports:
@@ -22,38 +25,50 @@ services:
       - mlops-net
 
   # ===========================================================================
-  # Streamlit Dashboard + LangGraph Agents
-  # Access at: http://localhost:8501
+  # FastAPI Backend + LangGraph Agents
+  # Access at: http://localhost:8000
   # ===========================================================================
-  app:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mlops-app
+    container_name: mlops-api
     restart: unless-stopped
     depends_on:
       - mlflow
     env_file:
       - .env
     environment:
+      TZ: Europe/Madrid
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONUNBUFFERED: "1"
     ports:
-      - "8501:8501"
+      - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./storage:/app/storage
+      - ./experience_pool:/app/experience_pool
     networks:
       - mlops-net
-    develop:
-      watch:
-        - action: sync
-          path: ./src
-          target: /app/src
-        - action: sync
-          path: ./dashboard
-          target: /app/dashboard
-        - action: rebuild
-          path: ./pyproject.toml
+
+  # ===========================================================================
+  # Next.js Frontend
+  # Access at: http://localhost:3000
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: mlops-frontend
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Madrid
+    ports:
+      - "3000:3000"
+    networks:
+      - mlops-net
 
 volumes:
   mlflow_data:

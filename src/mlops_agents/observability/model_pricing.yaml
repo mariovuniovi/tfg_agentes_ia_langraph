@@ -1,0 +1,14 @@
+# Estimated costs in USD per 1M tokens
+# Source: https://platform.openai.com/docs/pricing (checked 2026-05-31)
+# Update this file when model pricing changes or new models are added.
+# Restart the API server after editing (values are cached at startup).
+
+gpt-5.4-mini:
+  input_per_1m: 0.75
+  output_per_1m: 4.50
+  cached_input_per_1m: 0.0   # not published; update when available
+
+gpt-5.4-nano:
+  input_per_1m: 0.20
+  output_per_1m: 1.25
+  cached_input_per_1m: 0.0   # not published; update when available

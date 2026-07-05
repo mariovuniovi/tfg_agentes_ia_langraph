@@ -1,0 +1,60 @@
+{
+  "problem_type": "classification",
+  "target_column": "target",
+  "name": "iris_classification",
+  "description": "Iris flower classification dataset",
+  "columns": [
+    {
+      "name": "sepal_length",
+      "dtype": "float",
+      "description": "Sepal length in cm",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "max": 30.0
+    },
+    {
+      "name": "sepal_width",
+      "dtype": "float",
+      "description": "Sepal width in cm",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "max": 30.0
+    },
+    {
+      "name": "petal_length",
+      "dtype": "float",
+      "description": "Petal length in cm",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "max": 30.0
+    },
+    {
+      "name": "petal_width",
+      "dtype": "float",
+      "description": "Petal width in cm",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "max": 30.0
+    },
+    {
+      "name": "sample_id",
+      "dtype": "int",
+      "description": "Unique sample identifier used to join measurement files",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "target",
+      "dtype": "str",
+      "description": "Class label for the flower species",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["setosa", "versicolor", "virginica"]
+    }
+  ]
+}

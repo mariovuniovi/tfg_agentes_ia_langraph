@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data & ML artifacts (mounted as volume at runtime)
+data/
+mlruns/
+mlflow.db
+evidently_workspace/
+storage/
+*.db
+
+# Frontend (has its own build)
+frontend/node_modules/
+frontend/.next/
+
+# Git & docs
+.git/
+docs/
+*.md
+!README.md
+
+# Secrets
+.env

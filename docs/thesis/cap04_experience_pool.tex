@@ -1,0 +1,130 @@
+\subsection{Pool de experiencias: memoria a largo plazo del sistema}
+\label{sec:experience-pool-detalle}
+
+La mayoría de los sistemas MLOps tratan cada ejecución del pipeline de forma independiente: seleccionan modelos a partir de reglas estáticas o del criterio del ingeniero, entrenan, evalúan y descartan el contexto de esa ejecución. El \emph{pool} de experiencias introduce una dimensión temporal en el sistema: cada ejecución completada enriquece una base de conocimiento empírico que el planificador consultará en ejecuciones futuras. El objetivo es que el sistema aprenda de su propio historial y, con el tiempo, tome decisiones de selección de modelos mejor fundamentadas que las que podría tomar a partir de reglas estáticas únicamente.
+
+\subsubsection*{Qué almacena una experiencia}
+\label{sec:experience-schema}
+
+Cada entrada del \emph{pool} corresponde a una ejecución completa del pipeline y se modela como un \texttt{ExperienceRecord} Pydantic. Sus campos más relevantes son:
+
+\begin{itemize}
+  \item \texttt{task\_id} — identificador único con formato \texttt{<dataset>\_<problema>\_<fecha>\_<índice>}.
+  \item \texttt{problem\_type} — tipo de problema: \texttt{classification}, \texttt{regression} o \texttt{forecasting}.
+  \item \texttt{dataset\_profile} — perfil estadístico discretizado del dataset (véase más adelante).
+  \item \texttt{models\_tested} — lista de \texttt{CandidateResult}: por cada modelo candidato, el estado (\texttt{successful}/\texttt{failed}), la mejor puntuación de validación, el número de trials Optuna consumidos, la duración del entrenamiento y el \texttt{mlflow\_run\_id}.
+  \item \texttt{selected\_solution} — modelo campeón seleccionado: clave de modelo, hiperparámetros óptimos, puntuación de validación y desviación estándar.
+  \item \texttt{metric\_to\_optimize} y \texttt{metric\_direction} — métrica principal y si se maximiza o minimiza.
+  \item \texttt{validation\_strategy} — estrategia de validación utilizada (\texttt{single\_split}, \texttt{cross\_validation} o \texttt{rolling\_window}).
+  \item \texttt{training\_plan\_input} — \texttt{TrainingPlan} serializado que el ejecutor recibió del planificador, incluyendo las justificaciones de selección de candidatos.
+  \item \texttt{planner\_output} — salida completa del planificador, con el análisis de evidencias y las referencias citadas.
+  \item \texttt{exog\_availability}, \texttt{exog\_strategies} — información sobre variables exógenas y estrategias de extensión (específico de predicción temporal).
+  \item \texttt{per\_fold\_metrics} — métricas por fold en estrategias de validación cruzada.
+  \item \texttt{experience\_summary} — resumen en texto libre de la ejecución.
+\end{itemize}
+
+La riqueza de este esquema permite que el planificador no solo conozca qué modelo ganó en un caso pasado similar, sino también qué modelos fracasaron, cuántos recursos consumió cada uno y en qué condiciones de validación se obtuvieron los resultados.
+
+\subsubsection*{Almacenamiento relacional en tres tablas}
+\label{sec:experience-storage}
+
+El \emph{pool} se implementa sobre SQLite con tres tablas normalizadas:
+
+\begin{itemize}
+  \item \texttt{experiences} — una fila por ejecución, con el perfil del dataset, la solución seleccionada, las métricas principales y los metadatos MLflow. Es la tabla central de búsqueda.
+  \item \texttt{candidate\_results} — una fila por modelo candidato entrenado en cada ejecución. Permite al planificador conocer no solo quién ganó, sino cómo se comportaron los perdedores (útil para descartar modelos en situaciones similares).
+  \item \texttt{model\_artifacts} — referencias a los artefactos MLflow del modelo campeón. Actúa como puntero externo hacia el servidor de seguimiento.
+\end{itemize}
+
+La clase \texttt{ExperiencePool} proporciona tres operaciones: \texttt{insert\_from\_record} (escritura atómica en las tres tablas con \texttt{INSERT OR REPLACE}), \texttt{get} (recuperación por \texttt{task\_id}) y \texttt{find\_similar} (búsqueda por similitud de perfil). El sistema de migraciones (\texttt{apply\_pending\_migrations}) versiona el esquema de la base de datos de forma incremental, lo que permite añadir nuevas columnas sin perder los registros existentes.
+
+\subsubsection*{El perfil del dataset: discretización para comparación}
+\label{sec:dataset-profile}
+
+El componente central del mecanismo de recuperación es el \texttt{DatasetProfile}: un conjunto de características estadísticas del dataset expresadas como categorías discretas en lugar de valores continuos. La discretización sirve un propósito específico: dos datasets con 980 y 1.050 filas respectivamente tienen propiedades de aprendizaje esencialmente idénticas y deben considerarse similares, aunque sus conteos exactos difieran. Las categorías se calculan a partir del dataset canónico antes de invocar al planificador.
+
+Los campos principales y sus esquemas de discretización son:
+
+\begin{itemize}
+  \item \texttt{n\_rows}: \texttt{very\_small} ($<500$), \texttt{small} ($<1.000$), \texttt{medium} ($\leq 50.000$), \texttt{large} ($>50.000$).
+  \item \texttt{n\_features}: \texttt{small} ($<10$), \texttt{medium} ($\leq 100$), \texttt{large} ($>100$).
+  \item \texttt{missing\_rate}: \texttt{none} ($0\%$), \texttt{low} ($<5\%$), \texttt{medium} ($\leq 20\%$), \texttt{high} ($>20\%$).
+  \item \texttt{n\_classes} (clasificación): \texttt{binary}, \texttt{small\_multiclass} ($\leq 5$ clases), \texttt{many\_classes}.
+  \item \texttt{class\_balance} (clasificación): \texttt{balanced} (ratio máx./mín. $< 1{,}5$), \texttt{moderately\_imbalanced} ($< 5$), \texttt{severely\_imbalanced} ($\geq 5$).
+  \item \texttt{history\_length} (predicción temporal): \texttt{very\_short} ($<60$ puntos), \texttt{short} ($<200$), \texttt{medium} ($<2.000$), \texttt{long} ($\geq 2.000$).
+  \item \texttt{seasonality\_detected}, \texttt{trend\_detected}, \texttt{stationarity} (predicción temporal): booleanos calculados mediante tests estadísticos.
+  \item \texttt{exogenous\_features\_available}: booleano, determinante para la selección de modelos con soporte de exógenas.
+\end{itemize}
+
+Esta representación hace que la comparación entre perfiles sea directa: dos perfiles son similares en un campo si sus valores discretizados son idénticos. La discretización también actúa como mecanismo de privacidad: el \emph{pool} no almacena los datos originales ni sus estadísticas exactas, únicamente su forma estructural.
+
+\subsubsection*{Función de similitud por pesos}
+\label{sec:similarity-function}
+
+La recuperación de experiencias similares se implementa mediante una función de solapamiento ponderado sobre el espacio de campos del perfil. Cada campo tiene un peso que refleja su importancia diagnóstica para la selección de modelos:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{lll}
+\hline
+\textbf{Peso} & \textbf{Campos} & \textbf{Justificación} \\
+\hline
+3 & \texttt{n\_rows}, \texttt{n\_series}, \texttt{history\_length}, & Determinantes primarios del \\
+  & \texttt{horizon\_difficulty}, \texttt{seasonality\_detected} & comportamiento de los modelos \\
+\hline
+2 & \texttt{class\_balance}, \texttt{n\_classes}, \texttt{target\_distribution}, & Características secundarias \\
+  & \texttt{exogenous\_features\_available}, \texttt{frequency}, & con impacto significativo \\
+  & \texttt{trend\_detected}, \texttt{stationarity} & en la elección de modelo \\
+\hline
+1 & \texttt{n\_features}, \texttt{missing\_rate}, & Características de menor \\
+  & \texttt{n\_categorical\_features}, \texttt{n\_numerical\_features} & poder discriminativo \\
+\hline
+\end{tabular}
+\caption{Pesos de los campos del perfil en la función de similitud.}
+\label{tab:similarity-weights}
+\end{figure}
+
+La puntuación bruta de una experiencia se calcula sumando los pesos de los campos que coinciden exactamente entre el perfil actual y el perfil almacenado. Esta puntuación se normaliza por la puntuación máxima teórica para el tipo de problema (13 para clasificación, 11 para regresión, 29 para predicción temporal), produciendo un \emph{ratio} de similitud $r \in [0, 1]$. Los campos de predicción temporal tienen una puntuación máxima mayor porque la selección de modelos en ese dominio depende de más características específicas (frecuencia, horizon, estacionalidad, variables exógenas).
+
+\begin{lstlisting}[language=Python, caption={Fragmento del cálculo de similitud ponderada.}, label={lst:similarity}]
+for field, weight in RETRIEVAL_WEIGHTS.items():
+    pv, cv = profile.get(field), stored_profile.get(field)
+    if pv is not None and cv is not None and pv == cv:
+        score += weight
+        matched.append(field)
+ratio = round(score / max_score_for_problem_type, 3)
+\end{lstlisting}
+
+Los resultados se ordenan por puntuación descendente (desempate por antigüedad: más reciente primero) y se devuelven los $k$ mejores como objetos \texttt{RetrievalView}. Cada \texttt{RetrievalView} incluye la puntuación bruta, el ratio normalizado, los campos que coincidieron, los \emph{cubos} emparejados y los que difieren, y una nota de escala de la variable objetivo cuando las desviaciones estándar difieren en un orden de magnitud o más.
+
+El ratio de similitud se clasifica además en tres niveles de relevancia para el planificador:
+\begin{itemize}
+  \item \textbf{High} ($r \geq 0{,}7$): el dataset pasado es estructuralmente muy similar al actual; la evidencia empírica tiene alta credibilidad.
+  \item \textbf{Medium} ($0{,}4 \leq r < 0{,}7$): similitud parcial; la experiencia es indicativa pero debe contraponerse con las reglas estáticas.
+  \item \textbf{Low} ($r < 0{,}4$): poca similitud estructural; el planificador debe tratarla con cautela y no extrapolar directamente los resultados.
+\end{itemize}
+
+\subsubsection*{Por qué es útil: evidencia empírica frente a reglas estáticas}
+\label{sec:experience-value}
+
+Las reglas estáticas del fichero \texttt{ml\_rules.yaml} codifican heurísticas generales válidas para grandes familias de problemas. Son necesarias como punto de arranque, pero tienen limitaciones inherentes: no capturan el comportamiento específico de los modelos sobre datasets con las características concretas del problema actual, no reflejan los cambios en las implementaciones de los algoritmos con el tiempo, y no pueden expresar relaciones complejas entre características del dataset y rendimiento del modelo.
+
+El \emph{pool} de experiencias complementa las reglas estáticas en tres dimensiones:
+
+\textbf{Evidencia específica.} Si el sistema ha entrenado anteriormente sobre un dataset de clasificación binaria con desequilibrio severo de clases y tamaño pequeño, y en ese caso XGBoost superó a LightGBM con un margen notable, esta evidencia es directamente aplicable a un nuevo problema con el mismo perfil. Ninguna regla estática puede capturar esta especificidad porque depende de la interacción entre las características del dataset y el comportamiento empírico de cada modelo.
+
+\textbf{Advertencias sobre modelos fallidos.} El planificador no solo recupera qué modelo ganó, sino también qué modelos fracasaron o convergieron peor de lo esperado. Un modelo que falla consistentemente en datasets de predicción temporal con historial muy corto puede ser descartado proactivamente, ahorrando el coste de entrenarlo de nuevo en situaciones similares.
+
+\textbf{Aprendizaje incremental.} Cada ejecución del pipeline añade un punto de datos al \emph{pool}. Con el tiempo, el sistema acumula cobertura sobre distintas combinaciones de tipo de problema, características del dataset y comportamiento de los modelos. El beneficio del \emph{pool} crece monótonamente con el número de ejecuciones: un sistema que ha entrenado sobre cincuenta datasets distintos tiene mucha más capacidad de guiar al planificador que uno que solo conoce los diecinueve datasets de referencia iniciales.
+
+\subsubsection*{Integración con el agente planificador}
+\label{sec:experience-planner-integration}
+
+El planificador accede al \emph{pool} mediante la herramienta \texttt{retrieve\_similar\_experiences}, que internamente llama a \texttt{ExperiencePool.find\_similar}. La herramienta serializa el resultado como JSON y lo incluye en el historial de mensajes del agente. El planificador puede entonces citar experiencias específicas en sus referencias de evidencia (\texttt{evidence\_refs}), y el validador post-generación verifica que cada \texttt{experience\_id} citado corresponda efectivamente a una experiencia presente en el contexto recibido, previniendo que el agente invente referencias inexistentes.
+
+La separación entre recuperación determinista y razonamiento LLM tiene dos ventajas. En primer lugar, la función de similitud es completamente reproducible: dados el mismo perfil y el mismo \emph{pool}, siempre devuelve los mismos resultados, independientemente del modelo de lenguaje utilizado. En segundo lugar, el validador puede auditar las citas del planificador de forma programática, sin necesidad de una segunda llamada LLM para verificar la honestidad de las referencias.
+
+\subsubsection*{Estado actual del pool}
+\label{sec:experience-current-state}
+
+En la versión actual del sistema, el \emph{pool} contiene diecinueve experiencias de referencia obtenidas mediante el script \texttt{run\_benchmark.py}, distribuidas en siete problemas de clasificación, cinco de regresión y siete de predicción temporal, todas sobre datasets públicos de referencia. Esta base inicial garantiza que el planificador disponga de evidencia empírica desde la primera ejecución, incluso antes de que el sistema haya procesado datasets propios del usuario.

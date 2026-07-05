@@ -15,20 +15,21 @@ dependencies = [
     "langchain-core>=1.0",
     "langchain-openai>=0.3.17",
 
-    # MCP (Model Context Protocol)
-    "mcp[cli]>=1.2",
-    "langchain-mcp-adapters>=0.2.2",
-
     # Dashboard & MLOps
-    "streamlit>=1.40",
-    "mlflow>=2.18",
-    "evidently>=0.5",
+    "mlflow>=3.10",
 
     # ML & Data
+    "catboost>=1.2",
+    "lightgbm>=4.0",
     "scikit-learn>=1.6",
     "pandas>=2.2",
     "numpy>=2.0",
     "optuna>=4.0",
+    "skforecast>=0.13",
+    "statsforecast>=1.7",
+    "xgboost>=2.0",
+    "yfinance>=0.2",
+    "statsmodels>=0.14",
 
     # Configuration & Validation
     "pydantic>=2.10",
@@ -38,11 +39,18 @@ dependencies = [
     # HTTP & Logging
     "httpx>=0.28",
     "loguru>=0.7",
+
+    # Observability
+    "pyyaml>=6.0",
+
+    # API backend
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.12",
 ]
 
 [project.scripts]
-mlops-dashboard = "mlops_agents.utils.runners:run_dashboard"
-mlops-pipeline = "mlops_agents.graphs.mlops_graph:main"
+mlops-pipeline = "mlops_agents.graphs.cli:main"
 
 [dependency-groups]
 dev = [
@@ -51,6 +59,8 @@ dev = [
     "ruff>=0.9",
     "mypy>=1.13",
     "pre-commit>=4.0",
+    "types-PyYAML>=6.0",
+    "pandas-stubs>=3.0.3.260530",
 ]
 
 [build-system]
@@ -88,6 +98,25 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "PLR0913"]
+# 24 one-line `if cond: stmt` bucketing rules — deliberate compact tabular style
+"src/mlops_agents/training/profiler.py" = ["E701"]
+# sklearn X/y naming convention (X, X_tr, X_val locals)
+"src/mlops_agents/training/executor.py" = ["N806"]
+"src/mlops_agents/training/tabular_runner.py" = ["N806"]
+# sklearn X/y naming convention (X, Xa locals)
+"tests/test_models/test_factories.py" = ["N806"]
+# MockClient/MockSvc: uppercase aliases for patched classes in `with patch(...)` blocks
+"api/tests/test_experiments.py" = ["N806"]
+# UR_THRESHOLD: constant-style local for a fixed uniqueness-ratio cutoff
+"src/mlops_agents/tools/join_discovery_tools.py" = ["N806"]
+# sys.path bootstrap must run before mlops_agents imports — standard script pattern
+"scripts/run_benchmark.py" = ["E402"]
+# intentional broad `pytest.raises(Exception)` assertions (any failure is a pass)
+"tests/test_planning/test_validation.py" = ["B017"]
+# local single-user backend; blocking I/O acceptable
+"api/routers/uploads.py" = ["ASYNC230"]
+# local single-user measurement harness; blocking pathlib I/O acceptable
+"scripts/measure_agentic_cost.py" = ["ASYNC240"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mlops_agents"]
@@ -97,36 +126,41 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "api/tests"]
 asyncio_mode = "auto"
+pythonpath = ["."]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = ["-v", "--strict-markers", "--tb=short"]
 markers = [
     "slow: marks tests as slow",
     "integration: marks integration tests requiring real LLM calls",
+    "llm: marks tests making real LLM calls",
 ]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
+plugins = ["pydantic.mypy"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-    "streamlit.*",
     "mlflow.*",
-    "evidently.*",
     "langchain.*",
     "langchain_core.*",
     "langchain_openai.*",
     "langgraph.*",
-    "langchain_mcp_adapters.*",
-    "mcp.*",
     "loguru.*",
     "optuna.*",
     "sklearn.*",
+    # ML libraries shipped without stubs or py.typed marker
+    "statsforecast.*",
+    "skforecast.*",
+    "statsmodels.*",
+    "catboost.*",
+    "scipy.*",
 ]
 ignore_missing_imports = true

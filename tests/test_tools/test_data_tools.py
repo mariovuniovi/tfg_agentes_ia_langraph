@@ -6,8 +6,16 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from mlops_agents.tools.data_tools import check_missing_values, load_dataset, validate_schema
-
+from mlops_agents.tools.data_tools import (
+    apply_column_mapping,
+    check_missing_values,
+    detect_temporal_gaps,
+    impute_missing_values,
+    load_dataset,
+    merge_datasets,
+    parse_datetime_column,
+    validate_against_schema,
+)
 
 # ---------------------------------------------------------------------------
 # load_dataset
@@ -49,61 +57,6 @@ def test_load_dataset_returns_error_for_missing_file():
 
 
 # ---------------------------------------------------------------------------
-# validate_schema
-# ---------------------------------------------------------------------------
-
-def test_validate_schema_passes_when_all_columns_present(sample_csv):
-    expected = json.dumps(["feature_1", "feature_2", "target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is True
-    assert result["missing_columns"] == []
-
-
-def test_validate_schema_passes_with_subset_of_columns(sample_csv):
-    """Subset is valid — all expected columns exist even if dataset has extras."""
-    expected = json.dumps(["feature_1", "target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is True
-
-
-def test_validate_schema_fails_when_column_missing(sample_csv):
-    expected = json.dumps(["feature_1", "nonexistent_col"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is False
-    assert "nonexistent_col" in result["missing_columns"]
-
-
-def test_validate_schema_reports_extra_columns(sample_csv):
-    """Extra columns in dataset (not in expected) are reported but don't fail."""
-    expected = json.dumps(["target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["valid"] is True
-    assert "feature_1" in result["extra_columns"]
-    assert "feature_2" in result["extra_columns"]
-
-
-def test_validate_schema_returns_total_column_count(sample_csv):
-    expected = json.dumps(["target"])
-    result = json.loads(validate_schema.invoke({
-        "dataset_path": str(sample_csv),
-        "expected_columns": expected,
-    }))
-    assert result["total_columns"] == 3
-
-
-# ---------------------------------------------------------------------------
 # check_missing_values
 # ---------------------------------------------------------------------------
 
@@ -135,3 +88,819 @@ def test_check_missing_values_passed_threshold_false_when_high_missing(sample_cs
 def test_check_missing_values_passed_threshold_true_when_clean(sample_csv):
     result = json.loads(check_missing_values.invoke({"dataset_path": str(sample_csv)}))
     assert result["passed_threshold"] is True
+
+
+# ---------------------------------------------------------------------------
+# validate_against_schema
+# ---------------------------------------------------------------------------
+
+def test_validate_against_schema_passes_valid_data(canonical_iris_csv, iris_schema_file):
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(canonical_iris_csv),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is True
+    assert result["violations"] == []
+
+
+def test_validate_against_schema_detects_nullable_violation(tmp_path, iris_schema_file):
+    df = pd.DataFrame({
+        "sepal_length": [5.1, None],
+        "sepal_width":  [3.5, 3.0],
+        "petal_length": [1.4, 1.4],
+        "petal_width":  [0.2, 0.2],
+        "sample_id":    [1, 2],
+        "target":       ["setosa", "setosa"],
+    })
+    path = tmp_path / "nullable_violation.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "sepal_length" and v["rule"] == "nullable" for v in result["violations"])
+
+
+def test_validate_against_schema_detects_min_violation(tmp_path, iris_schema_file):
+    df = pd.DataFrame({
+        "sepal_length": [-1.0, 4.9],
+        "sepal_width":  [3.5, 3.0],
+        "petal_length": [1.4, 1.4],
+        "petal_width":  [0.2, 0.2],
+        "sample_id":    [1, 2],
+        "target":       ["setosa", "setosa"],
+    })
+    path = tmp_path / "min_violation.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "sepal_length" and v["rule"] == "min" for v in result["violations"])
+
+
+def test_validate_against_schema_detects_allowed_values_violation(tmp_path, iris_schema_file):
+    df = pd.DataFrame({
+        "sepal_length": [5.1],
+        "sepal_width":  [3.5],
+        "petal_length": [1.4],
+        "petal_width":  [0.2],
+        "sample_id":    [1],
+        "target":       ["unknown_species"],
+    })
+    path = tmp_path / "allowed_violation.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "target" and v["rule"] == "allowed_values" for v in result["violations"])
+
+
+def test_validate_against_schema_detects_missing_required_column(tmp_path, iris_schema_file):
+    df = pd.DataFrame({
+        "sepal_length": [5.1],
+        "sepal_width":  [3.5],
+        # petal_length missing
+        "petal_width":  [0.2],
+        "sample_id":    [1],
+        "target":       ["setosa"],
+    })
+    path = tmp_path / "missing_col.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(validate_against_schema.invoke({
+        "canonical_path": str(path),
+        "schema_path": str(iris_schema_file),
+    }))
+    assert result["passed"] is False
+    assert any(v["column"] == "petal_length" and v["rule"] == "required" for v in result["violations"])
+
+
+# ---------------------------------------------------------------------------
+# apply_column_mapping
+# ---------------------------------------------------------------------------
+
+def test_apply_column_mapping_renames_columns(tmp_path, sample_csv):
+    mapping = json.dumps({"feature_1": "sepal_length", "feature_2": "sepal_width", "target": "target"})
+    output_path = str(tmp_path / "canonical.csv")
+    result = json.loads(apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    }))
+    assert result["success"] is True
+    out_df = pd.read_csv(output_path)
+    assert "sepal_length" in out_df.columns
+    assert "sepal_width" in out_df.columns
+    assert "feature_1" not in out_df.columns
+
+
+def test_apply_column_mapping_drops_unmapped_columns(tmp_path, sample_csv):
+    mapping = json.dumps({"feature_1": "sepal_length"})
+    output_path = str(tmp_path / "canonical.csv")
+    result = json.loads(apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    }))
+    assert result["success"] is True
+    out_df = pd.read_csv(output_path)
+    assert list(out_df.columns) == ["sepal_length"]
+    assert "feature_2" not in out_df.columns
+    assert "dropped_columns" in result
+
+
+def test_apply_column_mapping_writes_output_file(tmp_path, sample_csv):
+    mapping = json.dumps({"feature_1": "sepal_length", "target": "target"})
+    output_path = str(tmp_path / "out.csv")
+    apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    })
+    assert Path(output_path).exists()
+
+
+def test_apply_column_mapping_reports_mapped_columns(tmp_path, sample_csv):
+    mapping = json.dumps({"feature_1": "sepal_length", "target": "target"})
+    output_path = str(tmp_path / "out.csv")
+    result = json.loads(apply_column_mapping.invoke({
+        "raw_path": str(sample_csv),
+        "mapping_json": mapping,
+        "output_path": output_path,
+    }))
+    assert "mapped_columns" in result
+    assert "sepal_length" in result["mapped_columns"]
+
+
+# ---------------------------------------------------------------------------
+# merge_datasets
+# ---------------------------------------------------------------------------
+
+def test_merge_datasets_joins_two_files(tmp_path, measurements_csv, labels_csv):
+    join_spec = json.dumps({
+        "join_key": "sample_id",
+        "files": [
+            {"path": str(measurements_csv), "key_column": "Id"},
+            {"path": str(labels_csv),       "key_column": "sample_id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    result = json.loads(merge_datasets.invoke({
+        "join_spec_json": join_spec,
+        "output_path": output_path,
+    }))
+    assert result["success"] is True
+    merged = pd.read_csv(output_path)
+    assert "SepalLengthCm" in merged.columns
+    assert "species" in merged.columns
+    assert result["row_count"] == 3
+
+
+def test_merge_datasets_writes_output_file(tmp_path, measurements_csv, labels_csv):
+    join_spec = json.dumps({
+        "join_key": "sample_id",
+        "files": [
+            {"path": str(measurements_csv), "key_column": "Id"},
+            {"path": str(labels_csv),       "key_column": "sample_id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    merge_datasets.invoke({"join_spec_json": join_spec, "output_path": output_path})
+    assert Path(output_path).exists()
+
+
+def test_merge_datasets_returns_error_when_key_missing(tmp_path, measurements_csv, labels_csv):
+    join_spec = json.dumps({
+        "join_key": "sample_id",
+        "files": [
+            {"path": str(measurements_csv), "key_column": "nonexistent_key"},
+            {"path": str(labels_csv),       "key_column": "sample_id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    result = json.loads(merge_datasets.invoke({
+        "join_spec_json": join_spec,
+        "output_path": output_path,
+    }))
+    assert "error" in result
+    assert not Path(output_path).exists()
+
+
+def test_merge_datasets_returns_error_when_join_produces_zero_rows(tmp_path):
+    df_a = pd.DataFrame({"id": [1, 2], "val_a": [10, 20]})
+    df_b = pd.DataFrame({"id": [3, 4], "val_b": ["x", "y"]})
+    path_a = tmp_path / "a.csv"
+    path_b = tmp_path / "b.csv"
+    df_a.to_csv(path_a, index=False)
+    df_b.to_csv(path_b, index=False)
+    join_spec = json.dumps({
+        "join_key": "id",
+        "files": [
+            {"path": str(path_a), "key_column": "id"},
+            {"path": str(path_b), "key_column": "id"},
+        ],
+    })
+    output_path = str(tmp_path / "merged.csv")
+    result = json.loads(merge_datasets.invoke({
+        "join_spec_json": join_spec,
+        "output_path": output_path,
+    }))
+    assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# impute_missing_values — role-aware dispatcher
+# ---------------------------------------------------------------------------
+
+
+def test_impute_invalid_problem_type_raises(tmp_path):
+    df = pd.DataFrame({"val": [1.0, None], "target": ["a", "b"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="problem_type"):
+        impute_missing_values.invoke({
+            "dataset_path": str(path),
+            "problem_type": "unknown",
+            "target_column": "target",
+        })
+
+
+def test_impute_tabular_numeric_uses_mean(tmp_path):
+    df = pd.DataFrame({"val": [1.0, None, 3.0], "target": ["a", "b", "c"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "classification",
+        "target_column": "target",
+    }))
+    assert "val" in result["columns_imputed"]
+    assert result["rows_affected"] == 1
+    df_after = pd.read_csv(path)
+    assert df_after["val"].isnull().sum() == 0
+    assert abs(df_after["val"].iloc[1] - 2.0) < 0.01
+
+
+def test_impute_tabular_categorical_uses_mode(tmp_path):
+    df = pd.DataFrame({"species": ["setosa", "setosa", None], "target": [0, 1, 0]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "regression",
+        "target_column": "target",
+    }))
+    assert "species" in result["columns_imputed"]
+    df_after = pd.read_csv(path)
+    assert df_after["species"].iloc[2] == "setosa"
+
+
+def test_impute_tabular_does_not_impute_target(tmp_path):
+    # target column should NEVER be imputed — rows with missing target are dropped
+    df = pd.DataFrame({"val": [1.0, 2.0, 3.0], "target": ["a", None, "c"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "classification",
+        "target_column": "target",
+    }))
+    assert "target" not in result["columns_imputed"]
+    df_after = pd.read_csv(path)
+    assert df_after["target"].isnull().sum() == 0  # row was dropped, not filled
+    assert len(df_after) == 2  # one row dropped
+
+
+def test_impute_tabular_missing_target_reported_in_warnings(tmp_path):
+    df = pd.DataFrame({"val": [1.0, 2.0], "target": [None, "b"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "classification",
+        "target_column": "target",
+    }))
+    assert len(result["warnings"]) > 0
+    assert "Dropped" in result["warnings"][0]
+
+
+def test_impute_tabular_no_missing_is_noop(tmp_path):
+    df = pd.DataFrame({"val": [1.0, 2.0], "target": [0, 1]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "classification",
+        "target_column": "target",
+    }))
+    assert result["columns_imputed"] == []
+    assert result["rows_affected"] == 0
+
+
+def test_impute_tabular_returns_output_path(tmp_path):
+    df = pd.DataFrame({"val": [1.0, None], "target": [0, 1]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "classification",
+        "target_column": "target",
+    }))
+    assert "output_path" in result
+
+
+def test_impute_tabular_writes_to_output_path(tmp_path):
+    df = pd.DataFrame({"val": [1.0, None], "target": [0, 1]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    out = tmp_path / "out.csv"
+    impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "classification",
+        "target_column": "target",
+        "output_path": str(out),
+    })
+    assert out.exists()
+
+
+def test_impute_forecasting_raises_if_datetime_null(tmp_path):
+    df = pd.DataFrame({
+        "date": [None, "2024-01-02", "2024-01-03"],
+        "target": [1.0, 2.0, 3.0],
+        "sid": ["s1", "s1", "s1"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null values"):
+        impute_missing_values.invoke({
+            "dataset_path": str(path),
+            "problem_type": "forecasting",
+            "target_column": "target",
+            "datetime_column": "date",
+            "series_id_columns": ["sid"],
+        })
+
+
+def test_impute_forecasting_raises_if_series_id_null(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "target": [1.0, 2.0, 3.0],
+        "sid": [None, "s1", "s1"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null values"):
+        impute_missing_values.invoke({
+            "dataset_path": str(path),
+            "problem_type": "forecasting",
+            "target_column": "target",
+            "datetime_column": "date",
+            "series_id_columns": ["sid"],
+        })
+
+
+def test_impute_forecasting_short_gap_target_filled(tmp_path):
+    # Internal gap of 2 <= max_interpolation_gap=3 -> all filled
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"],
+        "target": [1.0, None, None, 4.0, 5.0],
+        "sid": ["s1"] * 5,
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "forecasting",
+        "target_column": "target",
+        "datetime_column": "date",
+        "series_id_columns": ["sid"],
+        "max_interpolation_gap": 3,
+    }))
+    assert result["target_large_gaps"] == []
+    df_after = pd.read_csv(path)
+    assert df_after["target"].isnull().sum() == 0
+
+
+def test_impute_forecasting_large_gap_fully_preserved(tmp_path):
+    # Internal gap of 5 > max_interpolation_gap=3 -> NONE of the 5 NaNs are filled
+    df = pd.DataFrame({
+        "date": ["2024-01-0" + str(i) for i in range(1, 9)],
+        "target": [1.0, None, None, None, None, None, 7.0, 8.0],
+        "sid": ["s1"] * 8,
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "forecasting",
+        "target_column": "target",
+        "datetime_column": "date",
+        "series_id_columns": ["sid"],
+        "max_interpolation_gap": 3,
+    }))
+    assert len(result["target_large_gaps"]) > 0
+    assert result["target_large_gaps"][0]["gap_sizes"] == [5]
+    df_after = pd.read_csv(path)
+    # All 5 NaNs must remain — no partial imputation of large gaps
+    assert df_after["target"].isnull().sum() == 5
+
+
+def test_impute_forecasting_exogenous_numeric_forward_filled(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "target": [1.0, 2.0, 3.0],
+        "exog": [10.0, None, 30.0],
+        "sid": ["s1"] * 3,
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "forecasting",
+        "target_column": "target",
+        "datetime_column": "date",
+        "series_id_columns": ["sid"],
+    }))
+    assert "exog" in result["columns_imputed"]
+    df_after = pd.read_csv(path)
+    assert df_after["exog"].isnull().sum() == 0
+
+
+def test_impute_forecasting_exogenous_categorical_filled(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "target": [1.0, 2.0, 3.0],
+        "category": ["A", None, "A"],
+        "sid": ["s1"] * 3,
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "forecasting",
+        "target_column": "target",
+        "datetime_column": "date",
+        "series_id_columns": ["sid"],
+    }))
+    assert "category" in result["columns_imputed"]
+    df_after = pd.read_csv(path)
+    assert df_after["category"].isnull().sum() == 0
+
+
+def test_impute_forecasting_static_covariate_filled_cross_sectionally(tmp_path):
+    # A static store attribute (temporal:false) is constant per series and entirely null
+    # for an orphan series (s3). Per-series interpolation cannot fill it, so it must be
+    # filled cross-sectionally: median (numeric) / "unknown" (categorical) — never a
+    # fabricated temporal trend.
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02"] * 3,
+        "target": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "store": ["s1", "s1", "s2", "s2", "s3", "s3"],
+        "size": [100.0, 100.0, 300.0, 300.0, None, None],   # s3 orphan → whole series null
+        "region": ["north", "north", "south", "south", None, None],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text(json.dumps({"columns": [
+        {"name": "size", "temporal": False},
+        {"name": "region", "temporal": False},
+    ]}))
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(path),
+        "problem_type": "forecasting",
+        "target_column": "target",
+        "datetime_column": "date",
+        "series_id_columns": ["store"],
+        "schema_path": str(schema_path),
+    }))
+    after = pd.read_csv(path)
+    assert after["size"].isnull().sum() == 0
+    assert after["region"].isnull().sum() == 0
+    # orphan series s3 gets the cross-sectional median of {100,100,300,300} = 200
+    assert after[after["store"] == "s3"]["size"].unique().tolist() == [200.0]
+    # categorical orphan gets the explicit "unknown" category, not a fabricated region
+    assert after[after["store"] == "s3"]["region"].unique().tolist() == ["unknown"]
+    assert "size" in result["columns_imputed"] and "region" in result["columns_imputed"]
+
+
+def test_impute_forecasting_multi_series_no_index_collision(tmp_path):
+    """Multi-series concat must reset index so get_loc in gap helper never sees duplicates."""
+    csv = tmp_path / "multi.csv"
+    pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-01", "2024-01-02", "2024-01-03"],
+        "sid": ["s1", "s1", "s1", "s2", "s2", "s2"],
+        "sales": [1.0, None, 3.0, 4.0, None, 6.0],
+    }).to_csv(csv, index=False)
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": str(csv),
+        "problem_type": "forecasting",
+        "target_column": "sales",
+        "datetime_column": "date",
+        "series_id_columns": ["sid"],
+        "max_interpolation_gap": 3,
+    }))
+    out = pd.read_csv(result["output_path"])
+    assert out["sales"].isnull().sum() == 0
+    assert len(out) == 6
+
+
+def test_impute_file_not_found_returns_error():
+    result = json.loads(impute_missing_values.invoke({
+        "dataset_path": "/nonexistent/file.csv",
+        "problem_type": "classification",
+        "target_column": "target",
+    }))
+    assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# parse_datetime_column
+# ---------------------------------------------------------------------------
+
+def test_parse_datetime_column_parses_and_sorts(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-03", "2024-01-01", "2024-01-02"],
+        "val": [3, 1, 2],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    result = json.loads(parse_datetime_column.invoke({
+        "dataset_path": str(path),
+        "datetime_col": "date",
+    }))
+    assert result["null_count"] == 0
+    assert result["dtype"] == "datetime64"
+    assert result["output_path"] == str(path)  # overwrites input when output_path omitted
+    df_after = pd.read_csv(path, parse_dates=["date"])
+    assert list(df_after["val"]) == [1, 2, 3]
+
+
+def test_parse_datetime_column_sorts_by_series_then_date(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-02", "2024-01-01", "2024-01-02", "2024-01-01"],
+        "store_id": ["B", "A", "A", "B"],
+        "sales": [20, 10, 30, 40],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    parse_datetime_column.invoke({
+        "dataset_path": str(path),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+    })
+    df_after = pd.read_csv(path)
+    # Should be sorted: A 2024-01-01, A 2024-01-02, B 2024-01-01, B 2024-01-02
+    assert list(df_after["store_id"]) == ["A", "A", "B", "B"]
+    assert list(df_after["sales"]) == [10, 30, 40, 20]
+
+
+def test_parse_datetime_column_raises_if_nulls(tmp_path):
+    df = pd.DataFrame({"date": [None, "2024-01-02"], "val": [1, 2]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null"):
+        parse_datetime_column.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+        })
+
+
+def test_parse_datetime_column_raises_if_unparseable(tmp_path):
+    df = pd.DataFrame({"date": ["not-a-date", "2024-01-02"], "val": [1, 2]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null|unparseable"):
+        parse_datetime_column.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+        })
+
+
+def test_parse_datetime_column_writes_to_output_path(tmp_path):
+    df = pd.DataFrame({"date": ["2024-01-01", "2024-01-02"], "val": [1, 2]})
+    path = tmp_path / "data.csv"
+    out = tmp_path / "sorted.csv"
+    df.to_csv(path, index=False)
+    parse_datetime_column.invoke({
+        "dataset_path": str(path),
+        "datetime_col": "date",
+        "output_path": str(out),
+    })
+    assert out.exists()
+
+
+def test_parse_datetime_column_returns_error_for_missing_file():
+    result = json.loads(parse_datetime_column.invoke({
+        "dataset_path": "/nonexistent/data.csv",
+        "datetime_col": "date",
+    }))
+    assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# detect_temporal_gaps
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def daily_series_csv(tmp_path: Path) -> Path:
+    """Daily time series with one gap on 2024-01-03."""
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-04", "2024-01-05"],
+        "sales": [10.0, 20.0, 40.0, 50.0],
+        "store_id": ["S01"] * 4,
+    })
+    path = tmp_path / "series.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture()
+def daily_series_no_gaps_csv(tmp_path: Path) -> Path:
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "sales": [10.0, 20.0, 30.0],
+        "store_id": ["S01"] * 3,
+    })
+    path = tmp_path / "series_ok.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+def test_detect_temporal_gaps_finds_gap(tmp_path, daily_series_csv):
+    artifact = tmp_path / "gaps.json"
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    }))
+    assert result["has_gaps"] is True
+    assert result["total_missing_periods"] == 1
+    assert result["n_series_with_gaps"] == 1
+    assert len(result["gap_examples"]) == 1
+    assert result["gap_examples"][0]["first_missing"] == "2024-01-03"
+
+
+def test_detect_temporal_gaps_no_gaps(tmp_path, daily_series_no_gaps_csv):
+    artifact = tmp_path / "gaps.json"
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_no_gaps_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    }))
+    assert result["has_gaps"] is False
+    assert result["total_missing_periods"] == 0
+    assert result["gap_examples"] == []
+
+
+def test_detect_temporal_gaps_compact_format(tmp_path, daily_series_csv):
+    artifact = tmp_path / "gaps.json"
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    }))
+    ex = result["gap_examples"][0]
+    assert "series_id" in ex
+    assert "n_missing_periods" in ex
+    assert "first_missing" in ex
+    assert "last_missing" in ex
+    assert "sample_missing_dates" in ex
+    assert "artifact_path" in result
+
+
+def test_detect_temporal_gaps_raises_if_datetime_col_missing(tmp_path):
+    df = pd.DataFrame({"sales": [1.0, 2.0], "store_id": ["S01", "S01"]})
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="not found"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_datetime_null(tmp_path):
+    df = pd.DataFrame({
+        "date": [None, "2024-01-02"],
+        "sales": [1.0, 2.0],
+        "store_id": ["S01", "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_series_id_null(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02"],
+        "sales": [1.0, 2.0],
+        "store_id": [None, "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="null"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_target_missing(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-02"],
+        "store_id": ["S01", "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="target_column"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_invalid_frequency(tmp_path, daily_series_csv):
+    with pytest.raises(ValueError, match="frequency"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(daily_series_csv),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "INVALID_FREQ",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_raises_if_duplicates(tmp_path):
+    df = pd.DataFrame({
+        "date": ["2024-01-01", "2024-01-01"],
+        "sales": [1.0, 2.0],
+        "store_id": ["S01", "S01"],
+    })
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="duplicate"):
+        detect_temporal_gaps.invoke({
+            "dataset_path": str(path),
+            "datetime_col": "date",
+            "series_id_cols": ["store_id"],
+            "frequency": "D",
+            "target_column": "sales",
+        })
+
+
+def test_detect_temporal_gaps_writes_artifact(tmp_path, daily_series_csv):
+    artifact = tmp_path / "gaps.json"
+    detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+        "output_path": str(artifact),
+    })
+    assert artifact.exists()
+    import json as _json
+    data = _json.loads(artifact.read_text())
+    assert "gaps" in data
+
+
+def test_detect_temporal_gaps_default_artifact_uses_stem(tmp_path, daily_series_csv):
+    result = json.loads(detect_temporal_gaps.invoke({
+        "dataset_path": str(daily_series_csv),
+        "datetime_col": "date",
+        "series_id_cols": ["store_id"],
+        "frequency": "D",
+        "target_column": "sales",
+    }))
+    assert "series" in result["artifact_path"]  # stem of "series.csv"

@@ -1,0 +1,67 @@
+import type {
+  ExperimentOut, HealthResponse,
+  HITLDecision, RunOut, RunStatusResponse,
+} from '@/types/api'
+
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+
+async function json<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<T>
+}
+
+export async function validateSchema(file: File): Promise<{ schema_json: string; problem_type: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  return json(await fetch(`${BASE}/uploads/schema`, { method: 'POST', body: form }))
+}
+
+export async function startRun(dataset_paths: string[], schema_json: string): Promise<{ run_id: string }> {
+  return json(await fetch(`${BASE}/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_paths, schema_json }),
+  }))
+}
+
+export async function fetchRunStatus(runId: string): Promise<RunStatusResponse> {
+  return json(await fetch(`${BASE}/runs/${runId}`))
+}
+
+export async function approveRun(runId: string, decision: HITLDecision): Promise<{ ok: boolean }> {
+  return json(await fetch(`${BASE}/runs/${runId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(decision),
+  }))
+}
+
+export async function fetchExperiments(): Promise<ExperimentOut[]> {
+  return json(await fetch(`${BASE}/experiments`))
+}
+
+export async function fetchExperimentRuns(expId: string): Promise<RunOut[]> {
+  return json(await fetch(`${BASE}/experiments/${expId}/runs`))
+}
+
+export async function uploadFiles(files: File[]): Promise<{ paths: string[] }> {
+  const form = new FormData()
+  files.forEach(f => form.append('files', f))
+  return json(await fetch(`${BASE}/uploads`, { method: 'POST', body: form }))
+}
+
+export async function fetchHealth(): Promise<HealthResponse> {
+  return json(await fetch(`${BASE}/health`))
+}
+
+export interface RunSummary {
+  run_id: string
+  status: 'running' | 'awaiting_approval' | 'complete' | 'failed'
+  started_at_ms: number
+}
+
+export async function fetchRunsList(limit = 20): Promise<RunSummary[]> {
+  const r = await fetch(`${BASE}/runs?limit=${limit}`)
+  if (!r.ok) throw new Error('runs list')
+  return r.json()
+}

@@ -1,0 +1,185 @@
+\section{Descubrimiento de joins en el agente de validación}
+\label{sec:join-discovery}
+
+Muchos conjuntos de datos reales no llegan como un único fichero, sino repartidos en
+varias tablas relacionadas: un esquema en estrella con su tabla de hechos y sus
+dimensiones, una serie temporal acompañada de tablas de enriquecimiento (calendario,
+meteorología, catálogo de productos), etc. El \textit{pipeline}, sin embargo, opera
+sobre un \textbf{dataset canónico} único. Cerrar esa brecha es responsabilidad del
+agente de validación de datos (\texttt{data\_validator}), que cuando recibe varios
+ficheros ejecuta un subproceso de \textbf{descubrimiento de \textit{joins} agéntico}:
+infiere qué columnas enlazan las tablas y las integra en una sola, \emph{sin} que el
+usuario tenga que declarar las claves de \textit{join}.
+
+Esta sección detalla el mecanismo completo. La figura~\ref{fig:join-discovery-flow}
+ofrece la panorámica del subproceso dentro del nodo; aquí se desarrollan los pasos, las
+métricas deterministas y las garantías de cada herramienta.
+
+\subsection{Principio de diseño: separar la decisión de la medición}
+\label{sec:join-principio}
+
+El descubrimiento de \textit{joins} encarna el principio de \textit{restraint} agéntico
+que guía todo el sistema: el modelo de lenguaje interviene únicamente donde aporta
+valor —reducir un espacio de búsqueda combinatorio y emitir un juicio semántico sobre
+qué columnas son claves plausibles— mientras que toda medición y toda transformación de
+datos las realiza código determinista.
+
+Concretamente, el agente solo hace dos cosas: \textbf{(i)} proponer un conjunto reducido
+de candidatos de \textit{join} razonando sobre perfiles estructurales, y \textbf{(ii)}
+tomar la decisión final de aceptar o rechazar cada candidato. No calcula ninguna métrica
+de calidad ni ejecuta ningún \textit{merge}. Como consecuencia, el agente \emph{no puede
+alucinar} la calidad de un \textit{join}: cualquier selección debe estar respaldada por
+las cifras que devuelve la herramienta determinista de evaluación, y la materialización
+del \textit{join} es reproducible e independiente del modelo. Esta división detección
+determinista / decisión agéntica es la misma que gobierna la validación de datos y la
+planificación del entrenamiento.
+
+\subsection{Perfilado determinista previo}
+\label{sec:join-perfilado}
+
+El subproceso se activa solo cuando se proporciona más de un fichero. Conviene subrayar
+que el perfilado \textbf{no es una herramienta del agente}, sino código del nodo que se
+ejecuta \emph{antes} de que el agente arranque: el agente no puede invocarlo y, por tanto,
+no lo calcula. La función \texttt{profile\_raw\_datasets} —Python puro, sin decorador de
+herramienta ni llamadas al modelo— se ejecuta una sola vez durante el ensamblaje del
+mensaje de entrada (el \texttt{HumanMessage} que recibe el \texttt{data\_validator}), de
+modo que los perfiles viajan \textbf{embebidos en ese propio mensaje de entrada}. Las
+únicas herramientas de \textit{join} que el agente sí puede invocar son
+\texttt{evaluate\_join\_candidates} y \texttt{execute\_join\_plan}. Para cada columna de cada tabla se calcula un perfil
+compacto: tipo de dato, número de valores no nulos, tasa de nulos, cardinalidad
+(\texttt{unique\_count}), ratio de unicidad (\texttt{unique\_ratio}) y, para columnas
+numéricas o de fecha, los valores mínimo y máximo. Se adjuntan además las primeras
+\texttt{data\_validator\_profile\_nrows} filas de muestra (10 por defecto).
+
+Estos perfiles se serializan e \textbf{inyectan en el mensaje inicial} del agente. De
+este modo, el agente dispone del contexto estructural de todos los ficheros —nombres de
+columnas, tipos, cardinalidades, rangos y filas de ejemplo— sin haber invocado todavía
+ninguna herramienta y sin que el modelo haya visto los datos completos. El perfilado
+recorre los ficheros enteros para que las estadísticas sean exactas, pero solo expone
+una muestra acotada, lo que mantiene el coste en \textit{tokens} bajo y constante con
+independencia del tamaño de los ficheros.
+
+\subsection{Propuesta de candidatos por el agente}
+\label{sec:join-candidatos}
+
+A partir de los perfiles inyectados, el agente razona en el bucle ReAct y produce una
+propuesta en dos partes:
+
+\begin{enumerate}
+  \item \textbf{Selección del \textit{dataset} base.} El agente elige la tabla base, cuyo
+        número de filas \emph{define la cardinalidad del dataset canónico final}: todas
+        las demás tablas se enlazarán a ella mediante \textit{left join}, rellenando con
+        \texttt{NA} las filas sin correspondencia. El criterio es la cobertura de las
+        columnas objetivo; en caso de empate se prefiere la tabla con más filas.
+  \item \textbf{Propuesta de candidatos.} El agente identifica qué columnas del esquema
+        objetivo no están cubiertas por la tabla base y propone \textbf{como máximo 20}
+        candidatos de \textit{join} —pares (tabla.columna izquierda, tabla.columna
+        derecha)— que podrían aportarlas. La instrucción es explícita: debe razonar sobre
+        los perfiles (nombres, tipos, \texttt{unique\_ratio}, rangos, muestras) para
+        proponer claves \emph{semánticamente plausibles}, no adivinar a ciegas.
+\end{enumerate}
+
+El papel del agente en este paso es esencialmente \textbf{podar el espacio de búsqueda}:
+en lugar de evaluar el producto cartesiano de todas las parejas de columnas posibles,
+selecciona un puñado de hipótesis razonables que el código evaluará a continuación.
+
+\subsection{Evaluación determinista de candidatos}
+\label{sec:join-evaluacion}
+
+El agente invoca entonces la herramienta \texttt{evaluate\_join\_candidates}, que para
+cada candidato propuesto mide su calidad de forma determinista. Los valores de las claves
+se normalizan (\textit{trim} y minúsculas) antes de comparar, para tolerar diferencias de
+formato. La tabla~\ref{tab:join-metricas} resume las métricas calculadas y su papel en la
+decisión.
+
+\begin{table}[H]
+\centering
+\caption{Métricas deterministas calculadas por \texttt{evaluate\_join\_candidates} para
+cada candidato de \textit{join}. Los umbrales son configurables; se indican los valores
+por defecto.}
+\label{tab:join-metricas}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lp{6.2cm}l}
+\toprule
+\textbf{Métrica} & \textbf{Definición} & \textbf{Umbral} \\
+\midrule
+\texttt{left\_coverage}  & Fracción de claves distintas del lado izquierdo con
+                           correspondencia en el derecho ($|L\cap R| / |L|$). & $\geq 0{,}8$ \\
+\texttt{right\_coverage} & Fracción análoga del lado derecho ($|L\cap R| / |R|$). & --- \\
+\texttt{containment}     & $\max$(cobertura izq., der.); detecta relación de subconjunto
+                           (clave foránea $\subseteq$ clave primaria). & $\geq 0{,}8$ \\
+\texttt{jaccard}         & Solapamiento simétrico $|L\cap R| / |L\cup R|$. & --- \\
+\texttt{inferred\_rel.}  & Relación inferida (1:1, 1:N, N:1, N:N) según el
+                           \texttt{unique\_ratio} de cada lado. & UR $\geq 0{,}98$ \\
+\texttt{row\_multiplier} & Filas estimadas tras el \textit{join} dividido por las filas
+                           base; estima la \emph{explosión de filas}. & --- \\
+\texttt{explosion\_risk} & Riesgo derivado del multiplicador: bajo, medio o alto. &
+                           $1{,}25$ / $2{,}0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Además de las métricas, la herramienta emite \textbf{advertencias} explícitas cuando
+detecta condiciones problemáticas: discrepancia de tipos entre las dos columnas clave,
+cobertura izquierda o contención por debajo del umbral, relación \textit{many-to-many}, o
+presencia de nulos en alguna de las claves. Para acotar el coste, rechaza de entrada
+cualquier llamada con más de 20 candidatos. El resultado es una lista estructurada de
+evaluaciones que el agente recibe y sobre la que fundamentará su decisión.
+
+\subsection{Selección del plan y ejecución del \textit{join}}
+\label{sec:join-ejecucion}
+
+Con las evaluaciones en mano, el agente compone un \texttt{JoinPlan} estructurado:
+\textit{joins} seleccionados (con las columnas a añadir, una confianza y una
+justificación), candidatos rechazados con motivo explícito, ambigüedades sin resolver y
+advertencias. El sistema le obliga a rechazar un candidato cuando ninguno alcanza
+cobertura o contención aceptables, cuando la relación es \textit{many-to-many} o cuando el
+riesgo de explosión de filas es alto. La regla de oro es que \emph{no puede seleccionar un
+\textit{join} que la evaluación no haya confirmado}.
+
+La materialización corre a cargo de \texttt{execute\_join\_plan}, también determinista,
+que ofrece varias garantías sobre el dataset canónico resultante:
+
+\begin{itemize}
+  \item \textbf{Solo \textit{left join}.} El \textit{dataset} base fija las filas; su
+        cardinalidad se preserva siempre. Las filas de enriquecimiento sin
+        correspondencia se rellenan con \texttt{NA}. No se admiten \textit{inner joins}.
+  \item \textbf{Deduplicación de la clave derecha.} Antes de cada \textit{merge} se
+        eliminan duplicados de la clave en la tabla derecha (se retiene la primera
+        aparición), evitando una explosión accidental de filas; cada deduplicación se
+        registra como advertencia.
+  \item \textbf{Resolución de colisiones de columnas.} Las columnas que ya existen en la
+        tabla en curso se renombran con el sufijo del \textit{dataset} de origen, y la
+        clave derecha redundante se descarta tras el \textit{merge}.
+  \item \textbf{Bloqueo de claves erróneas.} Si un candidato seleccionado tiene
+        solapamiento nulo, la ejecución se aborta con un error explícito (par de claves
+        incorrecto), impidiendo producir un dataset vacío de forma silenciosa.
+  \item \textbf{Verificación del esquema.} Tras todos los \textit{joins}, comprueba que
+        las columnas objetivo requeridas estén presentes; si falta alguna, falla de forma
+        controlada en lugar de continuar con un dataset incompleto.
+\end{itemize}
+
+El fichero combinado se escribe en disco y se trata como un único \textit{dataset}
+canónico para el resto del \textit{pipeline}. La herramienta devuelve además el
+\texttt{JoinPlan} completo, que el nodo escribe en el estado compartido
+(\texttt{data\_join\_plan}).
+
+\subsection{Auditoría y supervisión humana}
+\label{sec:join-auditoria}
+
+Como todo \textit{join} altera la semántica del \textit{dataset}, el plan no se aplica de
+forma opaca. El \texttt{JoinPlan} auditado viaja en el estado hasta la primera puerta de
+aprobación humana (\texttt{dataset\_approval}), donde el operador ve, junto al informe de
+validación y la vista previa del dataset procesado, las claves de \textit{join}
+empleadas, las métricas de cobertura y cardinalidad por candidato, y los candidatos
+rechazados con su motivo. Así puede verificar no solo que el resultado es correcto, sino
+que las decisiones de integración del agente son razonables. Si el operador rechaza con un
+comentario, el controlador lo inyecta como retroalimentación en el estado y reencamina al
+agente para que intente un enfoque alternativo.
+
+El comportamiento de este subproceso sobre casos reales se examina en el capítulo de
+resultados: el descubrimiento de tres \textit{joins} multi-tabla en \textit{Grid Demand}
+(Sección~\ref{sec:caso-joins}) y el manejo de \textit{joins} imperfectos —cobertura
+parcial, claves foráneas huérfanas, deduplicación— en \textit{retail\_sales}
+(Sección~\ref{sec:caso-joins-imperfectos}).

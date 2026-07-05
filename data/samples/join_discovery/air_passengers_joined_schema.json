@@ -1,0 +1,56 @@
+{
+  "problem_type": "forecasting",
+  "name": "air_passengers_with_aviation_context",
+  "description": "Monthly international airline passengers 1949–1960 (Box & Jenkins) enriched with synthetic aviation context variables. Two source files must be joined on 'month' before running the pipeline: air_passengers_base.csv (target series) and aviation_context.csv (exogenous features). The output dataset has 144 rows and 4 columns. This scenario is used to validate join discovery on a date key with different column semantics.",
+  "target_column": "passengers",
+  "datetime_column": "month",
+  "forecast_horizon": 12,
+  "frequency": "MS",
+  "exogenous_columns": [
+    {
+      "name": "fuel_price_idx",
+      "future_availability": "unknown_future",
+      "temporal": true
+    },
+    {
+      "name": "avg_load_factor_pct",
+      "future_availability": "unknown_future",
+      "temporal": true
+    }
+  ],
+  "columns": [
+    {
+      "name": "month",
+      "dtype": "datetime",
+      "description": "First day of the calendar month (YYYY-MM-DD).",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "passengers",
+      "dtype": "int",
+      "description": "Number of international airline passengers (thousands). Target column.",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    },
+    {
+      "name": "fuel_price_idx",
+      "dtype": "float",
+      "description": "Synthetic aviation fuel price index.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "avg_load_factor_pct",
+      "dtype": "float",
+      "description": "Average seat occupancy rate across all routes, as a percentage.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "max": 100.0
+    }
+  ]
+}

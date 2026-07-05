@@ -1,0 +1,259 @@
+"""planner_node — entry point, retry orchestration, validation."""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
+
+import pandas as pd
+from langchain.agents.structured_output import StructuredOutputError
+from langchain_core.exceptions import OutputParserException
+from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.config import get_stream_writer
+from langgraph.types import Command
+
+from mlops_agents.config.settings import settings
+from mlops_agents.contracts.outputs import PlannerStateUpdate
+from mlops_agents.contracts.training import ForecastingSettings, TrainingPlan
+from mlops_agents.planning.agent import build_planner_agent
+from mlops_agents.planning.context import build_planner_validation_context
+from mlops_agents.planning.prompts import build_retry_message, format_planner_inputs
+from mlops_agents.planning.tools import build_planner_tools
+from mlops_agents.planning.trace import ToolTrace
+from mlops_agents.planning.validation import (
+    PlannerValidationError,
+    _check_conflict_resolution_present_if_flagged,
+    _check_evidence_references_hybrid,
+    _check_plan_exhaustiveness,
+    _check_plan_integrity,
+    _collect_all_refs,
+    detect_soft_conflicts,
+    validate_forecasting_settings,
+)
+from mlops_agents.prompts import get_prompt
+from mlops_agents.state.agent_state import AgentState
+from mlops_agents.training.exog_policy import resolve_exog_strategies
+from mlops_agents.training.profiler import build_dataset_profile
+from mlops_agents.training.validation_policy import resolve_validation_strategy
+from mlops_agents.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from mlops_agents.contracts.planner import EvidenceReference
+
+logger = get_logger(__name__)
+
+
+class PlannerError(Exception):
+    """Raised when the planner agent fails after the retry attempt."""
+
+
+def _emit_planner_event(payload: dict[str, Any]) -> None:
+    """Best-effort custom stream event; no-op outside a LangGraph streaming context.
+
+    Used to surface validation failures / retries to the UI in real time, since the
+    retry loop happens inside a single node invocation (no intermediate state update).
+    """
+    try:
+        writer = get_stream_writer()
+        if writer is not None:
+            writer(payload)
+    except Exception:
+        pass
+
+
+def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
+    """Entry: build profile + validation context once, run agent up to 2 attempts."""
+    processed_path = Path(state["processed_dataset_path"])
+    problem_type: str = state.get("problem_type", "")
+    task_meta: dict[str, Any] = state.get("task_metadata") or {}
+
+    raw_profile = build_dataset_profile(
+        processed_path, {**task_meta, "problem_type": problem_type}
+    )
+    profile_dict = raw_profile.model_dump()
+    profile = {k: v for k, v in profile_dict.items() if v is not None}
+
+    validation_ctx = build_planner_validation_context(profile, task_meta, problem_type)
+    system_prompt = get_prompt("planner").template
+
+    # Deterministic forecasting policy: resolve validation + exog BEFORE the agent so the
+    # LLM plans models under fixed settings it cannot override.
+    forecasting_fs: ForecastingSettings | None = None
+    policy_summary: str | None = None
+    if problem_type == "forecasting":
+        _df = pd.read_csv(processed_path)
+        try:
+            forecasting_fs = ForecastingSettings(
+                validation_strategy=resolve_validation_strategy(task_meta, len(_df)),
+                exog_strategies=resolve_exog_strategies(_df, task_meta, task_meta.get("frequency")),
+            )
+        except ValueError as exc:
+            raise PlannerError(f"Forecasting capacity check failed: {exc}") from exc
+        # Defense-in-depth on the resolver output. A failure here is a code bug, not
+        # bad LLM output, so hard-fail rather than retry (a retry can't fix it).
+        try:
+            validate_forecasting_settings(forecasting_fs, task_meta)
+        except PlannerValidationError as exc:
+            raise PlannerError(f"Resolved forecasting settings are invalid: {exc}") from exc
+        policy_summary = (
+            f"validation_strategy: type={forecasting_fs.validation_strategy.type}, "
+            f"n_folds={forecasting_fs.validation_strategy.n_folds}; "
+            f"exog extension per unknown-future column: "
+            f"{forecasting_fs.exog_strategies.per_column or 'none'}"
+        )
+
+    output = None
+    executor_plan: TrainingPlan | None = None
+    trace = ToolTrace()
+    last_error = ""
+    retry_used = False
+
+    for attempt in range(2):
+        trace = ToolTrace()
+        tools = build_planner_tools(profile, task_meta, problem_type, trace)
+        agent = build_planner_agent(tools)
+
+        messages: list[Any] = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=format_planner_inputs(profile, task_meta, problem_type, policy_summary)),
+        ]
+        if attempt == 1:
+            messages.append(build_retry_message(last_error))
+            retry_used = True
+            _emit_planner_event({
+                "kind": "planner_retry",
+                "attempt": attempt + 1,
+                "previous_error": last_error,
+            })
+
+        try:
+            result = agent.invoke(
+                {"messages": messages},
+                config={"recursion_limit": settings.planner_max_iterations},
+            )
+            output = result.get("structured_response")
+            if output is None:
+                raise PlannerValidationError(
+                    "agent returned no structured_response — model failed to produce PlannerOutput"
+                )
+
+            _check_plan_integrity(output, trace, validation_ctx)
+
+            # Build the executable experiment contract: the LLM's model-selection
+            # decision (output.plan) plus the code-resolved forecasting policy the LLM
+            # is not allowed to choose. forecasting_fs is None for non-forecasting.
+            # Any stray forecasting_settings on the decision is dropped — the
+            # code-resolved policy is always authoritative.
+            decision = output.plan.model_dump()
+            decision.pop("forecasting_settings", None)
+            executor_plan = TrainingPlan(**decision, forecasting_settings=forecasting_fs)
+            _check_plan_exhaustiveness(executor_plan, validation_ctx.available_model_keys)
+            _check_evidence_references_hybrid(output, validation_ctx, trace)
+            _check_conflict_resolution_present_if_flagged(output, validation_ctx, trace)
+            break  # success
+        except (PlannerValidationError, OutputParserException, StructuredOutputError, ValueError) as exc:
+            last_error = str(exc)
+            logger.warning(f"[planner] attempt {attempt + 1} failed ({type(exc).__name__}): {last_error[:200]}")
+            _emit_planner_event({
+                "kind": "planner_validation_error",
+                "attempt": attempt + 1,
+                "error": last_error,
+                "will_retry": attempt == 0,
+            })
+            if attempt == 1:
+                raise PlannerError(f"Planner failed after retry: {last_error}") from exc
+
+    # Sort candidates by priority (deterministic order for executor)
+    assert output is not None and executor_plan is not None
+    executor_plan.candidates = sorted(executor_plan.candidates, key=lambda c: c.priority)
+
+    soft = detect_soft_conflicts(validation_ctx, trace, executor_plan, output)
+    cited_experience_ids = sorted({
+        r.source_id for r in _collect_refs_for_record(output)
+        if r.source == "experience" and r.source_id
+    })
+    cited_rule_ids = sorted({
+        r.source_id for r in _collect_refs_for_record(output)
+        if r.source == "rule" and r.source_id
+    })
+
+    planner_status = "retry_ok" if retry_used else "ok"
+    record = _build_planner_output_record(
+        output, trace, validation_ctx, soft,
+        cited_experience_ids, cited_rule_ids, planner_status, last_error,
+        plan=executor_plan,
+    )
+
+    logger.info(
+        f"[planner] status={planner_status} candidates={len(executor_plan.candidates)} "
+        f"rejected={len(executor_plan.models_not_recommended)} tool_calls={trace.tool_call_count}"
+    )
+
+    output_state = PlannerStateUpdate(
+        planner_analysis=output.planning_analysis,
+        planner_evidence_used=[e.model_dump() for e in output.evidence_used],
+        planner_warnings=output.risks_or_warnings,
+        planner_status=planner_status,
+        planner_retry_used=retry_used,
+        training_plan=executor_plan.model_dump(),
+        planner_tool_trace=trace.model_dump(),
+        planner_validation_context=_audit_subset(validation_ctx),
+        planner_output_record=record,
+    )
+    return Command(goto="workflow_controller", update=output_state.to_update())
+
+
+# Helpers — placed below so test file imports cleanly
+
+def _collect_refs_for_record(output: Any) -> list[EvidenceReference]:
+    return _collect_all_refs(output)
+
+
+def _audit_subset(ctx: Any) -> dict[str, Any]:
+    """Compact, JSON-serializable subset of validation context for state/audit."""
+    return {
+        "problem_type": ctx.problem_type,
+        "available_model_keys": list(ctx.available_model_keys),
+        "matched_rule_ids": [r["rule_id"] for r in ctx.matched_rules],
+        "similar_experience_ids": [e.experience_id for e in ctx.similar_experiences],
+    }
+
+
+def _build_planner_output_record(
+    output: Any,
+    trace: ToolTrace,
+    validation_ctx: Any,
+    soft_conflicts: list[dict[str, Any]],
+    cited_experience_ids: list[str],
+    cited_rule_ids: list[str],
+    status: str,
+    last_error: str,
+    plan: Any,
+) -> dict[str, Any]:
+    """Compose the rich record consumed by the SSE pipeline & frontend PlannerPanel.
+
+    ``plan`` is the executable :class:`TrainingPlan` (decision + resolved settings) so
+    the record reflects exactly what reaches training.
+    """
+    return {
+        "planner_status": status,
+        "retry_used": status == "retry_ok",
+        "planning_analysis": output.planning_analysis,
+        "decision_basis": output.decision_basis.model_dump() if output.decision_basis else None,
+        "evidence_used": [e.model_dump() for e in output.evidence_used],
+        "evidence_conflicts": [c.model_dump() for c in output.evidence_conflicts],
+        "soft_conflicts": soft_conflicts,
+        "risks_or_warnings": output.risks_or_warnings,
+        "validation_errors": [last_error] if status == "retry_ok" else [],
+        "plan_summary": {
+            "candidate_rationales": [c.model_dump() for c in plan.candidates],
+            "rejected_model_rationales": [r.model_dump() for r in plan.models_not_recommended],
+            "candidate_models": [c.model_key for c in plan.candidates],
+            "models_not_recommended": [r.model_key for r in plan.models_not_recommended],
+        },
+        "cited_experience_ids": cited_experience_ids,
+        "cited_rule_ids": cited_rule_ids,
+        "tool_trace": trace.model_dump(),
+        "retrieved_experiences": [e.model_dump() for e in validation_ctx.similar_experiences],
+        "matched_rules": validation_ctx.matched_rules,
+        "prompt_version": "model_planner_v2",
+    }

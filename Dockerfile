@@ -27,13 +27,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # =============================================================================
 FROM python:3.12-slim-bookworm AS runtime
 
-RUN groupadd -g 1001 app && useradd -u 1001 -g app -m app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1001 app \
+    && useradd -u 1001 -g app -m app
 WORKDIR /app
 
 COPY --from=build --chown=app:app /app /app
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH" \
+    TZ=Europe/Madrid
 
 USER app
-EXPOSE 8501
-CMD ["streamlit", "run", "dashboard/app.py", \
-     "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+EXPOSE 8000
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

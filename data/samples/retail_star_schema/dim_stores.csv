@@ -1,0 +1,21 @@
+store_id,store_name,city_code,region,format,sq_meters,open_year
+1,Bilbao Express 1,BIL,Norte,express,2259,2009
+2,Barcelona Express 2,BCN,Este,express,3760,2011
+3,Valencia Hypermarket 3,VAL,Este,hypermarket,1587,2011
+4,Alicante Supermarket 4,ALC,Este,supermarket,4282,2016
+5,Madrid Supermarket 5,MAD,Centro,supermarket,1118,2011
+6,Malaga Supermarket 6,MLG,Sur,supermarket,823,2020
+7,Zaragoza Hypermarket 7,ZGZ,Centro,hypermarket,2047,2004
+8,Sevilla Express 8,SEV,Sur,express,3564,2010
+9,Malaga Supermarket 9,MLG,Sur,supermarket,1603,2005
+10,Malaga Supermarket 10,MLG,Sur,supermarket,4133,2019
+11,Sevilla Supermarket 11,SEV,Sur,supermarket,251,2003
+12,Bilbao Express 12,BIL,Norte,express,4912,2015
+13,Malaga Supermarket 13,MLG,Sur,supermarket,378,2020
+14,Zaragoza Express 14,ZGZ,Centro,express,4243,2006
+15,Sevilla Express 15,SEV,Sur,express,167,2006
+16,Alicante Supermarket 16,ALC,Este,supermarket,2207,2016
+17,Alicante Supermarket 17,ALC,Este,supermarket,1651,2013
+18,Madrid Express 18,MAD,Centro,express,4902,2012
+19,Bilbao Supermarket 19,BIL,Norte,supermarket,3326,2019
+20,Malaga Express 20,MLG,Sur,express,4874,2002

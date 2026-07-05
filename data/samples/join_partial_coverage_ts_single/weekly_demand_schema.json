@@ -1,0 +1,45 @@
+{
+  "problem_type": "forecasting",
+  "name": "weekly_demand_partial_join",
+  "description": "Single weekly demand series (~156 weeks) joined on the date key to a partial-coverage weather table (~75% of weeks; orphan weeks imputed) and a clean calendar table. Forecasting analogue of the regression partial-coverage case: trainable single series with exogenous joins.",
+  "target_column": "units_sold",
+  "datetime_column": "week",
+  "forecast_horizon": 8,
+  "frequency": "W-MON",
+  "exogenous_columns": [
+    {
+      "name": "mean_temp_c",
+      "future_availability": "unknown_future",
+      "temporal": true
+    },
+    {
+      "name": "rainfall_mm",
+      "future_availability": "unknown_future",
+      "temporal": true
+    },
+    {
+      "name": "is_holiday_week",
+      "future_availability": "known_future"
+    },
+    {
+      "name": "week_of_year",
+      "future_availability": "known_future"
+    }
+  ],
+  "columns": [
+    {
+      "name": "week",
+      "dtype": "datetime",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "units_sold",
+      "dtype": "int",
+      "required": true,
+      "nullable": false,
+      "min": 0
+    }
+  ]
+}

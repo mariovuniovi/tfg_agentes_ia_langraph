@@ -1,0 +1,59 @@
+{
+  "problem_type": "forecasting",
+  "name": "energy_forecast",
+  "description": "Weekly building energy consumption forecast using weather features",
+  "target_column": "kwh_consumed",
+  "datetime_column": "week_date",
+  "forecast_horizon": 4,
+  "frequency": "W",
+  "exogenous_columns": [
+    {
+      "name": "avg_temp_c",
+      "future_availability": "unknown_future",
+      "note": "Next week's temperature is not known in advance — will be extended using the configured strategy (naive_carry by default)",
+      "temporal": true
+    },
+    {
+      "name": "is_holiday_week",
+      "future_availability": "known_future",
+      "note": "Holiday calendar is known in advance for any future date",
+      "temporal": true
+    }
+  ],
+  "columns": [
+    {
+      "name": "week_date",
+      "dtype": "datetime",
+      "description": "Monday of the measurement week",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "kwh_consumed",
+      "dtype": "float",
+      "description": "Total energy consumed that week in kWh (forecast target)",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "avg_temp_c",
+      "dtype": "float",
+      "description": "Weekly average outdoor temperature in Celsius — unknown future, will be extended",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "is_holiday_week",
+      "dtype": "int",
+      "description": "1 if the week contains a public holiday, 0 otherwise — known future (calendar)",
+      "required": true,
+      "nullable": false,
+      "allowed_values": [
+        0,
+        1
+      ]
+    }
+  ]
+}

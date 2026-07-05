@@ -1,0 +1,481 @@
+# Model registry — declarative source of truth for model_key → factory + search space + metadata.
+# Loader at `loader.py` validates every entry. New models are added here.
+
+# -----------------------------------------------------------------------------
+# Classification
+# -----------------------------------------------------------------------------
+- model_key: logistic_regression
+  problem_type: classification
+  family: linear
+  complexity_rank: 1
+  library: sklearn
+  factory: build_logistic_regression
+  search_space:
+    name: logistic_regression_space
+    params:
+      C: { type: float, low: 0.001, high: 100.0, log: true }
+      max_iter: { type: int, low: 500, high: 5000 }
+  default_params:
+    C: 1.0
+    max_iter: 1000
+    random_state: 42
+  requires:
+    needs_scaling: true
+  use_when: [tabular_classification, small_dataset, interpretability_required]
+  avoid_when: [severely_imbalanced, highly_nonlinear]
+  supports_exogenous: false
+  supports_missing: false
+  notes: |
+    Strong, fast baseline. Sensitive to scale. Tends to underperform on
+    severely imbalanced or highly nonlinear data.
+
+- model_key: random_forest_classifier
+  problem_type: classification
+  family: tree_ensemble
+  complexity_rank: 2
+  library: sklearn
+  factory: build_random_forest_classifier
+  search_space:
+    name: random_forest_classifier_space
+    params:
+      n_estimators: { type: int, low: 50, high: 500 }
+      max_depth: { type: int, low: 3, high: 20 }
+      min_samples_split: { type: int, low: 2, high: 20 }
+  default_params:
+    n_estimators: 200
+    max_depth: 10
+    min_samples_split: 2
+    random_state: 42
+    n_jobs: -1
+  requires:
+    supports_missing: false
+  use_when: [tabular_classification, robust_baseline_needed]
+  supports_exogenous: false
+  supports_missing: false
+  notes: |
+    Good general-purpose tree ensemble. No scaling needed. Less competitive
+    than gradient boosting on large datasets.
+
+- model_key: lightgbm_classifier
+  problem_type: classification
+  family: gradient_boosting
+  complexity_rank: 3
+  library: lightgbm
+  factory: build_lightgbm_classifier
+  search_space:
+    name: lightgbm_classifier_space
+    params:
+      n_estimators: { type: int, low: 100, high: 1000 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      num_leaves: { type: int, low: 15, high: 127 }
+      min_child_samples: { type: int, low: 5, high: 100 }
+  default_params:
+    n_estimators: 500
+    learning_rate: 0.03
+    num_leaves: 31
+    min_child_samples: 20
+    random_state: 42
+    verbosity: -1
+  requires:
+    supports_missing: true
+    min_rows: 500
+  use_when: [tabular_classification, medium_or_large_dataset, high_performance_required]
+  avoid_when: [very_small_dataset, strict_interpretability_required]
+  supports_exogenous: false
+  supports_missing: true
+
+- model_key: xgboost_classifier
+  problem_type: classification
+  family: gradient_boosting
+  complexity_rank: 3
+  library: xgboost
+  factory: build_xgboost_classifier
+  search_space:
+    name: xgboost_classifier_space
+    params:
+      n_estimators: { type: int, low: 100, high: 1000 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      max_depth: { type: int, low: 3, high: 10 }
+      subsample: { type: float, low: 0.5, high: 1.0 }
+      colsample_bytree: { type: float, low: 0.5, high: 1.0 }
+  default_params:
+    n_estimators: 500
+    learning_rate: 0.03
+    max_depth: 6
+    subsample: 0.9
+    colsample_bytree: 0.9
+    random_state: 42
+    tree_method: hist
+    verbosity: 0
+  requires:
+    supports_missing: true
+    min_rows: 500
+  use_when: [tabular_classification, medium_or_large_dataset]
+  supports_exogenous: false
+  supports_missing: true
+
+- model_key: catboost_classifier
+  problem_type: classification
+  family: gradient_boosting
+  complexity_rank: 3
+  library: catboost
+  factory: build_catboost_classifier
+  search_space:
+    name: catboost_classifier_space
+    params:
+      iterations: { type: int, low: 100, high: 1000 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      depth: { type: int, low: 4, high: 10 }
+      l2_leaf_reg: { type: float, low: 1.0, high: 10.0 }
+  default_params:
+    iterations: 500
+    learning_rate: 0.03
+    depth: 6
+    l2_leaf_reg: 3.0
+    random_seed: 42
+    verbose: false
+  requires:
+    supports_missing: true
+    supports_categorical: true
+    min_rows: 500
+  use_when: [tabular_classification, many_categorical_features]
+  supports_exogenous: false
+  supports_missing: false
+
+# -----------------------------------------------------------------------------
+# Regression
+# -----------------------------------------------------------------------------
+- model_key: ridge
+  problem_type: regression
+  family: linear
+  complexity_rank: 1
+  library: sklearn
+  factory: build_ridge
+  search_space:
+    name: ridge_space
+    params:
+      alpha: { type: float, low: 0.001, high: 100.0, log: true }
+  default_params:
+    alpha: 1.0
+    random_state: 42
+  requires:
+    needs_scaling: true
+  use_when: [tabular_regression, small_dataset, interpretability_required]
+  supports_exogenous: false
+  supports_missing: false
+
+- model_key: random_forest_regressor
+  problem_type: regression
+  family: tree_ensemble
+  complexity_rank: 2
+  library: sklearn
+  factory: build_random_forest_regressor
+  search_space:
+    name: random_forest_regressor_space
+    params:
+      n_estimators: { type: int, low: 50, high: 500 }
+      max_depth: { type: int, low: 3, high: 20 }
+      min_samples_split: { type: int, low: 2, high: 20 }
+  default_params:
+    n_estimators: 200
+    max_depth: 10
+    min_samples_split: 2
+    random_state: 42
+    n_jobs: -1
+  supports_exogenous: false
+  supports_missing: false
+
+- model_key: lightgbm_regressor
+  problem_type: regression
+  family: gradient_boosting
+  complexity_rank: 3
+  library: lightgbm
+  factory: build_lightgbm_regressor
+  search_space:
+    name: lightgbm_regressor_space
+    params:
+      n_estimators: { type: int, low: 100, high: 1000 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      num_leaves: { type: int, low: 15, high: 127 }
+      min_child_samples: { type: int, low: 5, high: 100 }
+  default_params:
+    n_estimators: 500
+    learning_rate: 0.03
+    num_leaves: 31
+    min_child_samples: 20
+    random_state: 42
+    verbosity: -1
+  requires:
+    min_rows: 500
+  supports_exogenous: false
+  supports_missing: true
+
+- model_key: xgboost_regressor
+  problem_type: regression
+  family: gradient_boosting
+  complexity_rank: 3
+  library: xgboost
+  factory: build_xgboost_regressor
+  search_space:
+    name: xgboost_regressor_space
+    params:
+      n_estimators: { type: int, low: 100, high: 1000 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      max_depth: { type: int, low: 3, high: 10 }
+      subsample: { type: float, low: 0.5, high: 1.0 }
+  default_params:
+    n_estimators: 500
+    learning_rate: 0.03
+    max_depth: 6
+    subsample: 0.9
+    random_state: 42
+    tree_method: hist
+    verbosity: 0
+  requires:
+    min_rows: 500
+  supports_exogenous: false
+  supports_missing: true
+
+- model_key: catboost_regressor
+  problem_type: regression
+  family: gradient_boosting
+  complexity_rank: 3
+  library: catboost
+  factory: build_catboost_regressor
+  search_space:
+    name: catboost_regressor_space
+    params:
+      iterations: { type: int, low: 100, high: 1000 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      depth: { type: int, low: 4, high: 10 }
+      l2_leaf_reg: { type: float, low: 1.0, high: 10.0 }
+  default_params:
+    iterations: 500
+    learning_rate: 0.03
+    depth: 6
+    l2_leaf_reg: 3.0
+    random_seed: 42
+    verbose: false
+  requires:
+    supports_categorical: true
+    min_rows: 500
+  supports_exogenous: false
+  supports_missing: false
+
+# -----------------------------------------------------------------------------
+# Forecasting — statistical (statsforecast)
+# -----------------------------------------------------------------------------
+- model_key: naive
+  problem_type: forecasting
+  family: statistical
+  complexity_rank: 1
+  library: statsforecast
+  factory: build_naive
+  search_space:
+    name: naive_space
+    params: {}
+  default_params: {}
+  use_when: [forecasting, very_short_history, baseline_needed]
+  supports_exogenous: false
+  supports_missing: false
+
+- model_key: seasonal_naive
+  problem_type: forecasting
+  family: statistical
+  complexity_rank: 1
+  library: statsforecast
+  factory: build_seasonal_naive
+  search_space:
+    name: seasonal_naive_space
+    params:
+      season_length: { type: categorical, choices: [4, 7, 12, 24, 52] }
+  default_params:
+    season_length: 12
+  use_when: [forecasting, strong_seasonality, short_history]
+  supports_exogenous: false
+  supports_missing: false
+
+- model_key: ets
+  problem_type: forecasting
+  family: statistical
+  complexity_rank: 2
+  library: statsforecast
+  factory: build_ets
+  search_space:
+    name: ets_space
+    params:
+      season_length: { type: categorical, choices: [4, 7, 12, 24, 52] }
+  default_params:
+    season_length: 12
+  use_when: [forecasting, smooth_seasonality, trend_present]
+  supports_exogenous: false
+  supports_missing: false
+
+- model_key: auto_arima
+  problem_type: forecasting
+  family: statistical
+  complexity_rank: 2
+  library: statsforecast
+  factory: build_auto_arima
+  search_space:
+    name: auto_arima_space
+    params:
+      season_length: { type: categorical, choices: [4, 7, 12, 24, 52] }
+  default_params:
+    season_length: 12
+  use_when: [forecasting, autocorrelation_pattern, medium_history]
+  supports_exogenous: true
+  supports_missing: false
+
+# -----------------------------------------------------------------------------
+# Forecasting — supervised (skforecast lag-based)
+# -----------------------------------------------------------------------------
+- model_key: random_forest_forecaster
+  problem_type: forecasting
+  family: ml_lag_forecasting
+  complexity_rank: 2
+  library: sklearn
+  factory: build_random_forest_forecaster
+  search_space:
+    name: random_forest_forecaster_space
+    params:
+      lags: { type: int, low: 4, high: 36 }
+      n_estimators: { type: int, low: 50, high: 300 }
+      max_depth: { type: int, low: 3, high: 20 }
+  default_params:
+    lags: 12
+    n_estimators: 100
+    max_depth: 10
+    random_state: 42
+    n_jobs: -1
+  requires:
+    needs_lag_features: true
+  use_when: [forecasting, medium_or_large_history, exogenous_available]
+  supports_exogenous: true
+  supports_missing: false
+
+- model_key: extra_trees_forecaster
+  problem_type: forecasting
+  family: ml_lag_forecasting
+  complexity_rank: 2
+  library: sklearn
+  factory: build_extra_trees_forecaster
+  search_space:
+    name: extra_trees_forecaster_space
+    params:
+      lags: { type: int, low: 4, high: 36 }
+      n_estimators: { type: int, low: 50, high: 300 }
+      max_depth: { type: int, low: 3, high: 20 }
+  default_params:
+    lags: 12
+    n_estimators: 100
+    max_depth: 10
+    random_state: 42
+    n_jobs: -1
+  requires:
+    needs_lag_features: true
+  supports_exogenous: true
+  supports_missing: false
+
+- model_key: gbm_forecaster
+  problem_type: forecasting
+  family: ml_lag_forecasting
+  complexity_rank: 3
+  library: sklearn
+  factory: build_gbm_forecaster
+  search_space:
+    name: gbm_forecaster_space
+    params:
+      lags: { type: int, low: 4, high: 36 }
+      n_estimators: { type: int, low: 50, high: 300 }
+      learning_rate: { type: float, low: 0.01, high: 0.2, log: true }
+      max_depth: { type: int, low: 2, high: 8 }
+  default_params:
+    lags: 12
+    n_estimators: 100
+    learning_rate: 0.05
+    max_depth: 3
+    random_state: 42
+  requires:
+    needs_lag_features: true
+  supports_exogenous: true
+  supports_missing: false
+
+- model_key: lightgbm_forecaster
+  problem_type: forecasting
+  family: ml_lag_forecasting
+  complexity_rank: 3
+  library: lightgbm
+  factory: build_lightgbm_forecaster
+  search_space:
+    name: lightgbm_forecaster_space
+    params:
+      lags: { type: int, low: 4, high: 36 }
+      n_estimators: { type: int, low: 50, high: 500 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      num_leaves: { type: int, low: 7, high: 63 }
+  default_params:
+    lags: 12
+    n_estimators: 200
+    learning_rate: 0.05
+    num_leaves: 31
+    random_state: 42
+    verbosity: -1
+  requires:
+    needs_lag_features: true
+    min_rows: 100
+  use_when: [forecasting, long_history, exogenous_available]
+  supports_exogenous: true
+  supports_missing: true
+
+- model_key: xgboost_forecaster
+  problem_type: forecasting
+  family: ml_lag_forecasting
+  complexity_rank: 3
+  library: xgboost
+  factory: build_xgboost_forecaster
+  search_space:
+    name: xgboost_forecaster_space
+    params:
+      lags: { type: int, low: 4, high: 36 }
+      n_estimators: { type: int, low: 50, high: 500 }
+      learning_rate: { type: float, low: 0.005, high: 0.2, log: true }
+      max_depth: { type: int, low: 3, high: 10 }
+  default_params:
+    lags: 12
+    n_estimators: 200
+    learning_rate: 0.05
+    max_depth: 6
+    random_state: 42
+    tree_method: hist
+    verbosity: 0
+  requires:
+    needs_lag_features: true
+    min_rows: 100
+  supports_exogenous: true
+  supports_missing: false
+
+- model_key: svr_forecaster
+  problem_type: forecasting
+  family: ml_lag_forecasting
+  complexity_rank: 3
+  library: sklearn
+  factory: build_svr_forecaster
+  search_space:
+    name: svr_forecaster_space
+    params:
+      lags: { type: int, low: 4, high: 24 }
+      C: { type: float, low: 0.1, high: 100.0, log: true }
+      epsilon: { type: float, low: 0.01, high: 1.0 }
+      kernel: { type: categorical, choices: [rbf, linear] }
+  default_params:
+    lags: 12
+    C: 10.0
+    epsilon: 0.1
+    kernel: rbf
+  requires:
+    needs_lag_features: true
+    needs_scaling: true
+  use_when: [forecasting, small_or_medium_dataset, smooth_nonlinear_patterns]
+  supports_exogenous: true
+  supports_missing: false

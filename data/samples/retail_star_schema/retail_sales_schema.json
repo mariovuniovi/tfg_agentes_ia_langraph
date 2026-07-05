@@ -1,0 +1,186 @@
+{
+  "problem_type": "regression",
+  "name": "retail_sales_enriched",
+  "description": "Retail sales regression problem built from a 5-table star schema. The target is the total transaction amount. Five source files must be joined before running the pipeline: sales_transactions.csv (fact), dim_customers.csv (join: customer_id), dim_products.csv (join: product_id), dim_stores.csv (join: store_id), dim_brands.csv (join: brand_id via dim_products). An additional non-obvious join exists between dim_customers.city_code and dim_stores.city_code (shared geographic attribute). The merged dataset has 500 rows and 24 feature columns. This scenario is used to validate join discovery across diverse key types: integer FKs, an indirect FK (brand_id not in fact table), and a shared string attribute (city_code).",
+  "target_column": "total_amount",
+  "columns": [
+    {
+      "name": "transaction_id",
+      "dtype": "str",
+      "description": "Unique transaction identifier. Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "name": "sale_date",
+      "dtype": "datetime",
+      "description": "Date of the transaction (YYYY-MM-DD). Not a join key. Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "quantity",
+      "dtype": "int",
+      "description": "Number of units purchased. Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 1
+    },
+    {
+      "name": "unit_price",
+      "dtype": "float",
+      "description": "Price per unit at time of sale in euros. Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "discount_rate",
+      "dtype": "float",
+      "description": "Fractional discount applied (0.0–0.20). Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "name": "total_amount",
+      "dtype": "float",
+      "description": "Final transaction value in euros: quantity × unit_price × (1 − discount_rate). TARGET COLUMN. Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "channel",
+      "dtype": "str",
+      "description": "Sales channel. Source: sales_transactions.csv.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["in-store", "online", "click-and-collect"]
+    },
+    {
+      "name": "cust_age_group",
+      "dtype": "str",
+      "description": "Customer age bracket. Source: dim_customers.csv (joined on customer_id).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["18-25", "26-35", "36-50", "51+"]
+    },
+    {
+      "name": "cust_city_code",
+      "dtype": "str",
+      "description": "3-letter city code of the customer's home city. Source: dim_customers.csv (joined on customer_id). Also joinable to store_city_code via shared geography.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "cust_loyalty_tier",
+      "dtype": "str",
+      "description": "Customer loyalty programme tier. Source: dim_customers.csv (joined on customer_id).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["bronze", "silver", "gold", "platinum"]
+    },
+    {
+      "name": "cust_since_year",
+      "dtype": "int",
+      "description": "Year the customer first registered. Source: dim_customers.csv (joined on customer_id).",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "prod_category",
+      "dtype": "str",
+      "description": "Top-level product category. Source: dim_products.csv (joined on product_id).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["Food", "Electronics", "Clothing", "Home", "Sports"]
+    },
+    {
+      "name": "prod_subcategory",
+      "dtype": "str",
+      "description": "Product tier within the category. Source: dim_products.csv (joined on product_id).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["Standard", "Premium", "Budget"]
+    },
+    {
+      "name": "prod_base_price",
+      "dtype": "float",
+      "description": "Recommended retail price in euros. Source: dim_products.csv (joined on product_id).",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "prod_weight_kg",
+      "dtype": "float",
+      "description": "Product weight in kilograms. Source: dim_products.csv (joined on product_id).",
+      "required": true,
+      "nullable": false,
+      "min": 0.0
+    },
+    {
+      "name": "store_city_code",
+      "dtype": "str",
+      "description": "3-letter city code of the store. Source: dim_stores.csv (joined on store_id). Also joinable to cust_city_code via shared geography.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "store_region",
+      "dtype": "str",
+      "description": "Spanish geographic region of the store. Source: dim_stores.csv (joined on store_id).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["Norte", "Sur", "Este", "Oeste", "Centro"]
+    },
+    {
+      "name": "store_format",
+      "dtype": "str",
+      "description": "Store format by size. Source: dim_stores.csv (joined on store_id).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["express", "supermarket", "hypermarket"]
+    },
+    {
+      "name": "store_sq_meters",
+      "dtype": "int",
+      "description": "Sales floor area in square metres. Source: dim_stores.csv (joined on store_id).",
+      "required": true,
+      "nullable": false,
+      "min": 100
+    },
+    {
+      "name": "brand_name",
+      "dtype": "str",
+      "description": "Commercial brand name. Source: dim_brands.csv (joined via dim_products.brand_id — indirect join not in fact table).",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "brand_country_of_origin",
+      "dtype": "str",
+      "description": "ISO 2-letter country code of the brand's founding country. Source: dim_brands.csv (indirect join).",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "brand_market_segment",
+      "dtype": "str",
+      "description": "Price positioning of the brand. Source: dim_brands.csv (indirect join).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["premium", "mid-range", "budget"]
+    },
+    {
+      "name": "brand_founded_year",
+      "dtype": "int",
+      "description": "Year the brand was established. Source: dim_brands.csv (indirect join).",
+      "required": true,
+      "nullable": false
+    }
+  ]
+}

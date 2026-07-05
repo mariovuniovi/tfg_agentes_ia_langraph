@@ -1,7 +1,12 @@
-"""YAML prompt loader using LangChain's load_prompt."""
+"""YAML prompt loader."""
+
+from __future__ import annotations
 
 from pathlib import Path
-from langchain_core.prompts import load_prompt, PromptTemplate
+from typing import Any, cast
+
+import yaml
+from langchain_core.prompts import PromptTemplate
 
 PROMPTS_DIR = Path(__file__).parent
 
@@ -18,4 +23,17 @@ def get_prompt(name: str) -> PromptTemplate:
     path = PROMPTS_DIR / f"{name}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"Prompt file not found: {path}")
-    return load_prompt(str(path))
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return PromptTemplate(
+        template=data["template"],
+        input_variables=data.get("input_variables", []),
+    )
+
+
+def get_agent_config(name: str) -> dict[str, Any]:
+    """Return the config dict from a prompt YAML, or {} if absent."""
+    path = PROMPTS_DIR / f"{name}.yaml"
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return cast("dict[str, Any]", data.get("config", {}))

@@ -7,6 +7,36 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from mlops_agents.experience.schema import ExperienceRecord, SelectedSolution
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-integration",
+        action="store_true",
+        default=False,
+        help="Run tests marked integration.",
+    )
+    parser.addoption(
+        "--run-llm",
+        action="store_true",
+        default=False,
+        help="Run tests marked llm. Implies --run-integration for llm tests.",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    run_integration = config.getoption("--run-integration")
+    run_llm = config.getoption("--run-llm")
+    skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
+    skip_llm = pytest.mark.skip(reason="need --run-llm option to run")
+
+    for item in items:
+        if "llm" in item.keywords and not run_llm:
+            item.add_marker(skip_llm)
+        elif "integration" in item.keywords and not (run_integration or run_llm):
+            item.add_marker(skip_integration)
+
 
 @pytest.fixture()
 def sample_csv(tmp_path: Path) -> Path:
@@ -59,3 +89,94 @@ def mock_llm():
     mock = MagicMock()
     mock.invoke.return_value = MagicMock(content="Mocked LLM response", tool_calls=[])
     return mock
+
+
+@pytest.fixture()
+def iris_schema_file(tmp_path: Path) -> Path:
+    """Iris schema JSON file for validate_against_schema tests."""
+    import json
+    schema = {
+        "name": "iris_classification",
+        "columns": [
+            {"name": "sepal_length", "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "sepal_width",  "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "petal_length", "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "petal_width",  "dtype": "float", "required": True, "nullable": False, "min": 0.0, "max": 30.0},
+            {"name": "sample_id",    "dtype": "int",   "required": True, "nullable": False, "is_key": True},
+            {"name": "target",       "dtype": "str",   "required": True, "nullable": False,
+             "allowed_values": ["setosa", "versicolor", "virginica"]},
+        ],
+    }
+    path = tmp_path / "iris_classification.json"
+    path.write_text(json.dumps(schema))
+    return path
+
+
+@pytest.fixture()
+def canonical_iris_csv(tmp_path: Path) -> Path:
+    """Valid canonical iris CSV — all constraints satisfied."""
+    df = pd.DataFrame({
+        "sepal_length": [5.1, 4.9, 4.7],
+        "sepal_width":  [3.5, 3.0, 3.2],
+        "petal_length": [1.4, 1.4, 1.3],
+        "petal_width":  [0.2, 0.2, 0.2],
+        "sample_id":    [1, 2, 3],
+        "target":       ["setosa", "setosa", "setosa"],
+    })
+    path = tmp_path / "canonical.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture()
+def measurements_csv(tmp_path: Path) -> Path:
+    """Raw iris measurements CSV with 'Id' as key column."""
+    df = pd.DataFrame({
+        "Id": [1, 2, 3],
+        "SepalLengthCm": [5.1, 4.9, 4.7],
+        "SepalWidthCm":  [3.5, 3.0, 3.2],
+        "PetalLengthCm": [1.4, 1.4, 1.3],
+        "PetalWidthCm":  [0.2, 0.2, 0.2],
+    })
+    path = tmp_path / "measurements.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture()
+def labels_csv(tmp_path: Path) -> Path:
+    """Raw iris labels CSV with 'sample_id' as key column."""
+    df = pd.DataFrame({
+        "sample_id": [1, 2, 3],
+        "species":   ["setosa", "setosa", "setosa"],
+    })
+    path = tmp_path / "labels.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+@pytest.fixture
+def minimal_experience_record():
+    """Factory: build a minimal ExperienceRecord with overrideable fields."""
+    def _make(**overrides):
+        base = {
+            "task_id": "test_t_fixture_001",
+            "problem_type": "forecasting",
+            "dataset_profile": {"schema_version": 1, "problem_type": "forecasting",
+                                "n_rows": "medium"},
+            "training_plan_input": {},
+            "split_artifacts": {},
+            "mlflow": {"parent_run_id": "abc123"},
+            "metric_to_optimize": "rmse",
+            "models_tested": [],
+            "selected_solution": SelectedSolution(
+                model_key="naive",
+                hyperparameters={},
+                validation_score=1.0,
+                validation_std=0.0,
+                complexity_rank=1,
+            ),
+        }
+        base.update(overrides)
+        return ExperienceRecord(**base)
+    return _make
