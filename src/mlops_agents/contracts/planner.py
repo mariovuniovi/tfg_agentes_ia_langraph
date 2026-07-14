@@ -94,8 +94,7 @@ class PlannerOutput(BaseModel):
             "the model's internal reasoning process."
         )
     )
-    # TODO: Task 5.2 will enforce decision_basis as required on planner_node output.
-    # Optional here for backward compat with pre-SP5 PlannerOutput constructors.
+    # Optional: downstream consumers (planner_node, validation) handle its absence.
     decision_basis: DecisionBasis | None = None
     evidence_used: list[EvidenceReference] = Field(default_factory=list)
     evidence_conflicts: list[EvidenceConflict] = Field(default_factory=list)

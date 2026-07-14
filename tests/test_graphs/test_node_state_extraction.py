@@ -417,7 +417,7 @@ def test_executor_node_returns_to_supervisor(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# evaluation_node (deterministic — replaced the old LLM-based evaluator_node)
+# evaluation_node (deterministic promotion decision)
 # ---------------------------------------------------------------------------
 
 

@@ -106,7 +106,7 @@ class PlannerTrainingPlan(BaseModel):
     policy is resolved deterministically by code (``planner_node``) and the LLM must
     not emit it. ``planner_node`` builds the executable :class:`TrainingPlan` from this
     decision plus the resolved settings. This keeps the planner's contract honest —
-    it can no longer return a field that is always overwritten and ignored.
+    it cannot return a field that would always be overwritten and ignored.
     """
 
     problem_type: Literal["classification", "regression", "forecasting"]

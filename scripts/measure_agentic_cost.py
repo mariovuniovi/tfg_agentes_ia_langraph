@@ -5,12 +5,11 @@ evaluation → report_writer → deployer) headless, with both HITL gates
 auto-approved, N times per dataset. Each run's EventLog is dumped to JSON and
 aggregated (per-node compute time + cost) by ``agentic_cost_aggregate``.
 
-This is the reproducible replacement for the hand-built Chapter 6 cost table.
-It mirrors the app's telemetry (same ``parse_stream_event`` + ``estimate_cost``)
-so numbers match an app run in expectation, but isolates the human HITL pause
+This is the reproducible source for the Chapter 5 cost table. It mirrors the
+app's telemetry (same ``parse_stream_event`` + ``estimate_cost``) so numbers
+match an app run in expectation, but isolates the human HITL pause
 (auto-approve is immediate) and is meant to be run on an OTHERWISE-IDLE machine
-to avoid the CPU-contention / network-stall artefacts that inflated the
-previous measurement.
+to avoid CPU-contention / network-stall artefacts in the timing columns.
 
 Usage:
     uv run python scripts/measure_agentic_cost.py --smoke              # bakery ×1

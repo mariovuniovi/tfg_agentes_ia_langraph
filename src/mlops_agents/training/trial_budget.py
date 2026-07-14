@@ -1,7 +1,7 @@
 """Deterministic per-candidate Optuna trial budget and sampler selection.
 
 The trial count is fixed in code, independent of the dataset and of the planner
-LLM (which no longer emits a budget). Rationale: the number of trials needed is a
+LLM (the LLM does not emit a budget). Rationale: the number of trials needed is a
 function of the *search space* you explore, not the dataset — and per-trial cost on
 large series is already bounded by the rolling-window validation policy.
 """

@@ -225,7 +225,6 @@ def run_training_plan(
         mlflow.set_tag("champion_run_id", champion["mlflow_run_id"])
 
         # Evaluate champion on the held-out test set to get all metrics.
-        # Evaluate champion on the held-out test set to get all metrics.
         # For classification/regression: predict on X_test using the pkl model.
         # For forecasting: the validation score from Optuna is already the best
         # available metric (StatsForecast models use temporal splits, not X/y pairs).

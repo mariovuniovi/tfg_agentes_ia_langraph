@@ -83,7 +83,6 @@ export function PlannerPanel({ ctx, running }: Props) {
 
       {ctx.matched_rules.length > 0 && (
         <Card title={`ML rules matched (${ctx.matched_rules.length})`}>
-          {/* keep existing rule rendering — unchanged from v1 */}
           <div className="space-y-1.5">
             {ctx.matched_rules.map((rule) => {
               const cited = citedRules.has(rule.rule_id)

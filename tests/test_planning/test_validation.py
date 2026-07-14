@@ -276,8 +276,7 @@ def test_collect_all_refs_includes_rejected_refs():
 
 # ---------------------------------------------------------------------------
 # validate_forecasting_settings — validates the CODE-resolved forecasting
-# settings (moved here from _check_plan_integrity after the planner/executor
-# schema split; the LLM no longer emits forecasting_settings).
+# settings (the LLM does not emit forecasting_settings).
 # ---------------------------------------------------------------------------
 
 

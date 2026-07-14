@@ -201,10 +201,6 @@ const HITL_TYPE_TO_GATE: Record<string, string> = {
  * the previous routing event (end of the prior phase) up to `routing(next=X)`. The first
  * node has no preceding routing, so the run start (timestamp of the first event, i.e.
  * `run_info`) is used as its origin.
- *
- * The earlier implementation charged each window to the *previously* active node, an
- * off-by-one that attributed the human wait at the HITL gate to `data_validator` and the
- * `executor` span to `planner`. Attributing each window to `routing.next` fixes it.
  */
 function nodeActivityFromRouting(
   events: PipelineEvent[],

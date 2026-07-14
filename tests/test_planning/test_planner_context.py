@@ -1,4 +1,4 @@
-"""build_planner_context moved to mlops_agents.planning.context as build_planner_validation_context."""
+"""Tests for build_planner_validation_context (mlops_agents.planning.context)."""
 from mlops_agents.models.loader import get_models_for
 from mlops_agents.planning.context import build_planner_validation_context
 

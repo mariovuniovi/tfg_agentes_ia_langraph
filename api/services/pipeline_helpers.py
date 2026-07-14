@@ -44,7 +44,6 @@ def build_initial_state(dataset_paths: list[str], schema_json: str = "") -> dict
         "deployment_status": "",
         "error_message": "",
         "agent_attempt_counts": {},
-        # Refactor additions
         "dataset_approved": None,
         "dataset_rejection_comment": "",
         "deployment_approved": None,

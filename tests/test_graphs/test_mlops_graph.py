@@ -15,7 +15,7 @@ def test_graph_compiles_without_error():
 
 
 def test_graph_has_expected_nodes():
-    """Graph should contain all expected nodes after the architecture refactor."""
+    """Graph should contain all expected nodes."""
     from mlops_agents.graphs.mlops_graph import _build_graph
     graph = _build_graph()
 
@@ -95,7 +95,7 @@ def _make_mock_agent(final_content="done", tool_name=None, tool_content="{}"):
 
 
 def test_data_validator_node_routes_to_workflow_controller(tmp_path):
-    """data_validator_node routes to workflow_controller (not supervisor) after refactor."""
+    """data_validator_node routes back to workflow_controller."""
     state = _make_validator_state(tmp_path)
     mock_agent = _make_mock_agent(
         tool_name="apply_column_mapping",

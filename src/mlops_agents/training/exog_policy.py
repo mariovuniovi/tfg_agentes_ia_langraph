@@ -1,8 +1,9 @@
 """Deterministic per-column exogenous-extension policy.
 
-Decides how each unknown-future exog column is projected forward, so the LLM
-planner no longer chooses it. known_future columns use their actual future
-values (handled downstream) and are omitted from the per-column map.
+Decides how each unknown-future exog column is projected forward; the choice
+is deterministic and not exposed to the LLM planner. known_future columns use
+their actual future values (handled downstream) and are omitted from the
+per-column map.
 """
 from __future__ import annotations
 

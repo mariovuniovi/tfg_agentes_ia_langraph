@@ -1,10 +1,6 @@
-"""Evidence-reference validation tests moved to test_planning/test_validation.py.
+"""Smoke-tests for planning.validation exports plus plan-exhaustiveness checks.
 
-The old _check_evidence_references and _check_plan_exhaustiveness were in
-agents/planner.py. They now live in mlops_agents.planning.validation with
-updated signatures. Full coverage is in tests/test_planning/test_validation.py.
-
-This file is kept as a smoke-test to confirm the new imports resolve correctly.
+Full evidence-reference coverage lives in tests/test_planning/test_validation.py.
 """
 import pytest
 
@@ -18,14 +14,14 @@ from mlops_agents.planning.validation import (
 
 
 def test_planning_validation_imports_resolve():
-    """Smoke-test: new validation module exports are importable."""
+    """Smoke-test: validation module exports are importable."""
     assert PlannerValidationError is not None
     assert _check_plan_exhaustiveness is not None
     assert _check_evidence_references_hybrid is not None
 
 
 def test_planner_error_importable_from_planning_node():
-    """PlannerError is in planning.node (and re-exported via agents/planner shim)."""
+    """PlannerError is importable from planning.node."""
     assert PlannerError is not None
 
 

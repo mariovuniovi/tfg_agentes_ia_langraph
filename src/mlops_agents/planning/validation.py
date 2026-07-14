@@ -95,8 +95,8 @@ def _check_plan_integrity(
             f"models overlap candidates and rejected: {sorted(overlap)}"
         )
 
-    # 5. forecasting_settings is no longer part of the LLM's decision
-    #    (PlannerTrainingPlan has no such field). The code-resolved settings are
+    # 5. forecasting_settings is code-resolved, not part of the LLM's decision
+    #    (PlannerTrainingPlan has no such field). The resolved settings are
     #    validated separately by validate_forecasting_settings(), called from
     #    planner_node against the deterministically-built forecasting_fs.
 

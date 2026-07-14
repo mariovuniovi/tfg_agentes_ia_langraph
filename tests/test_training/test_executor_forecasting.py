@@ -109,7 +109,7 @@ def test_executor_fallback_resolves_multifold_validation(air_passengers_csv, tmp
         random_state=42,
     )
     rec = json.loads(Path(result.experience_record_path).read_text())
-    assert rec["validation_strategy"]["type"] == "expanding_window"   # not single_split — the fix
+    assert rec["validation_strategy"]["type"] == "expanding_window"   # regression guard: must not fall back to single_split
     assert rec["validation_strategy"]["n_folds"] >= 2
 
 
