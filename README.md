@@ -75,7 +75,7 @@ queda registrada en el log.
 ## 2. Árbol de módulos
 
 ```
-src/mlops_agents/            ← dominio (76 ficheros, mypy estricto en verde)
+src/mlops_agents/            ← dominio (78 ficheros, mypy estricto en verde)
 ├── graphs/                  topología y control de flujo
 │   ├── mlops_graph.py         StateGraph: nodos + wrappers finos (~150 líneas)
 │   ├── workflow_controller.py router determinista (las reglas de enrutado viven aquí)
@@ -151,7 +151,7 @@ scripts/                      run_pipeline.py · run_benchmark.py (benchmark off
 
 tests/                        espeja src/ 1:1 (test_data_validation/, test_planning/,
                               test_training/, …) + test_api/ + test_integration/
-docs/thesis/                  memoria en LaTeX (capítulos + anexos)
+docs/thesis/                  memoria en LaTeX y PDF(capítulos + anexos)
 data/ · storage/ · mlruns/    datasets de muestra · experience pool (SQLite) · MLflow
 ```
 
