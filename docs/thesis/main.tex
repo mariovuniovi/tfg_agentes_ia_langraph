@@ -197,8 +197,16 @@
 
 % Índice (sin encabezado para evitar solapamientos)
 {%
+  % El TOC puede forzar \pagestyle{plain} en su primera página; redefinimos
+  % 'plain' con los mismos ajustes que 'tocstyle' en vez de copiarlo con \let
+  % (ese \let filtraba el texto 'plain@@tocstyle' al documento).
+  \fancypagestyle{plain}{%
+    \fancyhf{}%
+    \fancyfoot[C]{Mario Vallina García}%
+    \renewcommand{\headrulewidth}{0pt}%
+    \renewcommand{\footrulewidth}{0.1pt}%
+  }%
   \pagestyle{tocstyle}%
-  \let\ps@plain\ps@tocstyle % algunas páginas del índice fuerzan 'plain'
   \tableofcontents
   \clearpage
 }%
@@ -207,15 +215,18 @@
 
 \subsection{Motivación}
 
-Este Trabajo Fin de Grado nace directamente de mi experiencia durante las prácticas en una empresa del sector químico, donde participé en el diseño de sistemas de inteligencia artificial aplicados a problemas reales de empresas industriales. Uno de los proyectos en los que estuve involucrado consistía en construir un sistema de predicción de precios de materias primas, en el que cada decisión de modelado --selección de algoritmos, tratamiento de variables exógenas, estrategia de validación, criterios de promoción a producción-- requería horas de trabajo manual repetitivo por parte de los científicos de datos. Esa observación sobre el terreno, sostenida durante meses, fue la chispa concreta que motivó este trabajo: ¿hasta qué punto es posible automatizar la parte ``rutinaria'' del desempeño del experto sin sacrificar trazabilidad ni rigor metodológico?
+% HECHO: redacción pasada a tercera persona (antes primera persona)
+Este Trabajo Fin de Grado surge de la experiencia adquirida durante unas prácticas realizadas en una empresa del sector químico, en las que se participó en el diseño de sistemas de inteligencia artificial aplicados a problemas reales de empresas industriales. Uno de los proyectos abordados consistía en construir un sistema de predicción de precios de materias primas, en el que cada decisión de modelado --selección de algoritmos, tratamiento de variables exógenas, estrategia de validación, criterios de promoción a producción-- requería horas de trabajo manual repetitivo por parte de los científicos de datos. Esa observación sobre el terreno, sostenida durante meses, fue la chispa concreta que motivó este trabajo: ¿hasta qué punto es posible automatizar la parte ``rutinaria'' del desempeño del experto sin sacrificar trazabilidad ni rigor metodológico?
 
-Desplegar modelos predictivos en producción exige articular un flujo completo que incluye ingestión de datos, limpieza, análisis, entrenamiento, evaluación, selección, versionado, despliegue, monitorización y mantenimiento. En este contexto surge MLOps, una disciplina orientada a gobernar el ciclo de vida del aprendizaje automático desde el desarrollo del modelo hasta su operación continua en entornos productivos~\cite{aws_mlops}.
+Desplegar modelos predictivos en producción exige articular un flujo completo que incluye ingestión de datos, limpieza, análisis, entrenamiento, evaluación, selección, versionado, despliegue, monitorización y mantenimiento. En este contexto surgen las operaciones de aprendizaje automático (MLOps, del inglés \emph{Machine Learning Operations}), una disciplina orientada a gobernar el ciclo de vida del aprendizaje automático desde el desarrollo del modelo hasta su operación continua en entornos productivos~\cite{aws_mlops}. % HECHO: sigla MLOps expandida en su primera aparición
 
-Sin embargo, los escenarios reales mantienen todavía una brecha relevante: numerosas decisiones de integración, validación y operación dependen de intervención manual, conocimiento experto y resolución ad hoc de incidencias. En mi experiencia, los equipos industriales suelen enfrentarse a tres dificultades recurrentes: datasets que llegan fragmentados en varios ficheros con esquemas inconsistentes, conocimiento empírico sobre qué modelos funcionan en qué contextos que permanece disperso, y ciclos de iteración demasiado largos cuando hay que probar nuevas series temporales con horizontes y frecuencias distintas. Estas tres fricciones limitan la reproducibilidad del proceso, incrementan el esfuerzo técnico necesario y dificultan la estandarización de los flujos predictivos en contextos industriales.
+Sin embargo, los escenarios reales mantienen todavía una brecha relevante: numerosas decisiones de integración, validación y operación dependen de intervención manual, conocimiento experto y resolución ad hoc de incidencias. % HECHO: redacción pasada a tercera persona (antes "En mi experiencia")
+La experiencia adquirida durante las prácticas permitió observar que los equipos industriales suelen enfrentarse a tres dificultades recurrentes: datasets que llegan fragmentados en varios ficheros con esquemas inconsistentes, conocimiento empírico sobre qué modelos funcionan en qué contextos que permanece disperso, y ciclos de iteración demasiado largos cuando hay que probar nuevas series temporales con horizontes y frecuencias distintas. Estas tres fricciones limitan la reproducibilidad del proceso, incrementan el esfuerzo técnico necesario y dificultan la estandarización de los flujos predictivos en contextos industriales.
 
-Este trabajo plantea la automatización de dicho flujo mediante un enfoque basado en agentes de IA, con la ambición de aportar una respuesta concreta a esa problemática. Frente a una automatización puramente determinista, la propuesta aprovecha la capacidad de los modelos de lenguaje de gran tamaño (LLM) para interpretar el estado del proceso, planificar pasos y ejecutar acciones mediante herramientas, con el fin de construir una automatización flexible, trazable y adaptable. La empresa cliente esperaba de mí dos cosas: una demostración técnica de que el patrón multi-agente podía aplicarse a un flujo MLOps real sin convertirse en una caja negra total, y un prototipo reproducible que les permitiese evaluar internamente si esta línea de trabajo merecía industrializarse. Ese es el trabajo que aquí se presenta.
+Este trabajo plantea la automatización de dicho flujo mediante un enfoque basado en agentes de IA, con la ambición de aportar una respuesta concreta a esa problemática. Frente a una automatización puramente determinista, la propuesta aprovecha la capacidad de los modelos de lenguaje de gran tamaño (LLM, del inglés \emph{Large Language Model}) para interpretar el estado del proceso, planificar pasos y ejecutar acciones mediante herramientas, con el fin de construir una automatización flexible, trazable y adaptable. % HECHO: tercera persona (antes "esperaba de mí dos cosas") | sigla LLM expandida en su primera aparición
+La empresa cliente planteó dos objetivos principales: una demostración técnica de que el patrón multi-agente podía aplicarse a un flujo MLOps real sin convertirse en una caja negra total, y un prototipo reproducible que le permitiese evaluar internamente si esta línea de trabajo merecía industrializarse. Ese es el trabajo que aquí se presenta.
 
-El antecedente directo de esta línea de trabajo aparece en AutoML, que automatiza partes del pipeline como el preprocesado, la selección de modelos y el ajuste de hiperparámetros~\cite{he2021automl}. En una dirección complementaria, trabajos recientes describen una evolución de las prácticas operativas desde MLOps, centrado en modelos tradicionales, hacia LLMOps y AgentOps, donde el incremento de autonomía demanda nuevas capacidades de operación, observabilidad y control~\cite{ganesh2024mlopsllmopsagentops}.
+El antecedente directo de esta línea de trabajo aparece en el aprendizaje automático automatizado (AutoML, del inglés \emph{Automated Machine Learning}), que automatiza partes del pipeline como el preprocesado, la selección de modelos y el ajuste de hiperparámetros~\cite{he2021automl}. En una dirección complementaria, trabajos recientes describen una evolución de las prácticas operativas desde MLOps, centrado en modelos tradicionales, hacia las operaciones sobre modelos de lenguaje (LLMOps, del inglés \emph{Large Language Model Operations}) y las operaciones sobre agentes (AgentOps, del inglés \emph{Agent Operations}), donde el incremento de autonomía demanda nuevas capacidades de operación, observabilidad y control~\cite{ganesh2024mlopsllmopsagentops}. % HECHO: siglas AutoML, LLMOps y AgentOps expandidas en su primera aparición
 
 \subsection{Objetivos}
 
@@ -229,23 +240,21 @@ Segundo, construir una arquitectura multi-agente capaz de coordinar componentes 
 
 Tercero, implementar un flujo de entrenamiento y evaluación aplicable principalmente a predicción temporal con variables exógenas ---el caso de uso central de la empresa cliente, asociado a precios de materias primas, indicadores macroeconómicos y variables de mercado relacionadas---, conservando además la posibilidad de ejecutar problemas tabulares de clasificación y regresión para demostrar la generalidad del sistema. En todos los casos, la selección de modelos no debe depender únicamente de una decisión manual, sino de un plan estructurado que combine información del dataset, conocimiento experto codificado y experiencias acumuladas de ejecuciones anteriores.
 
-Cuarto, incorporar mecanismos de trazabilidad que permitan al equipo auditar cada ejecución: modelos candidatos evaluados, métricas obtenidas, artefactos generados, criterios de selección e información asociada a cada run. Esta trazabilidad responde a una preocupación muy común en el ámbito profesional; la relevancia de intentar entender por qué se toman las decisiones. Ningún modelo promovido a producción debe ser una caja negra total, ni siquiera aunque el camino para construirlo haya pasado por un componente agéntico.
+Cuarto, incorporar mecanismos de trazabilidad que permitan al equipo auditar cada ejecución: modelos candidatos evaluados, métricas obtenidas, artefactos generados, criterios de selección e información asociada a cada ejecución. Esta trazabilidad responde a una preocupación muy común en el ámbito profesional; la relevancia de intentar entender por qué se toman las decisiones. Ningún modelo promovido a producción debe ser una caja negra total, ni siquiera aunque el camino para construirlo haya pasado por un componente agéntico. % HECHO: anglicismo corregido ("run" -> "ejecución")
 
-Conviene dejar claro desde el inicio que el objetivo de este Trabajo Fin de Grado no es construir el mejor modelo predictivo posible para el problema concreto que motivó el encargo, sino demostrar que el patrón multi-agente propuesto aporta valor verificable al flujo MLOps que lo rodea. El contexto industrial descrito en la motivación no opera como benchmark de validación experimental, sino como fuente de requisitos arquitectónicos: define el tipo de problema que el sistema debe poder procesar ---forecasting univariante con múltiples exógenas heterogéneas, frecuencia regular, posible presencia de variables con disponibilidad futura conocida---, las puertas de control que el flujo necesita y los criterios de auditabilidad que las decisiones deben respetar. Los experimentos del Capítulo~\ref{sec:resultados-analisis} se diseñan, en consecuencia, para validar el comportamiento del sistema agéntico ---calidad de la recuperación de experiencias, coherencia tanto del planificador como del validador de datos, robustez del controlador determinista, coste y variabilidad de los nodos LLM, utilidad de las puertas humanas--- y no para producir el mejor RMSE sobre el dataset original del cliente, al que no se tiene acceso fuera del ámbito de las prácticas. Esta delimitación es deliberada: las contribuciones del trabajo son arquitectónicas y reposan sobre el sistema, no sobre la calidad predictiva en un dominio concreto.
-
-Finalmente, el trabajo evalúa la utilidad, viabilidad y limitaciones del enfoque propuesto frente a un flujo MLOps más tradicional, especialmente en términos de automatización, apoyo a la toma de decisiones, reducción de intervención manual y capacidad para reutilizar conocimiento procedente de ejecuciones previas. Esta evaluación no pretende ser una comparativa exhaustiva con plataformas AutoML comerciales, sino aportar evidencia concreta a la empresa cliente sobre si el patrón multi-agente merece industrializarse en sus pipelines reales.
-
+Conviene dejar claro desde el inicio que el objetivo de este Trabajo Fin de Grado no es construir el mejor modelo predictivo posible para el problema concreto que motivó el encargo, sino demostrar que el patrón multi-agente propuesto aporta valor verificable al flujo MLOps que lo rodea. El contexto industrial descrito en la motivación no opera como benchmark de validación experimental, sino como fuente de requisitos arquitectónicos: define el tipo de problema que el sistema debe poder procesar ---forecasting univariante con múltiples exógenas heterogéneas, frecuencia regular, posible presencia de variables con disponibilidad futura conocida---, las puertas de control que el flujo necesita y los criterios de auditabilidad que las decisiones deben respetar. % HECHO: eliminados los párrafos con tono de conclusión (desde "Los experimentos del Capítulo..." y el de "Finalmente, el trabajo evalúa...")
 
 \subsection{Alcance del trabajo}
 \label{sec:alcance}
 
-El encargo inicial no llegó en forma de especificación cerrada con entregables prefijados, sino como una pregunta abierta por parte de la empresa. En sus propios términos, se trataba de «abrir nuevas vías para la aplicación de IA generativa en la industria química, facilitando el desarrollo de modelos predictivos sin necesidad de conocimientos avanzados en programación o estadística», con el fin de «evaluar la viabilidad de estas tecnologías en entornos reales y su potencial para mejorar la eficiencia y accesibilidad del análisis de datos». Este encuadre refleja una situación habitual en el tejido industrial actual: organizaciones que perciben que la IA generativa puede aportar valor a sus procesos, pero que no han identificado todavía dónde ni cómo aplicarla con criterio técnico. La empresa no me pidió un sistema concreto, sino que explorase el espacio del problema y propusiese una solución defendible.
+El encargo inicial no llegó en forma de especificación cerrada con entregables prefijados, sino como una pregunta abierta por parte de la empresa. En sus propios términos, se trataba de «abrir nuevas vías para la aplicación de IA generativa en la industria química, facilitando el desarrollo de modelos predictivos sin necesidad de conocimientos avanzados en programación o estadística», con el fin de «evaluar la viabilidad de estas tecnologías en entornos reales y su potencial para mejorar la eficiencia y accesibilidad del análisis de datos». Este encuadre refleja una situación habitual en el tejido industrial actual: organizaciones que perciben que la IA generativa puede aportar valor a sus procesos, pero que no han identificado todavía dónde ni cómo aplicarla con criterio técnico. La empresa no solicitó un sistema concreto, sino la exploración del espacio del problema y la propuesta de una solución defendible. % HECHO: tercera persona
 
-A partir de ese encargo abierto, una parte sustantiva del trabajo consistió en acotar el problema. Tras analizar los flujos de análisis de datos del equipo y los puntos donde los analistas dedicaban más tiempo a tareas repetitivas, identifiqué el cuello de botella en puntos como: interpretar datasets heterogéneos, decidir qué modelo probar primero, recordar qué funcionó en proyectos previos, justificar las decisiones de modelado y producir resultados auditables. Sobre esta lectura, propuse a la empresa un enfoque concreto, es decir, un sistema multi-agente que automatizase el flujo de predicción end-to-end, manteniendo los componentes deterministas allí donde se exige reproducibilidad y delegando en agentes asistidos por LLM únicamente las fases con incertidumbre semántica. La elección del enfoque agéntico ---en lugar de una interfaz visual tipo no-code, una herramienta AutoML clásica o un chatbot sobre datos--- responde a esa lectura del problema: la accesibilidad solicitada no se resuelve eliminando complejidad visualmente, sino encapsulándola tras una capa que sepa razonar sobre el contexto.
+% HECHO: tercera persona (antes "identifiqué" y "propuse")
+A partir de ese encargo abierto, una parte sustantiva del trabajo consistió en acotar el problema. Tras analizar los flujos de análisis de datos del equipo y los puntos donde los analistas dedicaban más tiempo a tareas repetitivas, se identificó el cuello de botella en puntos como: interpretar datasets heterogéneos, decidir qué modelo probar primero, recordar qué funcionó en proyectos previos, justificar las decisiones de modelado y producir resultados auditables. Sobre esta lectura, se propuso a la empresa un enfoque concreto, es decir, un sistema multi-agente que automatizase el flujo de predicción end-to-end, manteniendo los componentes deterministas allí donde se exige reproducibilidad y delegando en agentes asistidos por LLM únicamente las fases con incertidumbre semántica. La elección del enfoque agéntico ---en lugar de una interfaz visual tipo no-code, una herramienta AutoML clásica o un chatbot sobre datos--- responde a esa lectura del problema: la accesibilidad solicitada no se resuelve eliminando complejidad visualmente, sino encapsulándola tras una capa que sepa razonar sobre el contexto.
 
-La evaluación experimental del sistema, descrita en el Capítulo~\ref{sec:resultados-analisis}, no se realiza sobre los datos reales del cliente, sino sobre conjuntos públicos y datos sintéticos generados ad hoc que reproducen las propiedades estructurales del tipo de problema descrito: forecasting univariante con múltiples exógenas, frecuencia regular y posible presencia de variables con disponibilidad futura conocida. Dicha decisión es metodológica y deliberada. El sistema, por diseño, puede procesar conjuntos de cualquier escala y complejidad: la arquitectura no impone restricciones sobre el tamaño del dataset, el número de exógenas o la longitud del histórico, y de hecho parte de los experimentos del Capítulo~\ref{sec:resultados-analisis} estudian explícitamente cómo se comporta el coste agéntico cuando se varía la escala del problema. La razón para no utilizar la información del cliente en la evaluación es distinta y responde a una decisión de foco: lo que se evalúa en este trabajo es el comportamiento del sistema agéntico ---calidad de la recuperación de ejecuciones anteriores, coherencia del planificador, robustez del controlador, coste y variabilidad de los nodos LLM, utilidad de las puertas humanas--- y para medir ese comportamiento con limpieza se requieren conjuntos cuyas propiedades estructurales sean conocidas, controlables y reproducibles por cualquier lector. Un conjunto industrial real, con decenas de exógenas heterogéneas, requisitos de tratamiento específicos por columna y horizonte de despliegue propio, habría desplazado inevitablemente el foco hacia la ingeniería de features y la búsqueda de técnicas predictivas state of the art para ese caso concreto. Ese desplazamiento habría producido un trabajo distinto, en el que el sistema agéntico habría quedado como soporte de un proyecto de modelado en lugar de como objeto de estudio.
+La evaluación experimental del sistema, descrita en el Capítulo~\ref{sec:resultados-analisis}, no se realiza sobre los datos reales del cliente, sino sobre conjuntos públicos y datos sintéticos generados ad hoc que reproducen las propiedades estructurales del tipo de problema descrito: forecasting univariante con múltiples exógenas, frecuencia regular y posible presencia de variables con disponibilidad futura conocida. Dicha decisión es metodológica y deliberada. El sistema, por diseño, puede procesar conjuntos de cualquier escala y complejidad: la arquitectura no impone restricciones sobre el tamaño del dataset, el número de exógenas o la longitud del histórico, y de hecho parte de esos experimentos estudian explícitamente cómo se comporta el coste agéntico cuando se varía la escala del problema. La razón para no utilizar la información del cliente en la evaluación es distinta y responde a una decisión de foco: lo que se evalúa en este trabajo es el comportamiento del sistema agéntico ---calidad de la recuperación de ejecuciones anteriores, coherencia del planificador, robustez del controlador, coste y variabilidad de los nodos LLM, utilidad de las puertas humanas--- y para medir ese comportamiento con limpieza se requieren conjuntos cuyas propiedades estructurales sean conocidas, controlables y reproducibles por cualquier lector. Un conjunto industrial real, con decenas de exógenas heterogéneas, requisitos de tratamiento específicos por columna y horizonte de despliegue propio, habría desplazado inevitablemente el foco hacia la ingeniería de características y la búsqueda de técnicas predictivas del estado del arte para ese caso concreto. Ese desplazamiento habría producido un trabajo distinto, en el que el sistema agéntico habría quedado como soporte de un proyecto de modelado en lugar de como objeto de estudio. % HECHO: anglicismos corregidos ("ingeniería de features" -> "de características"; "state of the art" -> "estado del arte") | referencia duplicada al Capítulo de resultados eliminada
 
-En cuanto a las capacidades concretas que el sistema pone sobre la mesa, el prototipo aborda tres familias de problemas predictivos: clasificación tabular, regresión tabular y predicción temporal. El caso de uso principal corresponde a forecasting de series temporales con una única serie objetivo y múltiples variables exógenas, escenario representativo de los problemas que se encontrarían en el contexto industrial de origen ---precios de materias primas, variables de mercado o consumos energéticos relacionados---. El prototipo incluye la construcción de un perfil descriptivo del problema, la validación inicial de datasets mediante un agente de validación con herramientas, la generación de planes de entrenamiento mediante un agente planificador asistido por memoria empírica, la ejecución determinista de distintos modelos candidatos, el ajuste de hiperparámetros, el registro de métricas y artefactos en MLflow, y la selección automática de un modelo campeón sometida a revisión humana antes de su promoción lógica. Asimismo, incorpora un Experience Pool sobre SQLite donde se conservan resultados de ejecuciones anteriores, configuraciones de entrenamiento y métricas obtenidas, lo que permite reutilizar conocimiento empírico como apoyo a la toma de decisiones en futuras ejecuciones. La interfaz web, desarrollada con Next.js y FastAPI, muestra el avance del pipeline en tiempo real e incorpora dos puertas de supervisión humana en los puntos críticos del flujo: la aceptación del dataset preparado y la promoción del modelo seleccionado.
+En cuanto a las capacidades concretas que el sistema pone sobre la mesa, el prototipo aborda tres familias de problemas predictivos: clasificación tabular, regresión tabular y predicción temporal. El caso de uso principal corresponde a predicción de series temporales (forecasting) con una única serie objetivo y múltiples variables exógenas, escenario representativo de los problemas que se encontrarían en el contexto industrial de origen ---precios de materias primas, variables de mercado o consumos energéticos relacionados---. El prototipo incluye la construcción de un perfil descriptivo del problema, la validación inicial de datasets mediante un agente de validación con herramientas, la generación de planes de entrenamiento mediante un agente planificador asistido por memoria empírica, la ejecución determinista de distintos modelos candidatos, el ajuste de hiperparámetros, el registro de métricas y artefactos en MLflow, y la selección automática de un modelo campeón sometida a revisión humana antes de su promoción lógica. Asimismo, incorpora un Experience Pool sobre SQLite donde se conservan resultados de ejecuciones anteriores, configuraciones de entrenamiento y métricas obtenidas, lo que permite reutilizar conocimiento empírico como apoyo a la toma de decisiones en futuras ejecuciones. La interfaz web, desarrollada con Next.js y FastAPI, muestra el avance del pipeline en tiempo real e incorpora dos puertas de supervisión humana en los puntos críticos del flujo: la aceptación del dataset preparado y la promoción del modelo seleccionado. % HECHO: glosado "forecasting" en su primera aparición ("predicción de series temporales (forecasting)")
 
 En el caso específico de predicción temporal, el trabajo contempla el uso de variables exógenas y distingue entre aquellas conocidas a futuro ---por ejemplo, calendarios de festivos o variables planificadas--- y aquellas que deben estimarse antes de realizar la predicción. Tal distinción, frecuentemente descuidada en pipelines, permite evitar fugas durante la validación del modelo y mejora la fidelidad de la evaluación respecto a un escenario real de despliegue.
 
@@ -258,15 +267,15 @@ El sistema se ha validado como prototipo experimental, no como plataforma indust
 
 El resto de esta memoria se organiza en seis capítulos que avanzan desde los fundamentos teóricos hasta la validación experimental del prototipo, complementados por una sección final de anexos.
 
-El Capítulo 2 presenta los conceptos básicos necesarios para situar el trabajo. Se introducen las nociones de MLOps y de sistemas basados en modelos de lenguaje y agentes, distinguiendo entre componentes que se limitan a generar salidas estructuradas y aquellos que incorporan razonamiento sobre herramientas externas. A continuación, se discuten los elementos técnicos sobre los que se construye el sistema: el uso de JSON como contrato de entrada del pipeline, la API de OpenAI como capa de acceso al modelo, LangGraph como infraestructura de orquestación mediante grafos de estado, el patrón ReAct para agentes con herramientas y los mecanismos de Human-in-the-Loop en sistemas asistidos por IA generativa. El capítulo cierra con el principio de restraint agéntico, que vertebra las decisiones arquitectónicas del trabajo, y con una revisión de las herramientas auxiliares del ciclo MLOps utilizadas.
+El capítulo 2 presenta los conceptos básicos necesarios para situar el trabajo. Se introducen las nociones de MLOps y de sistemas basados en modelos de lenguaje y agentes, distinguiendo entre componentes que se limitan a generar salidas estructuradas y aquellos que incorporan razonamiento sobre herramientas externas. A continuación, se discuten los elementos técnicos sobre los que se construye el sistema: el uso de JSON como contrato de entrada del pipeline, la API de OpenAI como capa de acceso al modelo, LangGraph como infraestructura de orquestación mediante grafos de estado, el patrón ReAct para agentes con herramientas y los mecanismos de Human-in-the-Loop en sistemas asistidos por IA generativa. El capítulo cierra con el principio de restraint agéntico, que vertebra las decisiones arquitectónicas del trabajo, y con una revisión de las herramientas auxiliares del ciclo MLOps utilizadas.
 
-El Capítulo 3 recoge el estudio de alternativas tecnológicas considerado para cada componente principal del sistema. Se analizan opciones para el framework de orquestación, frente al cual se selecciona LangGraph; para el proveedor del modelo de lenguaje, donde se contrastan la API directa de OpenAI con GitHub Models, Azure OpenAI, Anthropic Claude, soluciones locales como Ollama o LM Studio y Hugging Face Inference Providers; para el almacén de experiencias, comparando SQLite, PostgreSQL, bases vectoriales y ficheros JSON; y para el stack de interfaz de usuario, contraponiendo Streamlit y Gradio frente a la combinación finalmente adoptada de Next.js y FastAPI. Cada decisión se justifica en función de los requisitos del prototipo.
+El capítulo 3 recoge el estudio de alternativas tecnológicas considerado para cada componente principal del sistema. Se analizan opciones para el framework de orquestación, frente al cual se selecciona LangGraph; para el proveedor del modelo de lenguaje, donde se contrastan la API directa de OpenAI con GitHub Models, Azure OpenAI, Anthropic Claude, soluciones locales como Ollama o LM Studio y Hugging Face Inference Providers; para el almacén de experiencias, comparando SQLite, PostgreSQL, bases vectoriales y ficheros JSON; y para el stack de interfaz de usuario, contraponiendo Streamlit y Gradio frente a la combinación finalmente adoptada de Next.js y FastAPI. Cada decisión se justifica en función de los requisitos del prototipo.
 
-El Capítulo 4 expone la arquitectura desarrollada del sistema. Comienza con una visión general que sitúa el grafo LangGraph dentro de una aplicación contenedorizada con interfaz web, API REST y almacenes de seguimiento experimental. A continuación se describe el contrato de entrada del pipeline, materializado en un esquema JSON que define el problema predictivo y las restricciones sobre los datos. La parte central del capítulo desarrolla los tipos de nodos del grafo y los contratos de ejecución que los gobiernan, dedicando una subsección específica al descubrimiento de joins entre tablas por parte del agente de validación. Posteriormente se presenta el patrón de controlador determinista combinado con agentes especializados, junto con su extracto de código, y se detallan los mecanismos de seguimiento experimental con MLflow y la memoria empírica del sistema ---el Experience Pool--- como soporte de la planificación. El capítulo concluye recorriendo el flujo de ejecución end-to-end del pipeline desde la perspectiva del usuario.
+El capítulo 4 expone la arquitectura desarrollada del sistema. Comienza con una visión general que sitúa el grafo LangGraph dentro de una aplicación contenedorizada con interfaz web, API REST y almacenes de seguimiento experimental. A continuación se describe el contrato de entrada del pipeline, materializado en un esquema JSON que define el problema predictivo y las restricciones sobre los datos. La parte central del capítulo desarrolla los tipos de nodos del grafo y los contratos de ejecución que los gobiernan, dedicando una subsección específica al descubrimiento de joins entre tablas por parte del agente de validación. Posteriormente se presenta el patrón de controlador determinista combinado con agentes especializados, junto con su extracto de código, y se detallan los mecanismos de seguimiento experimental con MLflow y la memoria empírica del sistema ---el Experience Pool--- como soporte de la planificación. El capítulo concluye recorriendo el flujo de ejecución end-to-end del pipeline desde la perspectiva del usuario.
 
-El Capítulo 5 contiene la evaluación experimental del prototipo. Tras delimitar el contexto y las dependencias de los resultados y describir el diseño de las pruebas, se analiza la composición y validación inicial del Experience Pool a partir de los benchmarks. A continuación, se estudia el comportamiento agéntico en ejecuciones completas de forecasting, prestando atención a la recuperación de experiencias y al razonamiento del planificador, al descubrimiento de joins por parte del agente de validación y al comportamiento del coste agéntico frente al tamaño del dataset y entre repeticiones de un mismo caso. El capítulo continúa con un análisis de robustez ante errores controlados, un desglose del coste por nodo ---separando latencia agéntica de cómputo determinista--- y una valoración del papel de las puertas de supervisión humana durante las ejecuciones.
+El capítulo 5 contiene la evaluación experimental del prototipo. Tras delimitar el contexto y las dependencias de los resultados y describir el diseño de las pruebas, se analiza la composición y validación inicial del Experience Pool a partir de los benchmarks. A continuación, se estudia el comportamiento agéntico en ejecuciones completas de forecasting, prestando atención a la recuperación de experiencias y al razonamiento del planificador, al descubrimiento de joins por parte del agente de validación y al comportamiento del coste agéntico frente al tamaño del dataset y entre repeticiones de un mismo caso. El capítulo continúa con un análisis de robustez ante errores controlados, un desglose del coste por nodo ---separando latencia agéntica de cómputo determinista--- y una valoración del papel de las puertas de supervisión humana durante las ejecuciones.
 
-El Capítulo 6 recoge las conclusiones del trabajo y plantea las líneas futuras. Se sintetizan los hallazgos principales de los experimentos, se cuantifican las cifras más representativas del comportamiento del prototipo y se identifican las limitaciones del alcance abordado, abriendo direcciones para una posible evolución del sistema hacia entornos más amplios.
+El capítulo 6 recoge las conclusiones del trabajo y plantea las líneas futuras. Se sintetizan los hallazgos principales de los experimentos, se cuantifican las cifras más representativas del comportamiento del prototipo y se identifican las limitaciones del alcance abordado, abriendo direcciones para una posible evolución del sistema hacia entornos más amplios.
 
 Por último, los anexos reúnen el material complementario del trabajo. El \emph{Anexo A} (Reproducción y despliegue) documenta los pasos necesarios para reproducir y desplegar la aplicación, incluyendo la configuración mediante variables de entorno, la ejecución gratuita a través de GitHub Models, el despliegue con Docker, el sembrado inicial del Experience Pool, la verificación funcional y el enlace al repositorio público de código. El \emph{Anexo B} (Procedencia de los conjuntos de datos) detalla las fuentes de los datasets utilizados en la evaluación experimental, distinguiendo entre los conjuntos reales obtenidos de fuentes públicas y los conjuntos sintéticos generados específicamente para este trabajo.
 
@@ -337,7 +346,8 @@ En el contexto de este trabajo, ReAct resulta relevante para aquellos nodos que 
 \subsection{Human-in-the-Loop en sistemas basados en IA generativa}
 \label{sec:hitl}
 
-El concepto de Human-in-the-Loop (HITL) se refiere a la inclusión de puntos de control donde se requiere supervisión o aprobación humana antes de que un sistema automático ejecute una acción irreversible o de alto impacto \cite{eu_ai_act}. Esta supervisión resulta especialmente importante cuando el flujo automatizado puede producir efectos difíciles de revertir, como aceptar un conjunto de datos procesado, promover un modelo como candidato a despliegue o ejecutar una operación con impacto sobre un entorno productivo.
+% HECHO: sigla HITL glosada también en español en su primera aparición
+El concepto de supervisión humana en el flujo (Human-in-the-Loop, HITL) se refiere a la inclusión de puntos de control donde se requiere supervisión o aprobación humana antes de que un sistema automático ejecute una acción irreversible o de alto impacto \cite{eu_ai_act}. Esta supervisión resulta especialmente importante cuando el flujo automatizado puede producir efectos difíciles de revertir, como aceptar un conjunto de datos procesado, promover un modelo como candidato a despliegue o ejecutar una operación con impacto sobre un entorno productivo.
  
 En sistemas que incorporan modelos de lenguaje y agentes, el HITL permite reducir el riesgo asociado a salidas incorrectas, incompletas o inesperadas. Aunque los LLMs pueden aportar capacidades útiles de interpretación, planificación y generación de explicaciones, sus resultados no deben asumirse como válidos sin mecanismos de control cuando afectan a decisiones críticas. La intervención humana introduce una barrera adicional de verificación y permite comprobar si la decisión propuesta responde al objetivo del sistema.
 
@@ -347,7 +357,7 @@ Además de su papel en seguridad y control, el HITL aporta trazabilidad. Cada ap
 \label{sec:restraint}
 
 
-Uno de los principios de diseño más importantes ---y menos intuitivos--- en sistemas agénticos es saber cuándo \emph{no} usar un agente. Anthropic lo formula explícitamente\cite{anthropic_agents}: 
+Uno de los principios de diseño más importantes ---y menos intuitivos--- en sistemas agénticos es saber cuándo \emph{no} usar un agente. Anthropic lo formula explícitamente \cite{anthropic_agents}: 
 \vspace{-0.8cm}
 \begin{center}
     <<\emph{Recomendamos encontrar la solución más simple posible, y solo aumentar la complejidad cuando sea necesario. Esto puede significar no construir sistemas agénticos en absoluto}.>>
@@ -398,7 +408,7 @@ A esos dos vectores se suman tres restricciones operativas. Las limitaciones té
 
 La segunda restricción operativa, el presupuesto, conviene desdoblarla en dos planos distintos. En el plano de la empresa, no se autorizó la contratación de licencias de pago para un prototipo de investigación; la empresa cliente, en una fase aún temprana de adopción de IA, descartó tanto OpenAI Enterprise como Azure OpenAI por su coste para un proyecto exploratorio, y rechazó también GitHub Models a pesar de su gratuidad porque el procesamiento se realiza en infraestructura externa, lo que entraba en conflicto con sus criterios internos de tratamiento de datos. La propuesta inicial recibida fue, por tanto, ejecutar todo el prototipo contra modelos abiertos servidos en local mediante Ollama o LM Studio.
 
-Sin embargo, como se detalla en la sección~\ref{sec:alt-proveedor}, los modelos abiertos disponibles en la actualidad presentan limitaciones reales para los nodos LLM más exigentes del sistema ---el validador de datos y el planificador---, y un equipo doméstico no dispone de la memoria necesaria para ejecutar alternativas lo suficientemente capaces. Esta restricción de partida obligó a redefinir el plano económico del proyecto. Dado que el TFG no tiene por qué ceñirse de forma estricta a la información y la infraestructura reales del cliente, y dado que la sustitución de los conjuntos reales por datos sintéticos ya rompía deliberadamente esa atadura, la decisión que tomé fue costear de mi bolsillo el acceso a la API de OpenAI durante el desarrollo y la evaluación experimental. Tal elección permite trabajar con modelos suficientemente capaces para que las conclusiones sobre el comportamiento del sistema sean significativas, manteniendo a la vez el coste por ejecución por debajo de un dólar en los escenarios típicos analizados.
+Sin embargo, como se detalla en la sección~\ref{sec:alt-proveedor}, los modelos abiertos disponibles en la actualidad presentan limitaciones reales para los nodos LLM más exigentes del sistema ---el validador de datos y el planificador---, y un equipo doméstico no dispone de la memoria necesaria para ejecutar alternativas lo suficientemente capaces. Esta restricción de partida obligó a redefinir el plano económico del proyecto. Dado que el TFG no tiene por qué ceñirse de forma estricta a la información y la infraestructura reales del cliente, y dado que la sustitución de los conjuntos reales por datos sintéticos ya rompía deliberadamente esa atadura, la decisión adoptada fue costear de forma particular el acceso a la API de OpenAI durante el desarrollo y la evaluación experimental. Tal elección permite trabajar con modelos suficientemente capaces para que las conclusiones sobre el comportamiento del sistema sean significativas, manteniendo a la vez el coste por ejecución por debajo de un dólar en los escenarios típicos analizados.% HECHO: tercera persona (antes "la decisión que tomé fue costear de mi bolsillo")
 
 Conviene dejar explícita una implicación de esta elección: el prototipo, tal como se evalúa en esta memoria, no replica las condiciones económicas que la empresa exigiría en un despliegue real. En un entorno productivo y con presupuesto disponible, la opción más alineada con los criterios corporativos sería OpenAI Enterprise o Azure OpenAI ---ambas, como el resto de proveedores compatibles con la API de OpenAI utilizada, sin impacto en la arquitectura del sistema---. La vía gratuita basada en GitHub Models se ha mantenido documentada en el Anexo~A y operativa en el código como alternativa para experimentación, en línea con la práctica habitual de ofrecer un canal sin coste para reproducción académica.
 
@@ -421,7 +431,7 @@ AutoGen y Semantic Kernel se consideraron inicialmente como alternativas indepen
 CrewAI ofrece una abstracción de alto nivel basada en agentes, tareas, crews y procesos \cite{crewai_docs}. Tal aproximación permite construir sistemas multiagente con poca configuración y resulta adecuada para prototipos en los que se desea modelar de forma sencilla la colaboración entre agentes especializados. Su modelo de ejecución contempla procesos secuenciales y jerárquicos, y sus Flows permiten definir automatizaciones más estructuradas con gestión de estado y control del flujo. Sin embargo, su abstracción principal no es un grafo de estados tipado comparable al de LangGraph, sino una organización de agentes y tareas de mayor nivel. Por ello, se adapta peor a una arquitectura en la que deben convivir agentes con herramientas, nodos LLM sin herramientas, validaciones deterministas, ejecución reproducible de entrenamiento, persistencia explícita del estado e interrupciones para supervisión humana.
 
 
-Código Python sin framework también se valoró como alternativa. Esta opción ofrece el máximo control sobre la implementación, pero obligaría a desarrollar manualmente la gestión del estado compartido, el enrutamiento condicional, los ciclos del grafo, la persistencia mediante checkpoints y el mecanismo de interrupción para supervisión humana. En el contexto de este TFG, dedicar un esfuerzo significativo a construir esta infraestructura desde cero habría desviado el foco principal del trabajo, centrado en la automatización de un flujo MLOps mediante agentes IA.
+Código Python sin framework también se valoró como alternativa. Esta opción ofrece el máximo control sobre la implementación, pero obligaría a desarrollar manualmente la gestión del estado compartido, el enrutamiento condicional, los ciclos del grafo, la persistencia mediante checkpoints y el mecanismo de interrupción para supervisión humana. En el contexto de este TFG, dedicar un esfuerzo significativo a construir esta infraestructura desde cero habría desviado el foco principal del trabajo, centrado en la automatización de un flujo MLOps mediante agentes IA. En la tabla~\ref{tab:alt-langgraph} se recoge una comparativa de las alternativas consideradas para la orquestación del sistema. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[htbp]
 \centering
@@ -467,7 +477,7 @@ Sin embargo, la ejecución local introduce limitaciones importantes. Los modelos
 
 Finalmente, Hugging Face Inference Providers proporciona acceso gestionado a numerosos modelos abiertos y comerciales mediante distintos proveedores de inferencia \cite{huggingface_inference_providers}. Si bien existe una capa de acceso gratuito, los modelos disponibles en ella rara vez ofrecen soporte fiable para tool calling o salidas estructuradas, y los límites de tasa son más restrictivos que los de GitHub Models; para acceder a modelos competitivos con garantías de calidad es necesario recurrir a planes de pago o a Inference Endpoints dedicados. Más allá del coste, su principal limitación para este proyecto es la heterogeneidad del catálogo: la calidad, latencia, disponibilidad y compatibilidad con salidas estructuradas dependen en gran medida del modelo y proveedor concretos. Por ello, Hugging Face se consideró una opción útil para experimentación, pero menos adecuada como proveedor principal de un sistema donde se prioriza la estabilidad del comportamiento del LLM, la simplicidad de integración y la fiabilidad de las salidas estructuradas.
 
-En consecuencia, la API directa de OpenAI fue seleccionada como proveedor principal por ofrecer una combinación favorable de calidad del modelo, estabilidad en salidas estructuradas, facilidad de integración y ausencia de restricciones severas de cuota durante el desarrollo. GitHub Models se mantuvo en su papel de alternativa de bajo coste para prototipado, Azure OpenAI se identificó como opción natural para una futura implantación empresarial, y los modelos locales se reservaron como alternativa cuando la privacidad o la ejecución dentro de infraestructura propia sean requisitos prioritarios.
+En consecuencia, la API directa de OpenAI fue seleccionada como proveedor principal por ofrecer una combinación favorable de calidad del modelo, estabilidad en salidas estructuradas, facilidad de integración y ausencia de restricciones severas de cuota durante el desarrollo. GitHub Models se mantuvo en su papel de alternativa de bajo coste para prototipado, Azure OpenAI se identificó como opción natural para una futura implantación empresarial, y los modelos locales se reservaron como alternativa cuando la privacidad o la ejecución dentro de infraestructura propia sean requisitos prioritarios. En la tabla~\ref{tab:alt-proveedor} se comparan los proveedores de modelos de lenguaje evaluados para los nodos LLM del sistema. % HECHO: referencia a tabla añadida en el texto
 
 
 \begin{table}[htbp]
@@ -512,7 +522,7 @@ Por último, se consideró la representación vectorial de experiencias como pos
 
 Por estos motivos, se seleccionó SQLite como solución. SQLite permite almacenar las experiencias en una base de datos relacional local, sin necesidad de desplegar un servidor independiente y manteniendo una integración sencilla con Python y Docker. Dicha elección resulta suficiente para la escala del prototipo, permite consultar y filtrar registros de forma estructurada, y conserva una arquitectura reproducible con una configuración mínima. Además, el sistema mantiene copias JSON auditables de las experiencias, combinando así una base SQLite para consulta y recuperación con ficheros legibles para inspección y trazabilidad.
 
-La elección de SQLite no pretende cerrar la puerta a soluciones más avanzadas. Si el sistema creciese hasta manejar muchas más experiencias, múltiples usuarios concurrentes o perfiles más complejos, tendría sentido replantear tanto el almacén como el mecanismo de recuperación. En ese escenario podría estudiarse una migración a PostgreSQL, una representación vectorial de los perfiles o una estrategia híbrida que combinase filtrado estructurado por SQL con búsqueda vectorial para información semántica no estructurada. En la versión actual, sin embargo, esta evolución queda fuera del alcance del TFG.
+La elección de SQLite no pretende cerrar la puerta a soluciones más avanzadas. Si el sistema creciese hasta manejar muchas más experiencias, múltiples usuarios concurrentes o perfiles más complejos, tendría sentido replantear tanto el almacén como el mecanismo de recuperación. En ese escenario podría estudiarse una migración a PostgreSQL, una representación vectorial de los perfiles o una estrategia híbrida que combinase filtrado estructurado por SQL con búsqueda vectorial para información semántica no estructurada. En la versión actual, sin embargo, esta evolución queda fuera del alcance del TFG. En la tabla~\ref{tab:alt-experiencia} se resumen las alternativas valoradas para el almacén de experiencias. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[htbp]
 \centering
@@ -544,7 +554,7 @@ También se valoró Gradio, una herramienta orientada a crear interfaces rápida
 
 La opción finalmente adoptada fue una arquitectura basada en Next.js y FastAPI. Next.js permite construir una interfaz React con componentes reutilizables, mayor control sobre la experiencia de usuario y una gestión más natural de pantallas, formularios y estados de la aplicación. FastAPI, por su parte, permite exponer el backend Python mediante endpoints tipados y mantener la lógica del pipeline separada de la capa visual. Tal separación encaja mejor con la arquitectura del proyecto, ya que el backend ejecuta el flujo MLOps y emite eventos, mientras que el frontend los consume y los presenta al usuario. Además, el canal WebSocket permite transmitir eventos del pipeline en tiempo real desde el backend hacia el frontend sin bloquear la interfaz.
 
-La elección de Next.js y FastAPI introduce más complejidad inicial que Streamlit o Gradio, ya que obliga a mantener dos servicios diferenciados y a desarrollar una interfaz web de forma explícita. Sin embargo, esta complejidad resulta justificada por los requisitos del prototipo: visualización progresiva de eventos, formularios de aprobación humana, separación entre lógica de ejecución e interfaz, y posibilidad de desplegar frontend y backend como servicios independientes. En consecuencia, el stack seleccionado ofrece una base más adecuada para una aplicación MLOps interactiva que debe mostrar el estado del sistema durante la ejecución y no solo resultados finales.
+La elección de Next.js y FastAPI introduce más complejidad inicial que Streamlit o Gradio, ya que obliga a mantener dos servicios diferenciados y a desarrollar una interfaz web de forma explícita. Sin embargo, esta complejidad resulta justificada por los requisitos del prototipo: visualización progresiva de eventos, formularios de aprobación humana, separación entre lógica de ejecución e interfaz, y posibilidad de desplegar frontend y backend como servicios independientes. En consecuencia, el stack seleccionado ofrece una base más adecuada para una aplicación MLOps interactiva que debe mostrar el estado del sistema durante la ejecución y no solo resultados finales. En la tabla~\ref{tab:alt-frontend} se comparan las alternativas consideradas para la interfaz de usuario. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[htbp]
 \centering
@@ -589,7 +599,7 @@ En torno al grafo se sitúa la capa de infraestructura de la aplicación. FastAP
 
 El canal WebSocket se utiliza con un propósito distinto. Una vez iniciada una ejecución y obtenido su identificador, el frontend abre una conexión persistente asociada al run\_id. A través de esa conexión, el backend envía objetos PipelineEvent en formato JSON a medida que el grafo avanza por sus nodos. Aunque WebSocket es un protocolo bidireccional, en esta implementación se emplea principalmente como canal de notificación desde el backend hacia el frontend. Dicha separación responde a un patrón de diseño simple: comandos mediante HTTP y eventos en tiempo real mediante WebSocket. De este modo, las acciones discretas del usuario mantienen una lógica de petición-respuesta fácil de validar y depurar, mientras que los eventos generados de forma asíncrona por LangGraph se transmiten al navegador sin necesidad de realizar consultas periódicas al backend.
 
-MLflow proporciona seguimiento de experimentos, almacenamiento de artefactos y registro del modelo campeón. SQLite actúa como almacén local del Experience Pool, conservando información estructurada de ejecuciones anteriores que puede recuperarse en futuras planificaciones. Finalmente, Docker permite empaquetar los distintos servicios y facilitar la reproducción del entorno de ejecución en otros equipos.
+MLflow proporciona seguimiento de experimentos, almacenamiento de artefactos y registro del modelo campeón. SQLite actúa como almacén local del Experience Pool, conservando información estructurada de ejecuciones anteriores que puede recuperarse en futuras planificaciones. Finalmente, Docker permite empaquetar los distintos servicios y facilitar la reproducción del entorno de ejecución en otros equipos. En la figura~\ref{fig:vision-general} se muestra una visión general de la arquitectura del sistema con sus principales componentes. % HECHO: referencia a figura añadida en el texto
 
 
 \begin{figure}[H]
@@ -612,17 +622,23 @@ Un aspecto especialmente relevante aparece en la declaración de variables exóg
 
 El contrato también describe el esquema esperado de columnas. Para cada columna puede especificarse su nombre, tipo de dato, descripción, obligatoriedad, posibilidad de valores nulos, restricciones numéricas, valores permitidos o papel como clave primaria. Además, pueden añadirse pistas de mapeo que ayuden al agente de validación a relacionar las columnas esperadas con los nombres presentes en los ficheros de entrada. Estas pistas no sustituyen a la validación programática, pero proporcionan contexto semántico útil cuando los datos proceden de varias fuentes o cuando existen nombres de columnas próximos entre sí.
 
-Durante la ejecución, el contrato de entrada alimenta varias fases del sistema. El agente de validación lo utiliza para comprobar si los datos recibidos son compatibles con el problema definido. A partir de esta validación se construye un perfil del dataset, que resume propiedades relevantes como tamaño, tipos de variables, valores ausentes, estructura temporal o presencia de variables exógenas. Posteriormente, el planificador emplea este perfil, junto con el contrato original, para proponer un plan de entrenamiento compatible con el tipo de problema. Finalmente, el ejecutor determinista utiliza dicha información para seleccionar particiones, estrategias de validación, modelos candidatos y tratamiento de variables exógenas.
+Durante la ejecución, el contrato de entrada alimenta varias fases del sistema. El agente de validación lo utiliza para comprobar si los datos recibidos son compatibles con el problema definido. A partir de esta validación se construye un perfil del conjunto de datos, que resume propiedades relevantes como tamaño, tipos de variables, valores ausentes, estructura temporal o presencia de variables exógenas. Posteriormente, el planificador emplea este perfil, junto con el contrato original, para proponer un plan de entrenamiento compatible con el tipo de problema. Finalmente, el ejecutor determinista utiliza dicha información para seleccionar particiones, estrategias de validación, modelos candidatos y tratamiento de variables exógenas. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 El contrato JSON representa, por tanto, una pieza de gobierno del sistema. La persona experta define el marco del problema, el objetivo predictivo, las columnas relevantes y las restricciones principales; el pipeline utiliza esa información para automatizar las fases posteriores con mayor seguridad, trazabilidad y coherencia. Tal aproximación evita delegar en el LLM una tarea que requiere conocimiento técnico y de dominio, y refuerza la separación entre especificación humana, razonamiento asistido por LLM y ejecución determinista.
 
 Un ejemplo sencillo de este esquema JSON podría ser el siguiente:
 
-\begin{lstlisting}[
-  language=json,
+\begin{lstlisting}[language=json,
   caption={Ejemplo simplificado de esquema JSON de entrada.},
   label={lst:json-schema-example},
   basicstyle=\ttfamily\small,
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=8pt,
+  frame=single,
+  framerule=0.4pt,
+  xleftmargin=1.5em,
+  tabsize=2,
   breaklines=true,
   breakatwhitespace=true,
   columns=fullflexible,
@@ -671,7 +687,7 @@ El grafo de ejecución se compone de nodos especializados que comparten un mismo
 
 Dicha estructura permite que los nodos intercambien información sin depender de un historial conversacional acumulado. El flujo no se construye como una conversación larga entre agentes, sino como una sucesión de transformaciones sobre un estado compartido. Cada nodo lee los campos que necesita, ejecuta su lógica y escribe nuevos resultados, como informes de validación, planes de entrenamiento, métricas, decisiones humanas o referencias a artefactos. El controlador determinista inspecciona después ese estado actualizado y decide el siguiente paso.
 
-La arquitectura distingue cuatro tipos principales de nodos: deterministas, agénticos con herramientas, LLM acotados y nodos de supervisión humana. Esta clasificación permite asignar a cada fase el nivel de autonomía estrictamente necesario. Las operaciones críticas, como entrenamiento, evaluación o promoción lógica del modelo, permanecen bajo control programático. Los modelos de lenguaje se reservan para tareas donde aportan valor, como interpretar el contexto del dataset, planificar modelos candidatos o generar explicaciones estructuradas para el usuario.
+La arquitectura distingue cuatro tipos principales de nodos: deterministas, agénticos con herramientas, LLM acotados y nodos de supervisión humana. Esta clasificación permite asignar a cada fase el nivel de autonomía estrictamente necesario. Las operaciones críticas, como entrenamiento, evaluación o promoción lógica del modelo, permanecen bajo control programático. Los modelos de lenguaje se reservan para tareas donde aportan valor, como interpretar el contexto del dataset, planificar modelos candidatos o generar explicaciones estructuradas para el usuario. En la tabla~\ref{tab:nodos-resumen} se resumen los nodos que componen el grafo MLOps y su función dentro del flujo. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[htbp]
 \centering
@@ -695,7 +711,7 @@ La arquitectura distingue cuatro tipos principales de nodos: deterministas, agé
 \label{tab:nodos-resumen}
 \end{table}
 
-No todos los nodos del grafo utilizan modelos de lenguaje. El controlador, el ejecutor, el evaluador y el desplegador permanecen implementados mediante código determinista. En cambio, los nodos que requieren interpretación, planificación o generación estructurada se apoyan en la API de OpenAI. La selección del modelo no se plantea como una decisión uniforme para todo el sistema, sino como un compromiso entre capacidad, coste y criticidad de cada tarea.
+No todos los nodos del grafo utilizan modelos de lenguaje. El controlador, el ejecutor, el evaluador y el desplegador permanecen implementados mediante código determinista. En cambio, los nodos que requieren interpretación, planificación o generación estructurada se apoyan en la API de OpenAI. La selección del modelo no se plantea como una decisión uniforme para todo el sistema, sino como un compromiso entre capacidad, coste y criticidad de cada tarea. En la tabla~\ref{tab:modelos-llm-nodos} se detallan los modelos de lenguaje utilizados por cada nodo LLM del sistema. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[htbp]
 \centering
@@ -796,7 +812,7 @@ Dicho resumen se construye antes de llamar al modelo mediante código Python ord
 
 
 
-A partir de estos perfiles y del contrato JSON, el agente selecciona primero la tabla base. Esta tabla fija la cardinalidad del dataset canónico final y se elige principalmente por la cobertura de columnas objetivo del esquema; en caso de empate, se prioriza la tabla con mayor número de filas. Las tablas restantes se tratan como fuentes auxiliares que pueden enriquecer el dataset base mediante left joins, preservando así la población principal del problema.
+A partir de estos perfiles y del contrato JSON, el agente selecciona primero la tabla base. Esta tabla fija la cardinalidad del conjunto de datos canónico final y se elige principalmente por la cobertura de columnas objetivo del esquema; en caso de empate, se prioriza la tabla con mayor número de filas. Las tablas restantes se tratan como fuentes auxiliares que pueden enriquecer el dataset base mediante left joins, preservando así la población principal del problema. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 Una vez seleccionada la tabla base, el agente propone un conjunto reducido de candidatos de join. Esta propuesta no se basa únicamente en coincidencias exactas de nombres de columnas, sino también en el contenido y significado probable de los campos. Por ejemplo, columnas como \texttt{store\_id}, \texttt{store\_code} o \texttt{store\_ref} pueden representar una misma entidad aunque sus nombres no coincidan literalmente. Del mismo modo, en problemas temporales pueden detectarse claves compatibles basadas en fechas, semanas, meses o periodos. Para acotar el coste y evitar una exploración combinatoria excesiva, el sistema limita el número de candidatos evaluados.
 
@@ -806,7 +822,7 @@ Con las evaluaciones disponibles, el agente compone un plan de integración estr
 
 La ejecución material del plan queda delegada a una herramienta programática. Esta herramienta aplica únicamente left joins sobre la tabla base, deduplica la clave derecha cuando es necesario, resuelve colisiones de nombres de columnas, bloquea uniones sin solapamiento y verifica al final que las columnas requeridas por el contrato estén presentes. Si alguna de estas garantías falla, el sistema detiene la ejecución de forma controlada en lugar de continuar con un dataset canónico incorrecto.
 
-El resultado de esta fase se incorpora al estado compartido del pipeline en forma de dataset procesado, informe de validación, plan de join y métricas de evaluación de candidatos. Dicha información puede ser revisada posteriormente en la puerta de aprobación del dataset. De este modo, el descubrimiento de joins combina tres niveles de control: el agente aporta razonamiento semántico, las herramientas proporcionan medición y ejecución reproducible, y el usuario conserva la posibilidad de revisar las decisiones de integración antes de continuar hacia la planificación y el entrenamiento.
+El resultado de esta fase se incorpora al estado compartido del pipeline en forma de dataset procesado, informe de validación, plan de join y métricas de evaluación de candidatos. Dicha información puede ser revisada posteriormente en la puerta de aprobación del conjunto de datos. De este modo, el descubrimiento de joins combina tres niveles de control: el agente aporta razonamiento semántico, las herramientas proporcionan medición y ejecución reproducible, y el usuario conserva la posibilidad de revisar las decisiones de integración antes de continuar hacia la planificación y el entrenamiento. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 
 
@@ -932,7 +948,7 @@ MLflow también cumple una función de auditoría técnica. Cada ejecución cons
 
 El Experience Pool actúa como la memoria empírica del sistema. Su objetivo es conservar una fotografía estructurada de ejecuciones anteriores que pueda reutilizarse como evidencia en nuevas planificaciones. Mientras que MLflow registra métricas, artefactos y modelos desde una perspectiva experimental, el Experience Pool almacena la experiencia en un formato pensado para la recuperación: qué tipo de problema se resolvió, qué características tenía el dataset, qué modelos se evaluaron, cuál fue seleccionado, qué métricas se obtuvieron y qué estrategias de validación o tratamiento de variables se aplicaron.
 
-Cada experiencia resume los elementos principales de una ejecución del pipeline. En problemas de clasificación o regresión, esta información incluye el perfil del dataset, el tipo de problema, la estrategia de validación utilizada, los modelos candidatos evaluados, sus resultados y el modelo seleccionado. En problemas de predicción temporal, la experiencia puede incorporar además la disponibilidad futura de variables exógenas y las estrategias aplicadas para extenderlas. Al disponer de esta información, el sistema no trata cada nueva ejecución como un caso aislado, sino que puede apoyarse en resultados observados previamente.
+Cada experiencia resume los elementos principales de una ejecución del pipeline. En problemas de clasificación o regresión, esta información incluye el perfil del conjunto de datos, el tipo de problema, la estrategia de validación utilizada, los modelos candidatos evaluados, sus resultados y el modelo seleccionado. En problemas de predicción temporal, la experiencia puede incorporar además la disponibilidad futura de variables exógenas y las estrategias aplicadas para extenderlas. Al disponer de esta información, el sistema no trata cada nueva ejecución como un caso aislado, sino que puede apoyarse en resultados observados previamente. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 Esta idea se relaciona con trabajos recientes como MLCopilot, que propone utilizar modelos de lenguaje para resolver nuevas tareas de aprendizaje automático apoyándose en experiencias previas y razonamiento sobre problemas similares \cite{mlcopilot}. En este trabajo se adopta una versión más acotada y trazable de esa aproximación: el Experience Pool no genera soluciones completas de forma autónoma, sino que almacena ejecuciones anteriores en un formato estructurado para proporcionar evidencia empírica al planificador. De este modo, las experiencias recuperadas orientan la selección de modelos, pero no sustituyen al registro declarativo, a las reglas estáticas ni a las validaciones deterministas posteriores.
 
@@ -943,22 +959,20 @@ La persistencia del Experience Pool se implementa mediante SQLite, complementado
 
 Durante la planificación, el sistema puede recuperar ejecuciones similares a partir del perfil del dataset y del tipo de problema. Esta recuperación no se basa en una conversación previa ni en memoria implícita del modelo, sino en registros persistentes y consultables. Para ello, el sistema aplica primero un filtrado estricto por \texttt{problem\_type}, de modo que un problema de forecasting solo se compara con casos previos de forecasting, uno de clasificación con registros de clasificación y uno de regresión con registros de regresión. Este filtrado evita que el planificador reciba evidencias procedentes de tareas incompatibles.
 
-Una vez aplicado este filtro, la similitud entre el nuevo dataset y las experiencias almacenadas se calcula mediante una puntuación determinista sobre campos del \texttt{DatasetProfile}. Cada campo relevante tiene un peso fijo según su importancia para comparar problemas predictivos. Los campos más influyentes reciben peso 3, los de relevancia intermedia peso 2 y los descriptivos generales peso 1. La Tabla~\ref{tab:retrieval-weights} resume estos pesos.
+Una vez aplicado este filtro, la similitud entre el nuevo dataset y las experiencias almacenadas se calcula mediante una puntuación determinista sobre campos del \texttt{DatasetProfile}. Cada campo relevante tiene un peso fijo según su importancia para comparar problemas predictivos. Los campos más influyentes reciben peso 3, los de relevancia intermedia peso 2 y los descriptivos generales peso 1. La tabla~\ref{tab:retrieval-weights} resume estos pesos.
 
 \begin{table}[H]
 \centering
-\caption{Pesos utilizados para calcular la similitud entre perfiles de dataset en el \textit{Experience Pool}.}
-\label{tab:retrieval-weights}
 \small
 \begin{tabularx}{\linewidth}{c >{\RaggedRight\arraybackslash}X}
-\toprule
-\textbf{Peso} & \textbf{Campos del perfil} \\
-\midrule
-3 & \texttt{n\_rows}, \texttt{history\_length}, \texttt{horizon\_difficulty}, \texttt{seasonality\_detected} \\
-2 & \texttt{class\_balance}, \texttt{n\_classes}, \texttt{target\_distribution}, \texttt{exogenous\_features\_available}, \texttt{frequency}, \texttt{trend\_detected}, \texttt{stationarity} \\
-1 & \texttt{n\_features}, \texttt{missing\_rate}, \texttt{n\_categorical\_features}, \texttt{n\_numerical\_features} \\
-\bottomrule
+\hline
+\textbf{Peso} & \textbf{Campos del perfil} \\\hline
+3 & \texttt{n\_rows}, \texttt{history\_length}, \texttt{horizon\_difficulty}, \texttt{seasonality\_detected} \\\hline
+2 & \texttt{class\_balance}, \texttt{n\_classes}, \texttt{target\_distribution}, \texttt{exogenous\_features\_available}, \texttt{frequency}, \texttt{trend\_detected}, \texttt{stationarity} \\\hline
+1 & \texttt{n\_features}, \texttt{missing\_rate}, \texttt{n\_categorical\_features}, \texttt{n\_numerical\_features} \\\hline
 \end{tabularx}
+\caption{Pesos utilizados para calcular la similitud entre perfiles de dataset en el \textit{Experience Pool}.}
+\label{tab:retrieval-weights}
 \end{table}
 
 El campo \texttt{problem\_type} no suma puntuación, ya que se utiliza como condición previa de filtrado. Si dos experiencias no pertenecen al mismo tipo de problema, no se comparan. En cambio, cuando el tipo de problema coincide, el sistema compara los campos aplicables a esa familia de tarea y acumula la puntuación de aquellos que coinciden. Por ejemplo, en forecasting se consideran campos específicos como la longitud histórica, la frecuencia temporal, la dificultad del horizonte, la existencia de estacionalidad o la disponibilidad de variables exógenas; en clasificación se consideran además campos como el número de clases y el balance de clases.
@@ -969,11 +983,11 @@ La puntuación bruta se normaliza dividiéndola por la puntuación máxima alcan
 \mathtt{similarity\_score} = \frac{\mathtt{score}}{\mathtt{max\_score}(\mathtt{problem\_type})}.
 \end{equation*}
 
-En la implementación actual, la puntuación máxima es 11 para clasificación, 9 para regresión y 27 para forecasting. El valor normalizado se expresa en el intervalo $[0,1]$ y se almacena como \texttt{similarity\_score}. Además, se asigna una etiqueta cualitativa de relevancia: \textit{high} si la similitud es mayor o igual que 0,7; \textit{medium} si se encuentra entre 0,4 y 0,7; y \textit{low} si es inferior a 0,4. Las experiencias se ordenan por puntuación bruta y, en caso de empate, se priorizan las más recientes.
+En la implementación actual, la puntuación máxima es 11 para clasificación, 9 para regresión y 24 para forecasting. El valor normalizado se expresa en el intervalo $[0,1]$ y se almacena como \texttt{similarity\_score}. Además, se asigna una etiqueta cualitativa de relevancia: \textit{high} si la similitud es mayor o igual que 0,7; \textit{medium} si se encuentra entre 0,4 y 0,7; y \textit{low} si es inferior a 0,4. Las experiencias se ordenan por puntuación bruta y, en caso de empate, se priorizan las más recientes.
 
 Este mecanismo tiene dos ventajas para el alcance del prototipo. En primer lugar, es transparente y auditable: se puede explicar por qué una experiencia ha sido considerada similar observando los campos coincidentes y sus pesos. En segundo lugar, evita introducir una base de datos vectorial o embeddings semánticos cuando el perfil del dataset ya contiene atributos estructurados suficientes para comparar ejecuciones. Si el sistema creciese hasta manejar muchas más experiencias o incorporase descripciones textuales extensas, podría estudiarse una recuperación híbrida o vectorial. En la versión actual, una función de similitud ponderada sobre campos estructurados resulta más simple, controlable y coherente con la filosofía determinista del sistema.
 
-Este esquema captura las dimensiones estructurales principales del perfil del dataset ---tamaño, frecuencia, presencia y disponibilidad de variables exógenas, estacionalidad y estacionariedad--- y resulta suficiente para el alcance del prototipo. Conviene reconocer, no obstante, que existen matices más finos que la métrica actual no distingue de forma explícita. Por una parte, no diferencia entre tipologías concretas de variables exógenas ---por ejemplo, exógenas macroeconómicas correlacionadas, sensoriales independientes, meteorológicas o de calendario---, que en problemas reales condicionan tanto la estrategia de modelado como la interpretación del resultado. Por otra parte, no representa de forma directa la estructura multicíclica de la estacionalidad, que en series de alta frecuencia puede superponer ciclos diarios, semanales y anuales. Estas distinciones quedan parcialmente capturadas a través de otros campos correlacionados ---como \texttt{frequency}, \texttt{exogenous\_features\_available} o \texttt{target\_distribution}---, lo que es coherente con el alcance abordado. Refinar la métrica con campos categóricos específicos para estas dimensiones constituye una evolución natural del sistema cuando el catálogo de experiencias crezca, y se recoge como tal en las líneas futuras del Capítulo~\ref{sec:conclusiones}.
+Este esquema captura las dimensiones estructurales principales del perfil del dataset ---tamaño, frecuencia, presencia y disponibilidad de variables exógenas, estacionalidad y estacionariedad--- y resulta suficiente para el alcance del prototipo. Conviene reconocer, no obstante, que existen matices más finos que la métrica actual no distingue de forma explícita. Por una parte, no diferencia entre tipologías concretas de variables exógenas ---por ejemplo, exógenas macroeconómicas correlacionadas, sensoriales independientes, meteorológicas o de calendario---, que en problemas reales condicionan tanto la estrategia de modelado como la interpretación del resultado. Por otra parte, no representa de forma directa la estructura multicíclica de la estacionalidad, que en series de alta frecuencia puede superponer ciclos diarios, semanales y anuales. Estas distinciones quedan parcialmente capturadas a través de otros campos correlacionados ---como \texttt{frequency} o \texttt{exogenous\_features\_available}--- lo que es coherente con el alcance abordado. Refinar la métrica con campos categóricos específicos para estas dimensiones constituye una evolución natural del sistema cuando el catálogo de experiencias crezca, y se recoge como tal en las líneas futuras del capítulo~\ref{sec:conclusiones}.
 
 Conviene aclarar que la similitud no decide por sí misma qué modelos se entrenan. Su función dentro del Experience Pool es ordenar las experiencias previas y seleccionar aquellas que resultan más relevantes para construir el contexto empírico del planificador. Es decir, la métrica de similitud actúa como un mecanismo de recuperación de evidencia, no como una regla automática de selección de modelos.
 
@@ -992,7 +1006,7 @@ Una vez descritos todos los componentes relevantes de la arquitectura del sistem
 
 El backend inicializa el estado del grafo con las rutas de los ficheros recibidos, el contrato JSON, los contadores de intentos y los campos necesarios para controlar el avance del flujo. La primera decisión corresponde al controlador determinista, que inspecciona el estado y redirige la ejecución hacia el agente de validación de datos. Este agente recibe el contrato de entrada y los ficheros disponibles, y utiliza sus herramientas para cargar los datos, evaluar posibles uniones entre tablas, ejecutar el plan de integración cuando existen varios ficheros, aplicar mapeos de columnas, comprobar restricciones del esquema y revisar la calidad del dataset resultante.
 
-Si la validación finaliza correctamente, el nodo escribe en el estado la ruta del dataset procesado, el informe de validación, el resumen del dataset, el tipo de problema y los metadatos de la tarea. A continuación, el flujo alcanza la primera puerta de supervisión humana. En este punto, el usuario puede revisar la información generada y decidir si el dataset preparado resulta adecuado para continuar. Cuando el usuario aprueba, el pipeline avanza hacia la planificación. Si rechaza la validación, puede aportar un comentario explicando el motivo; este comentario se incorpora al estado como retroalimentación y el controlador permite un nuevo intento del agente de validación, siempre dentro del límite máximo de reintentos configurado.
+Si la validación finaliza correctamente, el nodo escribe en el estado la ruta del dataset procesado, el informe de validación, el resumen del dataset, el tipo de problema y los metadatos de la tarea. A continuación, el flujo alcanza la primera puerta de supervisión humana. En este punto, el usuario puede revisar la información generada y decidir si el conjunto de datos preparado resulta adecuado para continuar. Cuando el usuario aprueba, el pipeline avanza hacia la planificación. Si rechaza la validación, puede aportar un comentario explicando el motivo; este comentario se incorpora al estado como retroalimentación y el controlador permite un nuevo intento del agente de validación, siempre dentro del límite máximo de reintentos configurado. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 Tras la aprobación del dataset, el sistema construye un perfil descriptivo del problema y activa el agente planificador. Este componente utiliza el contrato de entrada, el perfil del conjunto de datos, el registro de algoritmos disponibles, las reglas de conocimiento estático y las ejecuciones anteriores recuperadas del Experience Pool. Su objetivo no es entrenar candidatos, sino proponer un plan de entrenamiento estructurado. Dicho plan indica qué algoritmos deben evaluarse, cuáles se descartan y por qué, qué presupuesto de búsqueda se asigna y, en problemas de predicción temporal, qué estrategia de validación y tratamiento de variables exógenas debe aplicarse. Antes de pasar a la siguiente fase, el plan se valida mediante contratos Pydantic y reglas deterministas, de modo que el ejecutor solo recibe configuraciones compatibles con el sistema.
 
@@ -1002,7 +1016,7 @@ Una vez entrenado el modelo candidato, el nodo de evaluación aplica reglas dete
 
 Si la evaluación no supera los criterios establecidos, el pipeline finaliza sin promocionar el modelo. En cambio, si el candidato cumple los requisitos, el flujo alcanza la segunda puerta de supervisión humana. En este punto, el usuario revisa el informe de evaluación, las métricas comparativas y la acción propuesta antes de aprobar o rechazar la promoción. Si la decisión es negativa, la ejecución termina sin modificar el modelo campeón. Si la decisión es positiva, el nodo de despliegue lógico registra el modelo en MLflow y le asigna el alias \texttt{champion}, dejando constancia de la promoción dentro del registro de modelos.
 
-Durante toda la ejecución, cada nodo escribe únicamente los campos del estado que le corresponden, y el controlador determinista decide el siguiente paso en función de ese estado actualizado. De forma paralela, el backend emite eventos que el frontend recibe mediante WebSocket, permitiendo al usuario seguir el avance del pipeline sin realizar consultas periódicas. El resultado final de una ejecución completa no es solo un modelo promovido, sino también un conjunto de evidencias trazables: contrato de entrada, dataset procesado, plan de entrenamiento, métricas, informes, artefactos MLflow, decisiones humanas y registro de experiencia. Esta trazabilidad permite revisar posteriormente qué ocurrió en cada fase y reutilizar conocimiento empírico en nuevas ejecuciones.
+Durante toda la ejecución, cada nodo escribe únicamente los campos del estado que le corresponden, y el controlador determinista decide el siguiente paso en función de ese estado actualizado. De forma paralela, el backend emite eventos que el frontend recibe mediante WebSocket, permitiendo al usuario seguir el avance del pipeline sin realizar consultas periódicas. El resultado final de una ejecución completa no es solo un modelo promovido, sino también un conjunto de evidencias trazables: contrato de entrada, dataset procesado, plan de entrenamiento, métricas, informes, artefactos MLflow, decisiones humanas y registro de experiencia. Esta trazabilidad permite revisar posteriormente qué ocurrió en cada fase y reutilizar conocimiento empírico en nuevas ejecuciones. En la figura~\ref{fig:pipeline-end-to-end} se representa una visión general del pipeline end-to-end con las fases descritas. % HECHO: referencia a figura añadida en el texto
 
 \begin{figure}[H]
 \centering
@@ -1053,7 +1067,7 @@ El objetivo de este presupuesto no es agotar la optimización de hiperparámetro
 \subsubsection{Experiencias de predicción temporal}
 \label{sec:pool-forecasting}
 
-La Tabla~\ref{tab:pool-forecasting} recoge los 15 datasets de predicción temporal almacenados en el Experience Pool. Para cada uno se indica la frecuencia temporal, el horizonte de predicción, el número de observaciones, el modelo seleccionado como campeón por el ejecutor de entrenamiento, la familia del modelo, el error cuadrático medio sobre el conjunto de validación (RMSE) y el error normalizado nRMSE, calculado en esta versión como $\text{RMSE}/\sigma_y\times100$, es decir, el error relativo respecto a la desviación típica de la serie. Dicha métrica permite comparar de forma orientativa la magnitud del error entre series con escalas distintas y, a diferencia de la normalización por la media, se comporta de forma estable cuando la variable objetivo toma valores cercanos a cero o cambia de signo.
+La tabla~\ref{tab:pool-forecasting} recoge los 15 datasets de predicción temporal almacenados en el Experience Pool. Para cada uno se indica la frecuencia temporal, el horizonte de predicción, el número de observaciones, el modelo seleccionado como campeón por el ejecutor de entrenamiento, la familia del modelo, el error cuadrático medio sobre el conjunto de validación (RMSE) y el error normalizado nRMSE, calculado en esta versión como $\text{RMSE}/\sigma_y\times100$, es decir, el error relativo respecto a la desviación típica de la serie. Dicha métrica permite comparar de forma orientativa la magnitud del error entre series con escalas distintas y, a diferencia de la normalización por la media, se comporta de forma estable cuando la variable objetivo toma valores cercanos a cero o cambia de signo.
 
 La tabla no pretende demostrar superioridad predictiva frente a referencias externas, sino comprobar que el Experience Pool almacena experiencias variadas y trazables. Esta distinción resulta importante: la finalidad de estos benchmarks es alimentar la memoria empírica del sistema para apoyar futuras decisiones del planificador, no establecer un ranking definitivo de algoritmos de forecasting.
 
@@ -1061,35 +1075,31 @@ El conjunto de experiencias utilizado debe interpretarse como una base inicial d
 
 \begin{table}[H]
 \centering
-\caption{Resultados del benchmark de predicción temporal sobre los 15 datasets del pool. ETS = suavizado exponencial automático; ARIMA = AutoARIMA; SVR = máquinas de vectores de soporte para regresión; RF = \textit{Random Forest}; XGB = XGBoost; ET = \textit{Extra Trees}; GBM = \textit{Gradient Boosting}; LGBM = LightGBM; SeasonalNaive = pronóstico estacional ingenuo; Naive = pronóstico ingenuo. nRMSE $=\text{RMSE}/\sigma_y\times100$.}
-\label{tab:pool-forecasting}
 \scriptsize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.05}
 \begin{tabularx}{\linewidth}{>{\RaggedRight\arraybackslash}X l r r >{\RaggedRight\arraybackslash}X l r r}
-\toprule
-\textbf{Dataset} & \textbf{Frec.} & \textbf{H} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{Familia} & \textbf{RMSE} & \textbf{nRMSE\,(\%)} \\
-\midrule
-Air Passengers         & MS & 12 &    144 & ARIMA         & Estadístico &     23,56 & 19,6 \\
-CO$_2$ Mauna Loa       & MS &  6 &    526 & ETS           & Estadístico &      0,33 &  1,9 \\
-PPI Químicos           & MS & 12 &    474 & ET            & ML~sup.     &     11,16 & 14,7 \\
-Gas Henry Hub          & MS & 12 &    330 & ET            & ML~sup.     &      1,23 & 57,3 \\
-Manchas solares        & YS &  3 &    309 & SVR           & ML~sup.     &      9,29 & 23,0 \\
-Río Nilo               & YS &  3 &    100 & SVR           & ML~sup.     &    114,53 & 67,7 \\
-Bicicletas (diario)    &  D & 14 &    731 & ETS           & Estadístico & 1.385,24 & 71,5 \\
-Electrodomésticos      &  H & 24 &  3.290 & SeasonalNaive & Estadístico &     68,84 & 84,8 \\
-Petróleo Brent         &  B & 30 &  3.915 & LGBM          & ML~sup.     &      4,29 & 17,3 \\
-Carbón (feedstock)     &  B & 30 &  2.548 & Naive         & Estadístico &      9,49 & 13,0 \\
-S\&P~500               &  W & 13 &  1.011 & XGB           & ML~sup.     &    170,85 & 14,8 \\
-Petróleo WTI           &  W & 13 &  1.013 & ET            & ML~sup.     &      5,46 & 25,1 \\
-Oro + Macro            &  W & 13 &  1.013 & RF            & ML~sup.     &     65,79 & 15,0 \\
-Bitcoin (BTC)          &  W & 13 &    335 & RF            & ML~sup.     &  4.652,87 & 25,5 \\
-EUR/USD                &  W & 13 &    335 & GBM           & ML~sup.     &      0,02 & 30,9 \\
-\bottomrule
+\hline
+\textbf{Dataset} & \textbf{Frec.} & \textbf{H} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{Familia} & \textbf{RMSE} & \textbf{nRMSE\,(\%)} \\\hline
+Air Passengers         & MS & 12 &    144 & ARIMA         & Estadístico &     23,56 & 19,6 \\\hline
+CO$_2$ Mauna Loa       & MS &  6 &    526 & ETS           & Estadístico &      0,33 &  1,9 \\\hline
+PPI Químicos           & MS & 12 &    474 & ET            & ML~sup.     &     11,16 & 14,7 \\\hline
+Gas Henry Hub          & MS & 12 &    330 & ET            & ML~sup.     &      1,23 & 57,3 \\\hline
+Manchas solares        & YS &  3 &    309 & SVR           & ML~sup.     &      9,29 & 23,0 \\\hline
+Río Nilo               & YS &  3 &    100 & SVR           & ML~sup.     &    114,53 & 67,7 \\\hline
+Bicicletas (diario)    &  D & 14 &    731 & ETS           & Estadístico & 1.385,24 & 71,5 \\\hline
+Electrodomésticos      &  H & 24 &  3.290 & SeasonalNaive & Estadístico &     68,84 & 84,8 \\\hline
+Petróleo Brent         &  B & 30 &  3.915 & LGBM          & ML~sup.     &      4,29 & 17,3 \\\hline
+Carbón (feedstock)     &  B & 30 &  2.548 & Naive         & Estadístico &      9,49 & 13,0 \\\hline
+S\&P~500               &  W & 13 &  1.011 & XGB           & ML~sup.     &    170,85 & 14,8 \\\hline
+Petróleo WTI           &  W & 13 &  1.013 & ET            & ML~sup.     &      5,46 & 25,1 \\\hline
+Oro + Macro            &  W & 13 &  1.013 & RF            & ML~sup.     &     65,79 & 15,0 \\\hline
+Bitcoin (BTC)          &  W & 13 &    335 & RF            & ML~sup.     &  4.652,87 & 25,5 \\\hline
+EUR/USD                &  W & 13 &    335 & GBM           & ML~sup.     &      0,02 & 30,9 \\\hline
 \end{tabularx}
+\caption{Resultados del benchmark de predicción temporal sobre los 15 datasets del pool. Frec.: MS = mensual, YS = anual, D = diario, H = horario, B = días hábiles, W = semanal. ETS = suavizado exponencial automático; ARIMA = AutoARIMA; SVR = máquinas de vectores de soporte para regresión; RF = \textit{Random Forest}; XGB = XGBoost; ET = \textit{Extra Trees}; GBM = \textit{Gradient Boosting}; LGBM = LightGBM; SeasonalNaive = pronóstico estacional ingenuo; Naive = pronóstico ingenuo. nRMSE $=\text{RMSE}/\sigma_y\times100$.}
+\label{tab:pool-forecasting}
 \end{table}
-
-\noindent\footnotesize Frec.: MS = mensual, YS = anual, D = diario, H = horario, B = días hábiles, W = semanal.\normalsize
 
 Los resultados muestran que el Experience Pool contiene experiencias de forecasting con frecuencias temporales, tamaños y familias de modelo diferentes. Aparecen series mensuales, anuales, diarias, horarias, de días hábiles y semanales, con horizontes de predicción también distintos y volúmenes que van desde el centenar de observaciones hasta varios miles. Esta diversidad resulta relevante porque el planificador no recupera experiencias a partir del nombre del dataset ni de su dominio temático, sino a partir de características estructurales del perfil del problema.
 
@@ -1099,56 +1109,52 @@ Las discrepancias entre intuición previa y modelo campeón no deben interpretar
 
 Los valores de nRMSE abarcan un rango amplio, desde menos del 2\% en CO$_2$ Mauna Loa ---una serie con tendencia y estacionalidad muy regulares--- hasta cerca del 85\% en Electrodomésticos, una serie horaria multivariada de consumo eléctrico con elevada componente de ruido. Este rango no debe leerse como una clasificación de calidad de los modelos, sino como un reflejo de la dificultad intrínseca de cada serie bajo el presupuesto de búsqueda utilizado. Las series con mayor error relativo ---Gas Henry Hub, Bicicletas, Electrodomésticos o Río Nilo--- corresponden a problemas con alta volatilidad, ruido elevado o histórico corto frente al horizonte solicitado, mientras que las series con estructura de tendencia y estacionalidad más regulares obtienen errores relativos mucho menores. En conjunto, estas experiencias cubren comportamientos temporales diversos y proporcionan una base razonable para la recuperación posterior de casos similares.
 
-Conviene anticipar una objeción natural: si el sistema se concibió para asistir a una empresa del sector químico, ¿por qué el pool no contiene datasets de ese dominio concreto? La respuesta es que la composición del pool responde a un criterio estructural, no temático, como ya se argumentó en la sección~\ref{sec:pool-evaluacion}. El mecanismo de recuperación compara perfiles ---número de observaciones, frecuencia, presencia y disponibilidad de exógenas, estacionalidad, estacionariedad---, no etiquetas de dominio. Para que el planificador disponga de evidencia útil ante un problema de precios de materias primas químicas, lo relevante no es que el pool contenga series químicas, sino que contenga series con el mismo perfil estructural: commodities con frecuencia diaria o semanal y volatilidad elevada, índices de precios mensuales con tendencia, o problemas con variables exógenas de disponibilidad futura conocida. El pool incorpora precisamente esos perfiles ---Petróleo Brent, Petróleo WTI, Gas Henry Hub, PPI Químicos, Oro con variables macro--- sin necesidad de reproducir el dominio exacto del cliente. Por la misma razón, un dataset químico real de gran tamaño facilitado por la empresa no aportaría una validación más fuerte del sistema agéntico: ese caso mediría la capacidad predictiva sobre un dominio concreto, mientras que lo que aquí se evalúa es el comportamiento del sistema ---recuperación, planificación, joins, latencia, robustez, coste--- ante condiciones estructurales controladas. La elección de cada dataset se justifica por el perfil que aporta al pool, no por su temática.
+Conviene anticipar una objeción natural: si el sistema se concibió para asistir a una empresa del sector químico, ¿por qué el pool no contiene conjuntos de datos de ese dominio concreto? La respuesta es que la composición del pool responde a un criterio estructural, no temático, como ya se argumentó en la sección~\ref{sec:pool-evaluacion}. El mecanismo de recuperación compara perfiles ---número de observaciones, frecuencia, presencia y disponibilidad de exógenas, estacionalidad, estacionariedad---, no etiquetas de dominio. Para que el planificador disponga de evidencia útil ante un problema de precios de materias primas químicas, lo relevante no es que el pool contenga series químicas, sino que contenga series con el mismo perfil estructural: commodities con frecuencia diaria o semanal y volatilidad elevada, índices de precios mensuales con tendencia, o problemas con variables exógenas de disponibilidad futura conocida. El pool incorpora precisamente esos perfiles ---Petróleo Brent, Petróleo WTI, Gas Henry Hub, PPI Químicos, Oro con variables macro--- sin necesidad de reproducir el dominio exacto del cliente. Por la misma razón, un dataset químico real de gran tamaño facilitado por la empresa no aportaría una validación más fuerte del sistema agéntico: ese caso mediría la capacidad predictiva sobre un dominio concreto, mientras que lo que aquí se evalúa es el comportamiento del sistema ---recuperación, planificación, joins, latencia, robustez, coste--- ante condiciones estructurales controladas. La elección de cada dataset se justifica por el perfil que aporta al pool, no por su temática.
 
 \subsubsection{Experiencias de clasificación y regresión}
 \label{sec:pool-clasif-regr}
 
 Aunque el foco principal del trabajo se sitúa en la predicción temporal, el Experience Pool también incluye experiencias de clasificación y regresión. Su finalidad es demostrar que la arquitectura no queda restringida a un único tipo de problema: el mismo esquema general de contrato de entrada, planificación, ejecución determinista y registro de experiencias puede aplicarse a tareas tabulares no temporales.
 
-La Tabla~\ref{tab:pool-classification} recoge los resultados del benchmark de clasificación. La métrica utilizada es macro-F1 sobre el conjunto de validación. Tal métrica resulta adecuada en escenarios donde puede existir desbalanceo entre clases, ya que calcula el rendimiento medio por clase sin ponderarlo únicamente por la frecuencia de cada una.
+La tabla~\ref{tab:pool-classification} recoge los resultados del benchmark de clasificación. La métrica utilizada es macro-F1 sobre el conjunto de validación. Tal métrica resulta adecuada en escenarios donde puede existir desbalanceo entre clases, ya que calcula el rendimiento medio por clase sin ponderarlo únicamente por la frecuencia de cada una.
 
 \begin{table}[H]
 \centering
-\caption{Resultados del benchmark de clasificación. Métrica: macro-F1 sobre el conjunto de validación. RL = regresión logística; RF = Random Forest; LGBM = LightGBM.}
-\label{tab:pool-classification}
 \small
 \begin{tabular}{llrlr}
-\toprule
-\textbf{Dataset} & \textbf{Dominio} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{macro-F1} \\
-\midrule
-Iris                & Botánica       & 150    & RL & 0,966 \\
-Vino                & Enología       & 178    & RF    & 0,980 \\
-Cáncer de mama      & Medicina       & 569    & LGBM            & 0,972 \\
-Enfermedad cardíaca & Medicina       & 303    & RF    & 0,839 \\
-Titanic             & Histórico      & 891    & RF    & 0,977 \\
-Renta adultos       & Socioeconómico & 48.842 & LGBM            & 0,750 \\
-Marketing bancario  & Financiero     & 45.211 & LGBM            & 0,749 \\
-\bottomrule
+\hline
+\textbf{Dataset} & \textbf{Dominio} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{macro-F1} \\\hline
+Iris                & Botánica       & 150    & RL & 0,966 \\\hline
+Vino                & Enología       & 178    & RF    & 0,980 \\\hline
+Cáncer de mama      & Medicina       & 569    & LGBM            & 0,972 \\\hline
+Enfermedad cardíaca & Medicina       & 303    & RF    & 0,839 \\\hline
+Titanic             & Histórico      & 891    & RF    & 0,977 \\\hline
+Renta adultos       & Socioeconómico & 48.842 & LGBM            & 0,750 \\\hline
+Marketing bancario  & Financiero     & 45.211 & LGBM            & 0,749 \\\hline
 \end{tabular}
+\caption{Resultados del benchmark de clasificación. Métrica: macro-F1 sobre el conjunto de validación. RL = regresión logística; RF = Random Forest; LGBM = LightGBM.}
+\label{tab:pool-classification}
 \end{table}
 
-La Tabla~\ref{tab:pool-regression} resume los resultados del benchmark de regresión, utilizando RMSE como métrica principal. De nuevo, el objetivo no es comparar exhaustivamente algoritmos de regresión, sino generar experiencias representativas que puedan alimentar al planificador en ejecuciones posteriores.
+La tabla~\ref{tab:pool-regression} resume los resultados del benchmark de regresión, utilizando RMSE como métrica principal. De nuevo, el objetivo no es comparar exhaustivamente algoritmos de regresión, sino generar experiencias representativas que puedan alimentar al planificador en ejecuciones posteriores.
 
 \begin{table}[H]
 \centering
-\caption{Resultados del benchmark de regresión. Se incluye el RMSE absoluto y el error relativo respecto a la desviación típica de la variable objetivo.}
-\label{tab:pool-regression}
 \small
 \begin{tabular}{llrlrr}
-\toprule
-\textbf{Dataset} & \textbf{Dominio} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{RMSE} & \textbf{rRMSE/$\sigma$ (\%)} \\
-\midrule
-Diabetes              & Medicina     & 442    & Ridge    & 55,38 & 71,8 \\
-Eficiencia energética & Ingeniería   & 768    & CatBoost    & 0,369  & 3,7 \\
-Resistencia hormigón  & Construcción & 1.030  & CatBoost & 4,52  & 27,1 \\
-Alquiler bicicletas   & Transporte   & 17.389 & CatBoost & 38,25 & 21,1 \\
-Vivienda California   & Inmobiliario & 20.640 & LightGBM & 0,45  & 39,2 \\
-\bottomrule
+\hline
+\textbf{Dataset} & \textbf{Dominio} & \textbf{Filas} & \textbf{Modelo campeón} & \textbf{RMSE} & \textbf{rRMSE/$\sigma$ (\%)} \\\hline
+Diabetes              & Medicina     & 442    & Ridge    & 55,38 & 71,8 \\\hline
+Eficiencia energética & Ingeniería   & 768    & CatBoost    & 0,369  & 3,7 \\\hline
+Resistencia hormigón  & Construcción & 1.030  & CatBoost & 4,52  & 27,1 \\\hline
+Alquiler bicicletas   & Transporte   & 17.389 & CatBoost & 38,25 & 21,1 \\\hline
+Vivienda California   & Inmobiliario & 20.640 & LightGBM & 0,45  & 39,2 \\\hline
 \end{tabular}
+\caption{Resultados del benchmark de regresión. Se incluye el RMSE absoluto y el error relativo respecto a la desviación típica de la variable objetivo.}
+\label{tab:pool-regression}
 \end{table}
 
-En problemas de regresión, el RMSE absoluto debe interpretarse con cautela, ya que depende directamente de la escala de la variable objetivo. Por este motivo, la Tabla~\ref{tab:pool-regression} incorpora también el error relativo respecto a la desviación típica del target, $\text{rRMSE}/\sigma = \text{RMSE}/\sigma_y$. Dicha métrica permite comparar el error del modelo con la variabilidad intrínseca del dataset: cuanto menor es este valor, mayor proporción de la variabilidad de la variable objetivo está siendo explicada por el modelo.
+En problemas de regresión, el RMSE absoluto debe interpretarse con cautela, ya que depende directamente de la escala de la variable objetivo. Por este motivo, la tabla~\ref{tab:pool-regression} incorpora también el error relativo respecto a la desviación típica del target, $\text{rRMSE}/\sigma = \text{RMSE}/\sigma_y$. Dicha métrica permite comparar el error del modelo con la variabilidad intrínseca del dataset: cuanto menor es este valor, mayor proporción de la variabilidad de la variable objetivo está siendo explicada por el modelo.
 
 Esta normalización también ayuda a evitar una lectura simplista de los resultados. Un RMSE elevado no implica necesariamente que el modelo seleccionado sea inadecuado; puede indicar que el problema contiene poca señal predictiva, un tamaño muestral reducido o un nivel elevado de ruido irreducible. Bajo condiciones compatibles de cálculo, la relación entre el error relativo respecto a la desviación típica y el coeficiente de determinación puede aproximarse mediante:
 \begin{equation*}
@@ -1174,13 +1180,11 @@ Los datasets utilizados en estas pruebas ---tanto los casos de joins como los de
 
 A diferencia de los benchmarks iniciales, estas ejecuciones atraviesan el flujo completo del sistema: carga de ficheros, validación mediante el agente \texttt{data\_validator}, aprobación humana del dataset, planificación con recuperación de experiencias, entrenamiento determinista de candidatos, evaluación, generación de informe de auditoría y, cuando procede, aprobación final del modelo. Por tanto, no solo se analiza el modelo campeón obtenido, sino también el proceso seguido por el sistema para llegar a esa decisión.
 
-La Tabla~\ref{tab:casos-forecasting-resumen} resume las principales ejecuciones de forecasting utilizadas como casos de estudio. Las métricas predictivas se incluyen únicamente como referencia cuando resultan relevantes; el objetivo principal de esta sección no es comparar modelos, sino analizar el comportamiento del sistema durante la ejecución completa del pipeline. En particular, se evalúa si el sistema recupera experiencias coherentes, genera planes razonables, valida correctamente los datos, controla el coste agéntico y falla de forma segura cuando las entradas no permiten completar el flujo.
+La tabla~\ref{tab:casos-forecasting-resumen} resume las principales ejecuciones de forecasting utilizadas como casos de estudio. Las métricas predictivas se incluyen únicamente como referencia cuando resultan relevantes; el objetivo principal de esta sección no es comparar modelos, sino analizar el comportamiento del sistema durante la ejecución completa del pipeline. En particular, se evalúa si el sistema recupera experiencias coherentes, genera planes razonables, valida correctamente los datos, controla el coste agéntico y falla de forma segura cuando las entradas no permiten completar el flujo.
 
 %\clearpage
 \begin{table}[H]
 \centering
-\caption{Resumen de ejecuciones de forecasting utilizadas como casos de estudio.}
-\label{tab:casos-forecasting-resumen}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.05}
@@ -1196,18 +1200,20 @@ Medium dataset (Bakery) & 1.000 & Diario & Variabilidad LLM y coste por tamaño 
 Large dataset (Factory) & 10.000 & Horario & Tratabilidad por tamaño & Ejecución completa; el coste agéntico no escala con el tamaño\\\hline
 Casos \textit{break} & Variable & Mensual & Robustez ante errores & El sistema detiene el flujo sin entrenar sobre datos inválidos \\\hline
 \end{tabularx}
+\caption{Resumen de ejecuciones de forecasting utilizadas como casos de estudio.}
+\label{tab:casos-forecasting-resumen}
 \end{table}
 
 
 El caso Air Passengers se utiliza como prueba de control de la recuperación del Experience Pool. Dado que esa misma serie ya estaba presente en el almacén de experiencias, el resultado esperado era que la función de similitud identificase la experiencia equivalente. La ejecución confirma este comportamiento: el planificador recupera la experiencia almacenada correspondiente al mismo dataset con una similitud de 1.0 y la utiliza como evidencia directa en la generación del plan. Por tanto, este caso no se interpreta como una recuperación aproximada, sino como una validación de que el mecanismo de similitud reconoce correctamente una coincidencia exacta.
 
-El caso Grid Demand evalúa una situación más compleja desde el punto de vista de validación de datos. El sistema recibe varios ficheros crudos asociados a una misma serie temporal y el agente \texttt{data\_validator} debe identificar claves temporales compatibles, proponer joins y construir un dataset canónico antes de continuar. En esta prueba, los joins presentan una cobertura elevada y no generan explosión de filas, por lo que el agente acepta el plan de integración y lo presenta al usuario en la puerta de aprobación del dataset.
+El caso Grid Demand evalúa una situación más compleja desde el punto de vista de validación de datos. El sistema recibe varios ficheros crudos asociados a una misma serie temporal y el agente \texttt{data\_validator} debe identificar claves temporales compatibles, proponer joins y construir un conjunto de datos canónico antes de continuar. En esta prueba, los joins presentan una cobertura elevada y no generan explosión de filas, por lo que el agente acepta el plan de integración y lo presenta al usuario en la puerta de aprobación del dataset. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 El caso Store Sales introduce una situación más realista: los joins no son perfectos. A diferencia de los casos anteriores, no todos los valores de la clave de una tabla aparecen necesariamente en la otra, por lo que la unión puede generar valores faltantes en algunas variables auxiliares. La prueba permite comprobar que el sistema no exige una cobertura del 100\% para aceptar un join, pero tampoco acepta cualquier coincidencia parcial. El agente busca una relación estructural compatible entre una posible clave primaria del dataset base y una posible clave foránea de la tabla auxiliar, evalúa la cardinalidad de la relación, la cobertura obtenida, el riesgo de duplicación de filas y la coherencia semántica de las columnas implicadas.
 
 Tras ejecutar el plan de integración, el sistema conserva el dataset base mediante una unión de tipo left join, identifica los valores ausentes introducidos por la cobertura parcial y aplica las herramientas de imputación correspondientes cuando procede. Tal comportamiento resulta relevante porque aproxima el pipeline a escenarios reales, donde las fuentes de datos auxiliares rara vez encajan de forma perfecta.
 
-Los casos small, medium y large se utilizan para analizar la escalabilidad del coste del pipeline. En los datasets small y medium, el número de filas aumenta de forma significativa, pero el coste agéntico se mantiene en el mismo orden de magnitud, ya que los agentes no reciben el dataset completo, sino un perfil compacto generado por herramientas deterministas. Esta observación refuerza una decisión clave de la arquitectura: el coste de las llamadas LLM depende del contexto textual que se proporciona al agente, no del número bruto de observaciones del dataset.
+Los casos small, medium y large se utilizan para analizar la escalabilidad del coste del pipeline. En los datasets small y medium, el número de filas aumenta de forma significativa, pero el coste agéntico se mantiene en el mismo orden de magnitud, ya que los agentes no reciben el conjunto de datos completo, sino un perfil compacto generado por herramientas deterministas. Esta observación refuerza una decisión clave de la arquitectura: el coste de las llamadas LLM depende del contexto textual que se proporciona al agente, no del número bruto de observaciones del dataset. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 En cambio, el caso large, con 10.000 observaciones de frecuencia horaria, muestra que el crecimiento del coste se concentra en la fase determinista de entrenamiento. En una primera versión del sistema, la búsqueda de estacionalidad sobre la serie horaria exploraba periodos candidatos de forma exhaustiva, lo que disparaba el tiempo de entrenamiento y validación hasta agotar el límite end-to-end de 600 segundos establecido para esta demostración. Tras incorporar una búsqueda de estacionalidad acotada por la frecuencia del dataset ---que restringe los periodos candidatos a los compatibles con la granularidad temporal declarada en el contrato---, la ejecución completa el flujo dentro del presupuesto temporal, con un coste de entrenamiento determinista en torno a 84 segundos para este caso. El límite de 600 segundos se mantiene como salvaguarda práctica frente a ejecuciones excesivamente largas, pero ya no se alcanza en este escenario.
 
@@ -1239,8 +1245,6 @@ datos: el modelo razona sobre resúmenes, perfiles y métricas de calidad genera
 
 \begin{table}[H]
 \centering
-\caption{Resultados del agente de validación en escenarios con varios ficheros.}
-\label{tab:join-discovery}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.05}
@@ -1250,9 +1254,11 @@ datos: el modelo razona sobre resúmenes, perfiles y métricas de calidad genera
 Grid Demand & Serie + 3 tablas auxiliares & Fecha semanal (nombres distintos) & 3 \textit{joins} left aceptados (cobertura 100\,\%) & 156 & 156 \\\hline
 Store Sales & Serie semanal + 2 tablas de contexto & Fecha semanal (\texttt{week} / \texttt{week\_ref} / \texttt{week\_key}) & 2 \textit{joins} left aceptados (cobertura 72,4\,\%, huérfanas imputadas) & 156 & 156 \\\hline
 \end{tabularx}
+\caption{Resultados del agente de validación en escenarios con varios ficheros.}
+\label{tab:join-discovery}
 \end{table}
 
-Las dos filas de la Tabla~\ref{tab:join-discovery} representan situaciones distintas y, por tanto, permiten evaluar comportamientos complementarios del agente. Grid~Demand constituye el caso más sencillo: la relación entre tablas se basa en claves temporales compatibles y la cobertura de la unión es completa. En este escenario, el agente debe identificar que las tablas auxiliares están alineadas con la serie principal, comprobar que el join no genera duplicados ni pérdida de filas y construir un dataset final coherente con el contrato de entrada.
+Las dos filas de la tabla~\ref{tab:join-discovery} representan situaciones distintas y, por tanto, permiten evaluar comportamientos complementarios del agente. Grid~Demand constituye el caso más sencillo: la relación entre tablas se basa en claves temporales compatibles y la cobertura de la unión es completa. En este escenario, el agente debe identificar que las tablas auxiliares están alineadas con la serie principal, comprobar que el join no genera duplicados ni pérdida de filas y construir un dataset final coherente con el contrato de entrada.
 
 El agente de validación, sin intervención humana, infirió los tres joins de tipo \textsc{left} uno-a-uno, los evaluó (cobertura del 100\,\%, multiplicador de filas $1{,}00\times$, riesgo bajo) y los ejecutó, materializando un dataset de 156~filas $\times$ 8~columnas con cinco variables exógenas añadidas. El plan de join se presenta al revisor humano en la puerta de aprobación con su nivel de confianza (``alta'') y
 la justificación de cada candidato.
@@ -1291,12 +1297,10 @@ caso grande agotaba el timeout end-to-end de 600 segundos debido a una búsqueda
 estacionalidad exhaustiva sobre la serie horaria; tras acotar dicha búsqueda a los periodos
 compatibles con la frecuencia del dataset, el caso grande completa el flujo concentrando su
 coste, como era de esperar, en la fase determinista de entrenamiento y validación temporal de
-varios modelos candidatos.
+varios modelos candidatos. En la tabla~\ref{tab:validacion-tamano} se recoge el comportamiento del pipeline sobre datasets de distinto tamaño. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[H]
 \centering
-\caption{Comportamiento del pipeline en datasets de distinto tamaño.}
-\label{tab:validacion-tamano}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.05}
@@ -1307,12 +1311,15 @@ Small & 120 & Completado & LLM / entrenamiento corto & Perfil compacto y ejecuci
 Medium & 1.000 & Completado & Planner / executor & Mayor coste por razonamiento y entrenamiento \\\hline
 Large & 10.000 & Completado & Executor determinista & $\sim$116\,s de entrenamiento tras acotar la búsqueda de estacionalidad por frecuencia \\\hline
 \end{tabularx}
+\caption{Comportamiento del pipeline en datasets de distinto tamaño.}
+\label{tab:validacion-tamano}
 \end{table}
 
+% HECHO: anglicismo corregido en este párrafo ("dataset" -> "conjunto de datos")
 El resultado más relevante de esta prueba no es el tiempo concreto del caso grande, sino la
 separación entre coste agéntico y coste computacional determinista. El incremento del número
 de filas no implica que los agentes reciban más datos crudos ni que el consumo de tokens
-crezca proporcionalmente al tamaño del dataset. La arquitectura evita pasar el dataset
+crezca proporcionalmente al tamaño del dataset. La arquitectura evita pasar el conjunto de datos
 completo al LLM; en su lugar, las herramientas deterministas generan una representación
 compacta del problema: número de filas y columnas, nombres de variables, tipos de datos,
 estadísticas resumidas, presencia de valores ausentes, estructura temporal, disponibilidad de
@@ -1358,15 +1365,10 @@ ejecuciones equivalentes, especialmente cuando intervienen razonamiento, llamada
 herramientas y validaciones estructuradas posteriores. Por ello, en este trabajo no se asume
 que el coste de los nodos LLM sea estrictamente reproducible ejecución a ejecución. Lo que sí
 se busca es acotar su impacto mediante una arquitectura que limite el contexto enviado al
-modelo y mantenga las decisiones críticas bajo validación determinista.
+modelo y mantenga las decisiones críticas bajo validación determinista. En la tabla~\ref{tab:variabilidad-coste-agente} se muestra un ejemplo de esta variabilidad del coste agéntico en repeticiones del caso Bakery. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[H]
 \centering
-\caption{Ejemplo de variabilidad del coste agéntico en repeticiones del caso Bakery.
- Un reintento reejecuta el planificador (dos intentos en total): duplica aproximadamente
- sus tokens de salida y multiplica su tiempo por un factor de 2 a 3, según la
- varianza entre ambos intentos.}
-\label{tab:variabilidad-coste-agente}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.05}
@@ -1378,6 +1380,11 @@ modelo y mantenga las decisiones críticas bajo validación determinista.
 3 & 21,4 & 51,7  & 7,5k  & No \\\hline
 4 & 16,5 & 167,9 & 20,9k & Sí \\\hline
 \end{tabular}
+\caption{Ejemplo de variabilidad del coste agéntico en repeticiones del caso Bakery.
+ Un reintento reejecuta el planificador (dos intentos en total): duplica aproximadamente
+ sus tokens de salida y multiplica su tiempo por un factor de 2 a 3, según la
+ varianza entre ambos intentos.}
+\label{tab:variabilidad-coste-agente}
 \end{table}
 
 El punto clave observado en los experimentos es que esta variabilidad no implica que el coste
@@ -1402,14 +1409,10 @@ sobre datos permanecen bajo control programático.
 La robustez del sistema se evalúa mediante escenarios de fallo diseñados para comprobar que el pipeline no avanza cuando las condiciones de entrada no permiten una ejecución válida. Estos casos validan una de las decisiones centrales de la arquitectura: los agentes pueden interpretar la entrada, pero tanto la detección de una condición inválida como la decisión de parar son siempre deterministas. El agente de validación (un LLM) orquesta qué comprobaciones
 ejecutar y redacta un informe, pero su prosa nunca es vinculante: el veredicto pase/parada lo emiten herramientas y nodos deterministas a partir de su salida estructurada. Los tres escenarios ilustran además una defensa en profundidad, ya que cada fallo es atrapado por un componente determinista distinto y en una etapa distinta del flujo.
 
-Se inyectaron tres fallos: una columna objetivo declarada pero ausente en el dataset, una columna objetivo completamente formada por valores nulos y una serie temporal demasiado corta para el horizonte de predicción solicitado. La Tabla~\ref{tab:robustez} resume dónde y cómo se detecta cada uno.
+Se inyectaron tres fallos: una columna objetivo declarada pero ausente en el dataset, una columna objetivo completamente formada por valores nulos y una serie temporal demasiado corta para el horizonte de predicción solicitado. La tabla~\ref{tab:robustez} resume dónde y cómo se detecta cada uno.
 
 \begin{table}[H]
 \centering
-\caption{Escenarios de error forzado y comportamiento observado. Los tres alcanzan
- un estado terminal controlado mediante un componente determinista; ninguno entrena
- sobre datos inválidos ni promociona un modelo.}
-\label{tab:robustez}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
@@ -1426,6 +1429,10 @@ Columna objetivo 100\,\% nula
   & Función \nolinkurl{resolve_validation_strategy} (chequeo de capacidad) en el nodo \nolinkurl{planner}
   & La validación de datos pasa (esquema y calidad correctos) y el dataset supera incluso la puerta de aprobación humana. El agente señala la insuficiencia en su informe, pero ese texto no es vinculante. El bloqueo lo produce el chequeo de capacidad determinista del planificador (\textit{``need $\geq$ 60 observations for horizon 12, have 15''}), que detiene el pipeline antes del entrenamiento. \\\hline
 \end{tabularx}
+\caption{Escenarios de error forzado y comportamiento observado. Los tres alcanzan
+ un estado terminal controlado mediante un componente determinista; ninguno entrena
+ sobre datos inválidos ni promociona un modelo.}
+\label{tab:robustez}
 \end{table}
 
 Los tres escenarios alcanzan un estado terminal controlado y son detectados en etapas distintas, lo que evidencia la defensa en profundidad del diseño. El caso de la serie demasiado corta es el más revelador: ni el informe del agente ni la aprobación humana llegan a frenar la ejecución, y aun así el pipeline se detiene, porque la garantía de seguridad no descansa sobre el juicio del LLM ni sobre el operador humano, sino sobre el chequeo determinista que conoce la relación entre
@@ -1448,7 +1455,7 @@ de integración de datos, correspondiendo el primero a un join de cobertura tota
 (cuatro ficheros) y el segundo a un join de cobertura parcial (tres ficheros, con
 semanas huérfanas imputadas).
 
-La Tabla~\ref{tab:coste-desglose} desglosa, para estos cinco casos de pronóstico, el tiempo de
+La tabla~\ref{tab:coste-desglose} desglosa, para estos cinco casos de pronóstico, el tiempo de
 cómputo por nodo (excluyendo las pausas de revisión humana en las puertas HITL) y el coste
 monetario estimado. El tiempo se mide a partir de las marcas temporales del EventLog; el coste,
 a partir del recuento de tokens y la tabla de precios local (\texttt{gpt-5.4-mini}:
@@ -1456,26 +1463,22 @@ a partir del recuento de tokens y la tabla de precios local (\texttt{gpt-5.4-min
 Cada columna promedia entre 5 y 10 ejecuciones (fila \textit{N}) y excluye las repeticiones con
 reintento del planificador —caracterizadas más abajo—, de modo que el tiempo del \texttt{planner}
 corresponde a una única llamada al modelo. Para los dos nodos de mayor varianza, \texttt{planner}
-y \texttt{executor}, se indica además la desviación típica entre ejecuciones.
+y \texttt{executor}, se indica además la desviación típica entre ejecuciones. En la tabla, los nodos
+\texttt{executor}, \texttt{evaluation} y \texttt{deployer} son deterministas, mientras que el resto
+son agénticos (LLM). Los tiempos son intrínsecamente variables por dos causas distintas: la latencia
+de la API en los nodos LLM —sobre todo el \texttt{planner}— y, en el \texttt{executor}, el conjunto
+de candidatos que el \texttt{planner} propone en cada ejecución. Conviene precisar el origen de esta
+última variabilidad: la recuperación de experiencias es determinista —la métrica de similitud
+descrita en la Sección~\ref{sec:experience-pool-arquitectura} devuelve siempre el mismo orden ante la
+misma entrada, con desempate por recencia—, de modo que la variación entre ejecuciones equivalentes
+proviene del LLM del planificador y se concentra en la cola de candidatos cuando la evidencia
+recuperada es débil o ambigua; la selección del campeón entre los candidatos ya entrenados permanece,
+en cambio, determinista. Como un plan con modelos pesados (p.\,ej.\ \textit{xgboost} o árboles)
+multiplica el tiempo de entrenamiento, esa variación en la cola repercute directamente en el tiempo
+del \texttt{executor}. % HECHO: añadido el matiz sobre el origen de la variabilidad (recuperación determinista; no-determinación del LLM en la cola de candidatos)
 
 \begin{table}[H]
 \centering
-\caption{Desglose de tiempo de cómputo (segundos) y coste por ejecución. Los nodos
- \texttt{executor}, \texttt{evaluation} y \texttt{deployer} son deterministas; el resto
- son agénticos (LLM). El tiempo excluye las pausas humanas en las puertas HITL.
- Cada columna promedia entre 5 y 10 ejecuciones (fila \textit{N}); los tiempos por nodo se
- reconstruyen a partir de las marcas de tiempo de los eventos del \textit{run}. Se excluyen
- las ejecuciones con reintento del planificador —caracterizadas aparte en la
- Sección~\ref{sec:coste-variabilidad}—, de modo que el tiempo del \texttt{planner}
- corresponde a una única llamada al LLM. Se indica
- media\,$\pm$\,desviación típica en las dos filas de mayor varianza. Los tiempos son
- intrínsecamente variables por dos causas distintas: la latencia de la API en los nodos LLM
- (sobre todo el \texttt{planner}) y, en el \texttt{executor}, el conjunto de candidatos que
- el \texttt{planner} selecciona en cada ejecución —un plan con modelos pesados (p.\,ej.\
- \textit{xgboost} o árboles) multiplica el tiempo de entrenamiento—. Store~Sales es un
- join de cobertura parcial (3 ficheros); Grid es un join de cobertura
- total (4 ficheros).}
-\label{tab:coste-desglose}
 \small
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{llrrrrr}
@@ -1498,10 +1501,13 @@ y \texttt{executor}, se indica además la desviación típica entre ejecuciones.
 \multicolumn{2}{l}{\textit{N (ejecuciones)}} & 9 & 9 & 9 & 10 & 5 \\
 \bottomrule
 \end{tabular}
+% HECHO: caption acortado a solo el título (la explicación se trasladó al párrafo introductorio)
+\caption{Desglose de tiempo de cómputo y coste por ejecución.}
+\label{tab:coste-desglose}
 \end{table}
 
 
-A partir de la Tabla~\ref{tab:coste-desglose} se extraen varias observaciones. En primer lugar,
+A partir de la tabla~\ref{tab:coste-desglose} se extraen varias observaciones. En primer lugar,
 el coste monetario por ejecución completa se mantiene en valores reducidos, entre 0,09 y 0,17
 dólares. Este coste se concentra en los nodos \texttt{data\_validator} y \texttt{planner}, que
 realizan las llamadas más extensas al modelo. El descubrimiento de joins reubica además
@@ -1559,7 +1565,7 @@ presupuesto de intentos configurado (dos como máximo). Este comportamiento apar
 ocasional: en las ejecuciones sin reintento el planificador se situó en torno a 70 segundos y
 0,06 dólares, mientras que en las que reintentaron —dos intentos en total— alcanzó alrededor de
 160 segundos y 0,11 dólares, aproximadamente el doble. Por eso las repeticiones con reintento se
-caracterizan por separado y se excluyen del promedio de la Tabla~\ref{tab:coste-desglose}. Aunque
+caracterizan por separado y se excluyen del promedio de la tabla~\ref{tab:coste-desglose}. Aunque
 el sistema proporcione el mismo dataset, el mismo contrato de entrada y las mismas herramientas,
 una llamada LLM no garantiza una salida idéntica en tiempo, longitud ni estructura; en la mayoría
 de ejecuciones la respuesta cumple el esquema esperado, pero en otras puede aparecer una salida
@@ -1577,7 +1583,7 @@ el estado del pipeline.
 
 Por último, los tiempos de los nodos LLM deben interpretarse teniendo en cuenta que dependen de
 factores externos al propio código del sistema, como la latencia del proveedor, la carga del
-servicio y el número de tokens procesados. Por ello, las cifras de la Tabla~\ref{tab:coste-desglose}
+servicio y el número de tokens procesados. Por ello, las cifras de la tabla~\ref{tab:coste-desglose}
 no deben leerse como tiempos absolutos e invariantes, sino como una estimación experimental bajo la
 configuración utilizada; el coste en tokens, más estable, varía menos de un 20\% entre ejecuciones
 del mismo dataset. Lo relevante para este trabajo no es tanto el valor exacto de cada latencia, sino
@@ -1593,7 +1599,7 @@ modelos concentran el coste computacional determinista.
 
 Dado que el funcionamiento de las puertas de supervisión humana ya se describió en la arquitectura del sistema ~\ref{sec:arquitectura}, en esta sección se analiza únicamente su utilidad observada durante las ejecuciones experimentales. En lugar de medir el tiempo exacto de revisión, que depende de factores subjetivos como el nivel de detalle con el que el usuario inspeccione los resultados, se evalúa su papel como mecanismo de control antes de continuar hacia fases costosas o críticas del pipeline.
 
-En las ejecuciones analizadas, las puertas HITL resultan especialmente útiles cuando el sistema ha tomado decisiones que afectan a la calidad del dataset o al estado final del modelo. En casos sencillos, la revisión humana se limita a comprobar que el informe generado es coherente y que no existen advertencias relevantes. En cambio, en escenarios con varios ficheros, joins parciales o imputaciones, la supervisión adquiere mayor importancia: el usuario puede revisar si las claves propuestas, la cobertura de la unión y el dataset resultante tienen sentido desde el punto de vista del problema, antes de permitir que el entrenamiento continúe.
+En las ejecuciones analizadas, las puertas HITL resultan especialmente útiles cuando el sistema ha tomado decisiones que afectan a la calidad del dataset o al estado final del modelo. En casos sencillos, la revisión humana se limita a comprobar que el informe generado es coherente y que no existen advertencias relevantes. En cambio, en escenarios con varios ficheros, joins parciales o imputaciones, la supervisión adquiere mayor importancia: el usuario puede revisar si las claves propuestas, la cobertura de la unión y el conjunto de datos resultante tienen sentido desde el punto de vista del problema, antes de permitir que el entrenamiento continúe. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
 Dicho comportamiento tiene impacto directo sobre el coste operativo. Si un dataset canónico se ha construido de forma incorrecta, continuar hasta el entrenamiento supondría consumir recursos en modelos que no aportarían valor y que, probablemente, obligarían a repetir la ejecución completa. La puerta de aprobación permite detener el flujo en ese punto, corregir el contrato de entrada, rechazar un plan de integración dudoso o volver a ejecutar la validación con información adicional. En este sentido, la pausa humana no representa solo una interrupción del flujo, sino una salvaguarda frente a experimentos mal planteados.
 
@@ -1605,40 +1611,37 @@ En conjunto, las puertas de supervisión humana refuerzan la filosofía híbrida
 
 \newpage
 
+% HECHO: sección de conclusiones compactada (de 13 a 9 párrafos, eliminando repeticiones; sin pérdida de contenido)
 \section{Conclusiones y líneas futuras}
 \label{sec:conclusiones}
 
 Este trabajo ha abordado el diseño, implementación y validación de un prototipo de sistema MLOps asistido por agentes de inteligencia artificial para la automatización parcial de flujos predictivos. El objetivo principal no consistía en sustituir el trabajo experto ni construir una plataforma AutoML generalista, sino en estudiar cómo los modelos de lenguaje pueden apoyar fases concretas del ciclo de vida de un modelo predictivo manteniendo control, trazabilidad y reproducibilidad.
 
-La principal conclusión del trabajo es que la combinación de agentes LLM y componentes deterministas resulta adecuada cuando cada parte se utiliza en el lugar correcto. Los agentes aportan valor en tareas con incertidumbre semántica, como interpretar el contrato de entrada, razonar sobre el perfil de un dataset, proponer joins entre tablas, recuperar experiencias previas, generar planes de entrenamiento o redactar informes de auditoría. En cambio, las operaciones críticas del pipeline, como la validación formal, el entrenamiento, la evaluación, la selección del modelo campeón y el registro de artefactos, deben permanecer bajo lógica determinista.
+La principal conclusión es que la combinación de agentes LLM y componentes deterministas resulta adecuada cuando cada parte se utiliza en el lugar correcto, materializando el principio de diseño adoptado durante el trabajo: una arquitectura con columna vertebral determinista y bordes agénticos. Los agentes aportan valor en tareas con incertidumbre semántica ---interpretar el contrato de entrada, razonar sobre el perfil de un dataset, proponer joins entre tablas, recuperar experiencias previas, generar planes de entrenamiento o redactar informes de auditoría---, mientras que las operaciones críticas ---validación formal, entrenamiento, evaluación, selección del modelo campeón y registro de artefactos--- permanecen bajo lógica determinista. El sistema permite que los agentes propongan, razonen y expliquen, pero sus decisiones no modifican el estado del pipeline sin superar contratos estructurados, validaciones programáticas y, en los puntos críticos, revisión humana.
 
-Esta separación ha permitido materializar el principio de diseño adoptado durante el trabajo: una arquitectura con columna vertebral determinista y bordes agénticos. El sistema permite que los agentes propongan, razonen y expliquen, pero sus decisiones no modifican el estado del pipeline sin superar contratos estructurados, validaciones programáticas y, en los puntos críticos, revisión humana. De este modo, se evita delegar en el LLM responsabilidades que requieren garantías fuertes de consistencia.
+Los resultados experimentales muestran que el Experience Pool puede actuar como una memoria empírica útil para el planificador. Las experiencias almacenadas no funcionan como reglas rígidas, sino como evidencias recuperables que contextualizan nuevas decisiones: el sistema recupera experiencias equivalentes cuando existen, recurre a experiencias similares cuando no hay coincidencia exacta y combina esta información con reglas estáticas y con el perfil del conjunto de datos para generar planes de entrenamiento trazables. % HECHO: anglicismo corregido ("dataset" -> "conjunto de datos")
 
-Los resultados experimentales muestran que el Experience Pool puede actuar como una memoria empírica útil para el planificador. Las experiencias almacenadas no funcionan como reglas rígidas, sino como evidencia
-s recuperables que contextualizan nuevas decisiones de modelado. En los casos analizados, el sistema recupera correctamente experiencias equivalentes, utiliza experiencias similares cuando no existe una coincidencia exacta y combina esta información con reglas estáticas y con el perfil del dataset para generar planes de entrenamiento trazables.
+El agente de validación demuestra su utilidad en escenarios con varios ficheros: el descubrimiento asistido de joins combina razonamiento semántico y métricas deterministas de calidad ---cobertura, cardinalidad, duplicación de filas o valores faltantes introducidos por la unión---, algo especialmente relevante en contextos reales donde las fuentes de datos no encajan de forma perfecta. En forecasting, además, la distinción entre variables exógenas conocidas y desconocidas a futuro aproxima mejor el comportamiento a un escenario de despliegue real y reduce el riesgo de filtración de información futura durante la validación. Aunque el prototipo se acota a una única serie objetivo y no aborda forecasting multiserie o panel, la arquitectura establece una base razonable para tratar problemas temporales con variables auxiliares.
 
-También se ha comprobado la utilidad del agente de validación en escenarios con varios ficheros. El descubrimiento asistido de joins permite combinar razonamiento semántico y métricas deterministas de calidad, como cobertura, cardinalidad, duplicación de filas o valores faltantes introducidos por la unión. Esta capacidad resulta especialmente relevante en contextos reales, donde las fuentes de datos no siempre encajan de forma perfecta y una validación basada únicamente en nombres de columnas o reglas fijas sería insuficiente.
+El análisis de robustez confirma que el sistema falla de forma controlada ante entradas inválidas: los casos de columna objetivo ausente, objetivo completamente nulo e histórico insuficiente para el horizonte solicitado se detienen antes de entrenar modelos sobre datos incorrectos, apoyando la seguridad del flujo en validaciones deterministas y no en la salida generada por el agente.
 
-En el caso de forecasting, el sistema incorpora además una distinción importante entre variables exógenas conocidas a futuro y variables desconocidas a futuro. Esta decisión permite aproximar mejor el comportamiento del pipeline a un escenario real de despliegue y reduce el riesgo de filtración de información futura durante la validación. Aunque el prototipo se mantiene acotado a una única serie objetivo y no aborda forecasting multiserie o panel, la arquitectura propuesta establece una base razonable para tratar problemas temporales con variables auxiliares.
+Desde el punto de vista operativo, el coste asociado a los agentes se mantiene reducido en los casos evaluados, aunque introduce latencia y variabilidad entre ejecuciones: una misma tarea no garantiza siempre el mismo tiempo de respuesta, consumo de tokens o número de herramientas invocadas, y en ocasiones produce salidas que no cumplen el esquema esperado y obligan a repetir la llamada. El diseño híbrido no elimina esa variabilidad, pero evita que se propague sin control al estado del pipeline. Las puertas de supervisión humana complementan este diseño: permiten revisar datasets canónicos, planes de integración, métricas, informes de auditoría y propuestas de promoción antes de modificar el estado del modelo campeón, concentrando la intervención humana donde aporta mayor valor.
 
-El análisis de robustez confirma que el sistema falla de forma controlada ante entradas inválidas. Los casos de columna objetivo ausente, objetivo completamente nulo e histórico insuficiente para el horizonte solicitado se detienen antes de entrenar modelos sobre datos incorrectos. Tal comportamiento refuerza una de las ideas centrales del trabajo: la seguridad del flujo no debe depender de la prosa generada por el agente, sino de validaciones deterministas capaces de bloquear ejecuciones incompatibles con los contratos internos.
+Como limitación principal, el sistema se ha validado como prototipo experimental y no como plataforma industrial completa. El Experience Pool contiene una base inicial de experiencias, suficiente para demostrar el mecanismo de recuperación y trazabilidad, pero todavía limitada frente a la diversidad de problemas de un entorno productivo real. Asimismo, el presupuesto de optimización de hiperparámetros, los límites temporales de ejecución y la infraestructura utilizada condicionan los resultados obtenidos.
 
-Desde el punto de vista operativo, el coste asociado a los agentes se mantiene reducido en los casos evaluados, aunque introduce latencia y variabilidad entre ejecuciones. Esta variabilidad constituye una de las principales desventajas prácticas de incorporar modelos de lenguaje al pipeline: una misma tarea no garantiza siempre el mismo tiempo de respuesta, el mismo consumo de tokens, el mismo número de herramientas invocadas ni una salida estructurada idéntica. En ocasiones, esta variabilidad puede incluso producir respuestas que no cumplen completamente el esquema esperado, obligando al sistema a descartar el intento y repetir la llamada al modelo. La arquitectura propuesta aborda esta limitación mediante un diseño híbrido; de este modo, el sistema no elimina la variabilidad propia de los LLMs, pero sí evita que dicha variabilidad se propague sin control al estado del pipeline.
+En términos cuantitativos, los experimentos realizados permiten resumir el comportamiento del prototipo con cifras concretas. Las ejecuciones completas de forecasting end-to-end, sobre los casos analizados, se completaron en tiempos de cómputo entre 107 y 240 segundos, con un coste monetario por ejecución comprendido entre 0,09 y 0,18 USD. La cuota agéntica del tiempo total osciló entre el 60\% y el 84\%, con la fracción restante atribuible al executor determinista, cuyo peso crece de forma natural con el tamaño del dataset y la complejidad de los modelos candidatos. El Experience Pool inicial recogió 27 experiencias trazables ---15 de predicción temporal, 7 de clasificación y 5 de regresión---, suficientes para validar el mecanismo de recuperación por similitud ponderada. En los tres escenarios de fallo inyectado, el pipeline alcanzó un estado terminal controlado antes de entrenar modelo alguno. Por último, la variabilidad observada entre repeticiones de un mismo caso ---con diferencias de hasta el doble en tiempo de planificador y consumo de tokens--- refuerza que la incorporación de LLMs introduce una incertidumbre intrínseca que la arquitectura no elimina, pero sí acota mediante contratos estructurados, validaciones programáticas y reintentos limitados.
 
-Las puertas de supervisión humana complementan este diseño híbrido, cuyo valor reside en evitar que decisiones dudosas se propaguen hacia fases costosas o críticas. En particular, permiten revisar datasets canónicos, planes de integración, métricas, informes de auditoría y propuestas de promoción antes de modificar el estado del modelo campeón. La intervención humana no desaparece, sino que se concentra en puntos donde aporta mayor valor.
-
-En cuanto a la limitación principal, el sistema se ha validado como prototipo experimental y no como plataforma industrial completa. El Experience Pool contiene una base inicial de experiencias, suficiente para demostrar el mecanismo de recuperación y trazabilidad, pero todavía limitada frente a la diversidad de problemas que aparecerían en un entorno productivo real. Asimismo, el presupuesto de optimización de hiperparámetros, los límites temporales de ejecución y la infraestructura utilizada condicionan los resultados obtenidos.
-
-En términos cuantitativos, los experimentos realizados permiten resumir el comportamiento del prototipo con cifras concretas. Las ejecuciones completas de forecasting end-to-end, sobre los casos analizados, se completaron en tiempos de cómputo entre 107 y 240 segundos, con un coste monetario por ejecución comprendido entre 0,09 y 0,18 USD. La cuota agéntica del tiempo total osciló entre el 60\% y el 84\%, con la fracción restante atribuible al executor determinista, cuyo peso crece de forma natural con el tamaño del dataset y la complejidad de los modelos candidatos. El Experience Pool inicial recogió 23 experiencias trazables —11 de predicción temporal, 7 de clasificación y 5 de regresión—, suficientes para validar el mecanismo de recuperación por similitud ponderada. En los tres escenarios de fallo inyectado, el pipeline alcanzó un estado terminal controlado antes de entrenar modelo alguno, confirmando que la decisión de detener la ejecución descansa siempre sobre componentes deterministas y no sobre la prosa generada por el agente. Por último, la variabilidad observada entre repeticiones de un mismo caso —con diferencias de hasta el doble en tiempo de planificador y consumo de tokens— refuerza que la incorporación de LLMs introduce una incertidumbre intrínseca que la arquitectura no elimina, pero sí acota mediante contratos estructurados, validaciones programáticas y reintentos limitados.
-
-Entre las líneas futuras, la más inmediata consiste en ampliar y curar el Experience Pool con más datasets, dominios y ejecuciones, incorporando mecanismos más avanzados de recuperación cuando el volumen de experiencias crezca. En esa dirección, una evolución natural del mecanismo de recuperación pasa por enriquecer la métrica de similitud con campos categóricos adicionales que distingan, por ejemplo, la tipología de las variables exógenas (macroeconómica, sensorial, meteorológica, de calendario) o la estructura multicíclica de la estacionalidad en series de alta frecuencia; estos refinamientos resultarían especialmente útiles a medida que el catálogo de experiencias crezca y la heterogeneidad de los problemas observados aumente. También resultaría conveniente optimizar el executor mediante paralelización, límites de tiempo por modelo, reducción adaptativa del espacio de búsqueda y estrategias de early stopping. Otra extensión natural sería reforzar la capa de monitorización posterior al despliegue, incorporando detección de deriva, alertas de degradación y políticas automáticas de reentrenamiento.
-
-Finalmente, el trabajo deja abierta la evolución hacia una integración más completa en entornos empresariales, con gestión de usuarios, permisos, despliegue continuo, observabilidad productiva y gobierno de modelos. Aun así, el prototipo desarrollado demuestra que los agentes LLM pueden aportar valor real en un flujo MLOps si se integran de forma acotada, trazable y supervisada. La aportación principal no reside en automatizar todo el proceso sin intervención humana, sino en mostrar una forma viable de combinar razonamiento agéntico, memoria empírica, ejecución determinista y control experto dentro de un mismo pipeline predictivo.
+Entre las líneas futuras, la más inmediata consiste en ampliar y curar el Experience Pool con más datasets, dominios y ejecuciones, enriqueciendo la métrica de similitud con campos categóricos adicionales ---la tipología de las variables exógenas o la estructura multicíclica de la estacionalidad en series de alta frecuencia--- e incorporando mecanismos de recuperación más avanzados cuando el volumen crezca. También sería conveniente optimizar el executor mediante paralelización, límites de tiempo por modelo, reducción adaptativa del espacio de búsqueda y early stopping, así como reforzar la monitorización posterior al despliegue con detección de deriva, alertas de degradación y reentrenamiento automático; más allá, la evolución natural apunta a una integración empresarial completa con gestión de usuarios, permisos, despliegue continuo y gobierno de modelos. Aun así, el prototipo desarrollado demuestra que los agentes LLM pueden aportar valor real en un flujo MLOps si se integran de forma acotada, trazable y supervisada: la aportación principal no reside en automatizar todo el proceso, sino en mostrar una forma viable de combinar razonamiento agéntico, memoria empírica, ejecución determinista y control experto en un mismo pipeline predictivo.
 
 
 
 \newpage
-\section*{ Bibliografía}
+\renewcommand{\refname}{Bibliografía}
+\phantomsection
+\addcontentsline{toc}{section}{Bibliografía}
+\section*{Bibliografía}
+\bibliographystyle{unsrt}
+\bibliography{Biblio}
 
 
 
@@ -1670,14 +1673,12 @@ La única dependencia obligatoria para la vía Docker es
 
 La configuración se lee de un fichero \texttt{.env} en la raíz del proyecto. Para crearlo, copie la plantilla incluida \texttt{.env.example} a un nuevo fichero \texttt{.env} y adáptelo rellenando al menos la variable \texttt{OPENAI\_API\_KEY}.
 
-La Tabla~\ref{tab:repro-env} resume las variables relevantes. La única imprescindible
+La tabla~\ref{tab:repro-env} resume las variables relevantes. La única imprescindible
 es la clave de la API del proveedor de modelos; el resto tienen valores por defecto
 sensatos.
 
 \begin{table}[H]
 \centering
-\caption{Variables de entorno principales (\texttt{.env}).}
-\label{tab:repro-env}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
@@ -1686,10 +1687,13 @@ sensatos.
 \textbf{Variable} & \textbf{Obligatoria} & \textbf{Descripción / valor por defecto} \\\hline
 \texttt{OPENAI\_API\_KEY} & Sí & Clave de la API de OpenAI (o \textit{token} personal de GitHub). \\\hline
 \texttt{OPENAI\_BASE\_URL} & No & \textit{Endpoint} alternativo; p.~ej.\ GitHub~Models (Sección~\ref{anexo:repro-github}). \\\hline
+\texttt{OPENAI\_MODEL\_OVERRIDE} & No & Fuerza un mismo modelo en todos los agentes, ignorando el declarado en sus \textit{prompts}. Vacío por defecto. \\\hline
 \texttt{MLFLOW\_TRACKING\_URI} & No & \texttt{http://mlflow:5000} (Docker) / \texttt{sqlite:///./mlflow.db} (local). \\\hline
 \texttt{MLFLOW\_EXPERIMENT\_NAME} & No & \texttt{mlops-agents}. \\\hline
 \texttt{LOG\_LEVEL} & No & \texttt{INFO}. \\\hline
 \end{tabularx}
+\caption{Variables de entorno principales (\texttt{.env}).}
+\label{tab:repro-env}
 \end{table}
 
 \noindent
@@ -1716,12 +1720,14 @@ sistema; basta con:
   \item Sustituir el modelo de cada agente —definido en los ficheros de \textit{prompt}
         \nolinkurl{src/mlops_agents/prompts/} (\nolinkurl{data_agent}, \nolinkurl{planner},
         \nolinkurl{report_writer})— por uno disponible en el catálogo de GitHub~Models
-        (p.~ej.\ \nolinkurl{gpt-4.1-mini}).
+        (p.~ej.\ \nolinkurl{gpt-4.1-mini}) o forzar el modelo directamente en todos los agentes mediante la
+        variable \texttt{OPENAI\_MODEL\_OVERRIDE}.
 \end{enumerate}
 
 \noindent
-La contrapartida es un límite de 150~peticiones diarias por modelo en la capa gratuita y una fiabilidad algo menor en los agentes que exigen un seguimiento preciso de instrucciones —el validador de datos y el planificador—. Por ello, para obtener resultados consistentes y reproducir las cifras de la sección~\ref{sec:resultados-analisis} se
-recomienda la API de OpenAI; GitHub~Models se ofrece como vía de exploración sin coste.
+La contrapartida es doble. Por un lado, la capa gratuita impone límites de uso —cuotas por
+minuto y por día que varían según el modelo—. Por otro, y de mayor relevancia, GitHub~Models acepta la petición de salida estructurada pero no garantiza el cumplimiento estricto del esquema (\textit{structured output}) del que depende el planificador: en la práctica, la etapa de validación de datos se completa con normalidad, pero el planificador puede devolver una salida que no se ajusta al contrato \texttt{PlannerOutput} y, en tal caso, agotar sus reintentos y abortar la ejecución. Por ello, para ejecutar el pipeline de extremo a extremo y reproducir las cifras de la
+Sección~\ref{sec:resultados-analisis} se recomienda la API de OpenAI; GitHub~Models se ofrece como vía de exploración sin coste.
 
 
 \subsection{Despliegue con Docker}
@@ -1737,13 +1743,11 @@ docker compose up --build     # construye las imagenes y arranca los 3 servicios
 \end{lstlisting}
 
 El comando levanta tres contenedores sobre una red privada compartida
-(\texttt{mlops-net}), descritos en la Tabla~\ref{tab:repro-servicios}. Una vez en marcha,
+(\texttt{mlops-net}), descritos en la tabla~\ref{tab:repro-servicios}. Una vez en marcha,
 la aplicación es accesible en \url{http://localhost:3000}.
 
 \begin{table}[H]
 \centering
-\caption{Servicios desplegados por \texttt{docker compose}.}
-\label{tab:repro-servicios}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
@@ -1754,6 +1758,8 @@ la aplicación es accesible en \url{http://localhost:3000}.
 \texttt{mlops-api} & 8000 & \textit{Backend} FastAPI + agentes LangGraph. Invoca al LLM, ejecuta el \textit{pipeline} y expone la API REST/SSE. \\\hline
 \texttt{mlops-frontend} & 3000 & Interfaz Next.js. Consume el \textit{backend} en \texttt{http://localhost:8000}. \\\hline
 \end{tabularx}
+\caption{Servicios desplegados por \texttt{docker compose}.}
+\label{tab:repro-servicios}
 \end{table}
 
 \noindent
@@ -1798,19 +1804,17 @@ Una vez desplegado, la verificación funcional consiste en abrir
 
 Los conjuntos de datos empleados en la evaluación (sección~\ref{sec:resultados-analisis}) se dividen en dos categorías. Los conjuntos reales proceden de fuentes públicas y se citan mediante su referencia académica canónica cuando existe, o bien mediante su repositorio de distribución (UCI Machine Learning Repository, OpenML, statsmodels o Yahoo Finance). Los conjuntos sintéticos se generaron específicamente para este trabajo con el fin de aislar comportamientos concretos del
 sistema (escalado por tamaño, descubrimiento de joins, fallos controlados); no admiten cita externa y su reproducibilidad queda garantizada por los scripts
-generadores con semilla fija incluidos en el repositorio.
+generadores con semilla fija incluidos en el repositorio. En la tabla~\ref{tab:datasets-reales} se recogen los conjuntos de datos reales empleados junto con su fuente y referencia. % HECHO: referencia a tabla añadida en el texto
 
 \begin{table}[H]
 \centering
-\caption{Conjuntos de datos reales: fuente y referencia. Las series financieras comparten una única referencia de distribución (Yahoo Finance).}
-\label{tab:datasets-reales}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\linewidth}{>{\RaggedRight\arraybackslash}p{4.2cm} >{\RaggedRight\arraybackslash}p{4.2cm} >{\RaggedRight\arraybackslash}X}
+\begin{tabularx}{\linewidth}{>{\RaggedRight\arraybackslash}p{6cm} >{\RaggedRight\arraybackslash}p{6cm} >{\RaggedRight\arraybackslash}X}
 \hline
 \textbf{Dataset (memoria)} & \textbf{Fuente} & \textbf{Cita} \\\hline
-\multicolumn{3}{l}{\textit{Pronóstico (Tabla~\ref{tab:pool-forecasting})}} \\[2pt]
+\multicolumn{3}{l}{\textit{Pronóstico (tabla~\ref{tab:pool-forecasting})}} \\[2pt]
 Air Passengers        & \texttt{statsmodels} (Box \& Jenkins)      & \cite{ds_airpassengers} \\
 CO$_2$ Mauna Loa      & \texttt{statsmodels} (Scripps/NOAA)        & \cite{ds_co2} \\
 Manchas solares       & \texttt{statsmodels} (WDC-SILSO)           & \cite{ds_sunspots} \\
@@ -1822,7 +1826,7 @@ Petróleo WTI          & Yahoo Finance                              & \cite{ds_y
 Oro + Macro           & Yahoo Finance                              & \cite{ds_yahoo} \\
 Bitcoin (BTC)         & Yahoo Finance                              & \cite{ds_yahoo} \\
 EUR/USD               & Yahoo Finance                              & \cite{ds_yahoo} \\\hline
-\multicolumn{3}{l}{\textit{Clasificación (Tabla~\ref{tab:pool-classification})}} \\[2pt]
+\multicolumn{3}{l}{\textit{Clasificación (tabla~\ref{tab:pool-classification})}} \\[2pt]
 Iris                  & \texttt{scikit-learn} (Fisher, 1936)       & \cite{ds_iris} \\
 Vino                  & UCI / \texttt{scikit-learn}                & \cite{ds_wine} \\
 Cáncer de mama        & UCI / \texttt{scikit-learn}                & \cite{ds_breastcancer} \\
@@ -1830,13 +1834,15 @@ Enfermedad cardíaca   & OpenML 53 (Cleveland)                      & \cite{ds_h
 Titanic               & OpenML 40945                               & \cite{ds_titanic} \\
 Renta adultos         & OpenML 1590 (Kohavi)                       & \cite{ds_adult} \\
 Marketing bancario    & OpenML 1461 (Moro et al.)                  & \cite{ds_bank} \\\hline
-\multicolumn{3}{l}{\textit{Regresión (Tabla~\ref{tab:pool-regression})}} \\[2pt]
+\multicolumn{3}{l}{\textit{Regresión (tabla~\ref{tab:pool-regression})}} \\[2pt]
 Diabetes              & \texttt{scikit-learn} (Efron et al.)       & \cite{ds_diabetes} \\
 Eficiencia energética & UCI (Tsanas \& Xifara)                     & \cite{ds_energyeff} \\
 Resistencia hormigón  & UCI (Yeh, 1998)                            & \cite{ds_concrete} \\
 Alquiler bicicletas   & OpenML 42712 (Fanaee-T \& Gama)            & \cite{ds_bikesharing} \\
 Vivienda California   & \texttt{scikit-learn} (Pace \& Barry)      & \cite{ds_calhousing} \\\hline
 \end{tabularx}
+\caption{Conjuntos de datos reales: fuente y referencia. Las series financieras comparten una única referencia de distribución (Yahoo Finance).}
+\label{tab:datasets-reales}
 \end{table}
 
 Los casos de estudio basados en errores del pipeline y los datasets utilizados para validar el descubrimiento de joins se generaron mediante scripts propios y, por tanto, no requieren cita externa. Dentro de este grupo se incluyen Revenue mensual (\nolinkurl{small_monthly_revenue}), Bakery diario (\nolinkurl{medium_daily_bakery}) y Factory por horas (\nolinkurl{large_hourly_factory}), que corresponden a series univariantes sintéticas de tamaño controlado.
@@ -1849,8 +1855,4 @@ Por último, se incluyen los samples de join y cobertura parcial, como \nolinkur
 
 
 \newpage
-\renewcommand{\refname}{Bibliografía}
-\bibliographystyle{unsrt}
-\bibliography{Biblio}
-
 \end{document}
