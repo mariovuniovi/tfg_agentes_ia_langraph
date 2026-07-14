@@ -100,13 +100,9 @@ RejectedModel = RejectedModelSpec
 
 
 class PlannerTrainingPlan(BaseModel):
-    """The planner agent's *decision surface* — only the fields the LLM controls.
+    """Planner-controlled model-selection fields.
 
-    Deliberately omits ``forecasting_settings``: the validation + exogenous-extension
-    policy is resolved deterministically by code (``planner_node``) and the LLM must
-    not emit it. ``planner_node`` builds the executable :class:`TrainingPlan` from this
-    decision plus the resolved settings. This keeps the planner's contract honest —
-    it cannot return a field that would always be overwritten and ignored.
+    Executor-owned forecasting settings are intentionally excluded.
     """
 
     problem_type: Literal["classification", "regression", "forecasting"]
@@ -151,12 +147,7 @@ class PlannerTrainingPlan(BaseModel):
 
 
 class TrainingPlan(PlannerTrainingPlan):
-    """The executable experiment contract handed to the deterministic executor.
-
-    Extends the planner's decision (:class:`PlannerTrainingPlan`) with
-    ``forecasting_settings`` — the code-resolved validation + exogenous policy.
-    Only forecasting plans populate it; classification/regression leave it ``None``.
-    """
+    """Executable plan with code-resolved forecasting settings."""
 
     forecasting_settings: ForecastingSettings | None = None
 

@@ -1,10 +1,4 @@
-"""Tabular candidate runners — classification and regression.
-
-Both modalities share the same data shape (feature matrix X + target column y),
-the same size-aware validation-strategy selection (single split vs k-fold CV),
-the same Optuna search scaffold with a default-params fallback, and the same
-full-pool champion retrain.
-"""
+"""Training and retraining routines for tabular candidates."""
 from __future__ import annotations
 
 import pickle
@@ -52,7 +46,7 @@ def _select_cls_validation(y: pd.Series) -> tuple[Any, ...]:
     Falls back to single_split when the dataset is too small for reliable CV:
     - fewer than settings.min_rows_for_cv total training rows, or
     - fewer than settings.min_class_count_for_cv samples in the smallest class.
-    A single deterministic split is much more honest than 2-fold CV on 8 rows.
+    Small datasets use a deterministic holdout instead of unstable low-fold CV.
     """
     n_rows = len(y)
     min_class_count = int(y.value_counts().min())

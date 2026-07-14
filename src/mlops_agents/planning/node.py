@@ -75,8 +75,7 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
     validation_ctx = build_planner_validation_context(profile, task_meta, problem_type)
     system_prompt = get_prompt("planner").template
 
-    # Deterministic forecasting policy: resolve validation + exog BEFORE the agent so the
-    # LLM plans models under fixed settings it cannot override.
+    # Resolve executor-owned forecasting settings before model selection.
     forecasting_fs: ForecastingSettings | None = None
     policy_summary: str | None = None
     if problem_type == "forecasting":
@@ -88,8 +87,7 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
             )
         except ValueError as exc:
             raise PlannerError(f"Forecasting capacity check failed: {exc}") from exc
-        # Defense-in-depth on the resolver output. A failure here is a code bug, not
-        # bad LLM output, so hard-fail rather than retry (a retry can't fix it).
+        # Resolver failures are deterministic; retrying the planner cannot fix them.
         try:
             validate_forecasting_settings(forecasting_fs, task_meta)
         except PlannerValidationError as exc:
@@ -138,12 +136,9 @@ def planner_node(state: AgentState) -> Command[Literal["workflow_controller"]]:
 
             _check_plan_integrity(output, trace, validation_ctx)
 
-            # Build the executable experiment contract: the LLM's model-selection
-            # decision (output.plan) plus the code-resolved forecasting policy the LLM
-            # is not allowed to choose. forecasting_fs is None for non-forecasting.
-            # Any stray forecasting_settings on the decision is dropped — the
-            # code-resolved policy is always authoritative.
+            # Combine planner-controlled model selection with executor-owned settings.
             decision = output.plan.model_dump()
+            # Ignore legacy or extra planner fields at this contract boundary.
             decision.pop("forecasting_settings", None)
             executor_plan = TrainingPlan(**decision, forecasting_settings=forecasting_fs)
             _check_plan_exhaustiveness(executor_plan, validation_ctx.available_model_keys)

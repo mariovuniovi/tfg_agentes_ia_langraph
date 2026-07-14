@@ -1,10 +1,4 @@
-"""Forecasting candidate runner — everything time-series-specific.
-
-Owns the forecasting candidate loop (Optuna search over temporal folds),
-frequency-aware seasonality narrowing, leakage-safe exogenous handling
-(known-future actuals vs unknown-future extension), champion retraining,
-champion evaluation on the held-out test horizon, and the forecast chart PNG.
-"""
+"""Training and evaluation routines for forecasting candidates."""
 from __future__ import annotations
 
 import pickle
@@ -47,12 +41,10 @@ logger = get_logger(__name__)
 def narrow_seasonality_to_freq(
     spec: SearchSpaceSpec, freq: str | None, model_key: str, n_obs: int
 ) -> SearchSpaceSpec:
-    """Replace a categorical season_length grid with the model's frequency-aware,
-    length-pruned candidate periods (see seasonality.season_length_grid).
+    """Apply the bounded seasonal grid to a categorical season-length parameter.
 
-    Known frequencies are authoritative even after a planner/user search-space
-    override. Unknown frequencies, non-categorical spaces, and models without a
-    season_length parameter keep their original search space.
+    Unknown frequencies and unsupported search spaces remain unchanged. For a
+    known frequency, the bounded grid replaces any search-space override.
     """
     param = spec.params.get("season_length")
     grid = season_length_grid(model_key, freq, n_obs)
@@ -67,11 +59,9 @@ def narrow_seasonality_to_freq(
 
 
 def min_fold_train_len(vs: ValidationStrategy, train_pool_len: int) -> int:
-    """Smallest training set any validation fold will use.
+    """Return the smallest training partition used by validation.
 
-    Season pruning must use this, not the full pool: a capped rolling window (or the
-    first expanding fold) can be far shorter than the pool, so a period the pool
-    could nominally estimate may be unestimable in the folds that actually run.
+    Seasonal periods are pruned against this size so every fold can estimate them.
     """
     if vs.type == "rolling_window" and vs.window_size:
         return vs.window_size
@@ -223,7 +213,7 @@ def run_candidate_forecasting(
 
     validate_forecasting_plan(throwaway, task_metadata, profile, train_pool_stats)
 
-    # Defensive guard — should never be reached if top-level guard in run_training_plan works
+    # Enforce the panel-forecasting restriction at the candidate boundary.
     if sid_cols:
         raise NotImplementedError(
             "Multi-target panel forecasting (series_id_columns non-empty) is out of "
@@ -232,7 +222,7 @@ def run_candidate_forecasting(
             f"{sid_cols}"
         )
 
-    # ─── Single-target leakage-safe path ────────────────────────────
+    # Prepare exogenous inputs for single-target forecasting.
     availability = resolve_exog_availability(list(pool.columns), task_metadata)
     exog_columns = list(availability.keys())
     strategies = forecasting_settings.exog_strategies
@@ -248,9 +238,8 @@ def run_candidate_forecasting(
             cand_val = pool.loc[val_idx].reset_index(drop=True)
 
             if is_stat:
-                # statsforecast path: ignores exog (existing behavior). series_length is
-                # the fold's actual training size, so the AutoARIMA approximation gate
-                # reflects this fit (small bounded windows -> exact; long fits -> CSS).
+                # StatsForecast models do not consume exogenous columns. The current
+                # fold length controls AutoARIMA's approximation threshold.
                 fit_metadata = {**task_metadata, "series_length": len(cand_train)}
                 sf = factory({"task_metadata": fit_metadata, "params": params})
                 sf.fit(_to_sf_format(cand_train, target, dt_col, sid_cols))
@@ -270,7 +259,7 @@ def run_candidate_forecasting(
                 fold_scores.append(score)
                 continue
 
-            # ── Skforecast path with leakage-safe exog ────────────
+            # Build leakage-safe validation exogenous values for skforecast.
             forecaster = factory({"task_metadata": task_metadata, "params": params})
             series_dict = build_series_dict(cand_train, dt_col, target, sid_cols, freq)
 
