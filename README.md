@@ -68,7 +68,7 @@ queda registrada en el log.
 |---|---|---|
 | **UI web** | `frontend/` (Next.js) → `api/` (FastAPI, REST + WebSocket) → grafo | demo interactiva con HITL por navegador |
 | **CLI** | `scripts/run_pipeline.py` → `graphs/cli.py` → grafo | ejecución por consola con HITL interactivo |
-| **Medición** | `scripts/measure_agentic_cost.py` → grafo (headless, auto-aprueba) | experimentos de coste/tiempo del capítulo 6 de la memoria |
+| **Medición** | `scripts/measure_agentic_cost.py` → grafo (headless, auto-aprueba) | experimentos de coste/tiempo del capítulo 5 de la memoria |
 
 ---
 
@@ -146,7 +146,7 @@ frontend/                     UI Next.js — cliente tipado del WebSocket (~15 t
 
 scripts/                      run_pipeline.py · run_benchmark.py (benchmark offline del
                               experience pool) · seed_mlflow.py · measure_agentic_cost.py
-                              + agentic_cost_aggregate.py (medición coste/tiempo, cap. 6)
+                              + agentic_cost_aggregate.py (medición coste/tiempo, cap. 5)
                               · generadores de datasets sintéticos
 
 tests/                        espeja src/ 1:1 (test_data_validation/, test_planning/,

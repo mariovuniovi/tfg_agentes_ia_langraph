@@ -1,0 +1,95 @@
+{
+  "problem_type": "forecasting",
+  "name": "store_weekly_sales_partial_join",
+  "description": "Multi-series weekly demand forecasting (one series per store) built from a fact panel plus two store dimension tables that must be joined before training. The target is units_sold and each store is a separate series (series_id = store_id). Three source files must be uploaded together: store_weekly_sales.csv (panel, 20 stores x 60 weeks), store_directory.csv (join: store_weekly_sales.store_id = store_directory.store_code), and store_demographics.csv (join: store_weekly_sales.store_id = store_demographics.store_ref). The join keys have DIFFERENT column names across files and must be matched semantically. This scenario stress-tests partial-coverage joins on a NON-date key: store_directory is MISSING several stores referenced by the panel (orphan foreign keys, so a left join leaves some store attributes null), whereas store_demographics contains MORE stores than the panel uses (foreign key is a subset of the primary key). Store attributes are STATIC per store (temporal=false): orphans are filled cross-sectionally (median / 'unknown'), never with a fabricated temporal trend. Used to validate how join discovery reports coverage, containment and cardinality on a forecasting panel, and how the controller tolerates incomplete referential integrity.",
+  "target_column": "units_sold",
+  "datetime_column": "week",
+  "forecast_horizon": 8,
+  "frequency": "W-MON",
+  "series_id_columns": ["store_id"],
+  "exogenous_columns": [
+    {"name": "population_k", "future_availability": "known_future", "temporal": false},
+    {"name": "median_age", "future_availability": "known_future", "temporal": false},
+    {"name": "urban_flag", "future_availability": "known_future", "temporal": false}
+  ],
+  "columns": [
+    {
+      "name": "week",
+      "dtype": "datetime",
+      "description": "Monday of the ISO week (YYYY-MM-DD). Source: store_weekly_sales.csv.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "store_id",
+      "dtype": "str",
+      "description": "Store identifier and series id (e.g. ST01). Join key to store_directory.store_code and store_demographics.store_ref. Source: store_weekly_sales.csv.",
+      "required": true,
+      "nullable": false
+    },
+    {
+      "name": "units_sold",
+      "dtype": "int",
+      "description": "Weekly units sold for the store. TARGET COLUMN (the time series). Source: store_weekly_sales.csv.",
+      "required": true,
+      "nullable": false,
+      "min": 0,
+      "temporal": true
+    },
+    {
+      "name": "region",
+      "dtype": "str",
+      "description": "Store region. STATIC store attribute. Source: store_directory.csv (joined on store_id = store_code). Orphan stores absent from the directory are filled cross-sectionally with the explicit 'unknown' category (not fabricated).",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["north", "south", "east", "west", "unknown"],
+      "temporal": false
+    },
+    {
+      "name": "store_size_sqm",
+      "dtype": "int",
+      "description": "Store sales-floor area in square metres. STATIC store attribute. Source: store_directory.csv (joined on store_id = store_code). Orphan stores are filled with the cross-sectional median (a documented placeholder, not the true value).",
+      "required": true,
+      "nullable": false,
+      "min": 0,
+      "temporal": false
+    },
+    {
+      "name": "store_type",
+      "dtype": "str",
+      "description": "Store format. STATIC store attribute. Source: store_directory.csv (joined on store_id = store_code). Orphan stores are filled with the explicit 'unknown' category.",
+      "required": true,
+      "nullable": false,
+      "allowed_values": ["flagship", "standard", "express", "unknown"],
+      "temporal": false
+    },
+    {
+      "name": "population_k",
+      "dtype": "int",
+      "description": "Catchment population in thousands. STATIC exogenous attribute (known future). Source: store_demographics.csv (joined on store_id = store_ref). Full coverage.",
+      "required": true,
+      "nullable": false,
+      "min": 0,
+      "temporal": false
+    },
+    {
+      "name": "median_age",
+      "dtype": "float",
+      "description": "Catchment median age. STATIC exogenous attribute (known future). Source: store_demographics.csv (joined on store_id = store_ref).",
+      "required": true,
+      "nullable": false,
+      "min": 0.0,
+      "temporal": false
+    },
+    {
+      "name": "urban_flag",
+      "dtype": "int",
+      "description": "1 if the store is in an urban area, else 0. STATIC exogenous attribute (known future). Source: store_demographics.csv (joined on store_id = store_ref).",
+      "required": true,
+      "nullable": false, 
+      "min": 0,
+      "max": 1,
+      "temporal": false
+    }
+  ]
+}
