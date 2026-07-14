@@ -250,7 +250,7 @@ automáticamente la Responses API de OpenAI, que GitHub Models no soporta.
 ### Sembrar el experience pool (opcional)
 
 El planner recupera experiencias de entrenamientos pasados. Para poblarlas con el
-benchmark offline (21 datasets públicos: sklearn / OpenML / yfinance / CSV locales):
+benchmark offline (27 datasets públicos: sklearn / OpenML / statsmodels / UCI / yfinance / FRED / CSV locales):
 
 ```bash
 uv run python scripts/run_benchmark.py

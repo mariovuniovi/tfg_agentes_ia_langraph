@@ -1,5 +1,5 @@
-# Benchmark manifest — 19 datasets across classification, regression, and forecasting.
-# source: sklearn | openml | local | yfinance
+# Benchmark manifest — 27 datasets across classification, regression, and forecasting.
+# source: sklearn | openml | statsmodels | uci_url | yfinance | fred | local
 # Forecasting datasets cover single-target rules in ml_rules.yaml (V1: single-target only).
 
 # ---------------------------------------------------------------------------
